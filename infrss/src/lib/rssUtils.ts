@@ -1,7 +1,14 @@
 // lib/rssUtils.ts
+
+// 🔁 Use a public CORS proxy for cross-origin RSS/HTML fetches
+export const fetchWithCors = async (url: string): Promise<Response> => {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    return fetch(proxyUrl);
+};
+
 export async function getFeedUrlFromHtml(siteUrl: string): Promise<string | null> {
     try {
-      const res = await fetch(siteUrl);
+      const res = await fetchWithCors(siteUrl);
       const html = await res.text();
   
       const parser = new DOMParser();
@@ -24,7 +31,7 @@ export async function getFeedUrlFromHtml(siteUrl: string): Promise<string | null
 
 export async function fetchAndParseRSS(feedUrl: string): Promise<{ title: string; items: { title: string; link: string; pubDate: string }[] } | null> {
   try {
-    const res = await fetch(feedUrl);
+    const res = await fetchWithCors(feedUrl);
     const text = await res.text();
     const parser = new DOMParser();
     const doc = parser.parseFromString(text, "application/xml");

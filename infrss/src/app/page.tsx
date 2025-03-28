@@ -45,7 +45,7 @@ export default function HomePage() {
 
   return (
     <main className="p-6 space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold">FeedStream</h1>
+      <h1 className="text-3xl font-bold">InfRSS</h1>
       <div className="space-y-2">
         <Input
           placeholder="Enter site URL or RSS feed"
