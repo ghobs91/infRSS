@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const title = xml.match(/<title>(.*?)<\/title>/)?.[1] || url;
         feeds.push({ title, url });
       } catch (err) {
-        console.warn("Failed to fetch feed:", url);
+        console.warn(`Failed to fetch feed at ${url} due to error: ${err}`);
       }
     }
 
