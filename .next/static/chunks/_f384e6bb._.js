@@ -52,14 +52,19 @@ __turbopack_context__.s({
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 ;
-const Button = ({ className, children, ...props })=>{
+const Button = ({ className = "", variant = "default", children, ...props })=>{
+    const base = "font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors";
+    const variants = {
+        default: "bg-blue-600 hover:bg-blue-700 text-white",
+        destructive: "bg-red-600 hover:bg-red-700 text-white"
+    };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-        className: `bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors ${className}`,
+        className: `${base} ${variants[variant]} ${className}`,
         ...props,
         children: children
     }, void 0, false, {
         fileName: "[project]/src/components/ui/button.tsx",
-        lineNumber: 7,
+        lineNumber: 13,
         columnNumber: 5
     }, this);
 };
