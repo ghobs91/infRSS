@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST='{"lib/feedSuggestions.ts -> @xenova/transformers":{"id":7228,"files":["static/chunks/590caa2a.98f07975333de4e6.js","static/chunks/6139e184.267b2470ff10d133.js","static/chunks/b2db8554.03428308738a78ab.js","static/chunks/911.84aa9f3de5ac662d.js","static/chunks/279.00cad130f91bf0e0.js"]}}';

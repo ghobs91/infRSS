@@ -1,5 +1,10 @@
 // lib/rssUtils.ts
 
+interface FeedData {
+  title: string;
+  url: string;
+}
+
 // 🔁 Use a public CORS proxy for cross-origin RSS/HTML fetches
 export const fetchWithCors = async (url: string): Promise<Response> => {
     const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
