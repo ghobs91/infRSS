@@ -11,7 +11,7 @@ import {
   loadFeedsFromStorage,
   saveFeedToStorage,
 } from "@/lib/rssUtils";
-import { suggestFeedsByTopic } from "@/lib/feedSuggestions";
+import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
 interface FeedData {
   title: string;
@@ -50,62 +50,63 @@ export default function HomePage() {
   };
 
   const handleTopicSuggest = async () => {
-    const results = await suggestFeedsByTopic(topic);
+    const results = await suggestFeedsWithWorker(topic, []); // API now auto-fetches feeds by topic
     setSuggestedFeeds(results);
   };
 
   return (
-    <main className="p-6 space-y-6 max-w-3xl mx-auto bg-gray-900 text-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold text-white">FeedReader</h1>
-      <div className="space-y-2">
-        <Input
-          placeholder="Enter site URL or RSS feed"
-          value={feedUrlInput}
-          onChange={(e) => setFeedUrlInput(e.target.value)}
-          className="bg-gray-800 text-white placeholder-gray-400"
-        />
-        <Button onClick={handleAddFeed} className="bg-blue-600 hover:bg-blue-700">
-          Add Feed
-        </Button>
-      </div>
+    <main className="space-y-8">
+      <section className="space-y-4">
+        <h1 className="text-2xl font-semibold text-gray-800">Add Feed</h1>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Input
+            placeholder="Enter site URL or RSS feed"
+            value={feedUrlInput}
+            onChange={(e) => setFeedUrlInput(e.target.value)}
+            className="flex-1 border-gray-300"
+          />
+          <Button onClick={handleAddFeed}>Add Feed</Button>
+        </div>
+      </section>
 
-      <div className="space-y-2">
-        <Input
-          placeholder="Enter a topic you're interested in"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          className="bg-gray-800 text-white placeholder-gray-400"
-        />
-        <Button onClick={handleTopicSuggest} className="bg-blue-600 hover:bg-blue-700">
-          Suggest Feeds
-        </Button>
-        <div>
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold text-gray-800">Suggest Feeds</h2>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Input
+            placeholder="Enter a topic you're interested in"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="flex-1 border-gray-300"
+          />
+          <Button onClick={handleTopicSuggest}>Suggest</Button>
+        </div>
+        <div className="grid gap-3">
           {suggestedFeeds.map((feed) => (
-            <Card key={feed.url} className="mt-2 bg-gray-800 text-white">
-              <CardContent>
-                <p className="font-semibold">{feed.title}</p>
-                <p className="text-sm text-gray-400">{feed.url}</p>
+            <Card key={feed.url} className="bg-white border border-gray-200 shadow-sm">
+              <CardContent className="p-4">
+                <p className="font-medium text-gray-800">{feed.title}</p>
+                <p className="text-sm text-gray-500">{feed.url}</p>
               </CardContent>
             </Card>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h2 className="text-2xl font-semibold text-white">Articles</h2>
+      <section className="space-y-4">
+        <h2 className="text-2xl font-semibold text-gray-800">Articles</h2>
         <div className="grid gap-4">
           {articles.map((article, idx) => (
-            <Card key={idx} className="bg-gray-800 text-white">
-              <CardContent>
-                <a href={article.link} className="text-lg font-medium underline text-blue-400">
+            <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
+              <CardContent className="p-4">
+                <a href={article.link} className="text-lg font-medium text-blue-600 hover:underline">
                   {article.title}
                 </a>
-                <p className="text-sm text-gray-400">{article.pubDate}</p>
+                <p className="text-sm text-gray-500">{article.pubDate}</p>
               </CardContent>
             </Card>
           ))}
         </div>
-      </div>
+      </section>
     </main>
   );
 }

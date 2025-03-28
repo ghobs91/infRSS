@@ -20,9 +20,12 @@ interface FeedData {
   }
   
   export async function suggestFeedsByTopic(topic: string): Promise<FeedData[]> {
-    // ⛔ dynamic import ensures it's only run in the browser
+    // ⛔ Ensure this only runs in browser
+    if (typeof window === "undefined") return [];
+  
     const { pipeline, env } = await import("@xenova/transformers");
   
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (env.backends as any).onnx = "wasm";
     env.allowLocalModels = false;
     env.useBrowserCache = true;
@@ -40,3 +43,4 @@ interface FeedData {
   
     return scored.sort((a, b) => b.score - a.score).slice(0, 5);
   }
+  
