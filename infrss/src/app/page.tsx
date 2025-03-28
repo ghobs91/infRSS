@@ -1,38 +1,45 @@
-// app/page.tsx (Next.js App Router with TypeScript)
+// app/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getFeedUrlFromHtml, fetchAndParseRSS } from "@/lib/rssUtils";
-import { suggestFeedsByTopic } from "../lib/feedSuggestions";
-
-interface FeedItem {
-  title: string;
-  link: string;
-  pubDate: string;
-}
-
-interface FeedData {
-  title: string;
-  url: string;
-  items: FeedItem[];
-}
+import {
+  getFeedUrlFromHtml,
+  fetchAndParseRSS,
+  loadFeedsFromStorage,
+  saveFeedToStorage,
+  type FeedData,
+} from "@/lib/rssUtils";
+import { suggestFeedsByTopic } from "@/lib/feedSuggestions";
 
 export default function HomePage() {
-  const [feedUrlInput, setFeedUrlInput] = useState<string>("");
-  const [feeds, setFeeds] = useState<FeedData[]>([]);
-  const [articles, setArticles] = useState<FeedItem[]>([]);
-  const [topic, setTopic] = useState<string>("");
+  const [feedUrlInput, setFeedUrlInput] = useState("");
+  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
+  const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
+
+  useEffect(() => {
+    const loadSavedFeeds = async () => {
+      const feeds = loadFeedsFromStorage();
+      const allArticles = await Promise.all(
+        feeds.map(async (feed) => {
+          const data = await fetchAndParseRSS(feed.url);
+          return data?.items || [];
+        })
+      );
+      setArticles(allArticles.flat());
+    };
+    loadSavedFeeds();
+  }, []);
 
   const handleAddFeed = async () => {
     const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
     if (resolvedFeedUrl) {
       const feedData = await fetchAndParseRSS(resolvedFeedUrl);
       if (feedData) {
-        setFeeds((prev) => [...prev, { url: resolvedFeedUrl, ...feedData }]);
+        saveFeedToStorage({ title: feedData.title, url: resolvedFeedUrl });
         setArticles((prev) => [...prev, ...feedData.items]);
       }
     }
@@ -45,7 +52,7 @@ export default function HomePage() {
 
   return (
     <main className="p-6 space-y-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold">InfRSS</h1>
+      <h1 className="text-3xl font-bold">FeedReader</h1>
       <div className="space-y-2">
         <Input
           placeholder="Enter site URL or RSS feed"

@@ -52,3 +52,26 @@ export async function fetchAndParseRSS(feedUrl: string): Promise<{ title: string
     return null;
   }
 }
+
+// Persistence
+export function saveFeedToStorage(feed: FeedData) {
+    const stored = localStorage.getItem("feeds");
+    const current: FeedData[] = stored ? JSON.parse(stored) : [];
+    if (!current.find((f) => f.url === feed.url)) {
+      const updated = [...current, feed];
+      localStorage.setItem("feeds", JSON.stringify(updated));
+    }
+  }
+  
+export function loadFeedsFromStorage(): FeedData[] {
+    const stored = localStorage.getItem("feeds");
+    return stored ? JSON.parse(stored) : [];
+}  
+
+export function removeFeedFromStorage(url: string) {
+    const stored = localStorage.getItem("feeds");
+    const current: FeedData[] = stored ? JSON.parse(stored) : [];
+    const updated = current.filter((feed) => feed.url !== url);
+    localStorage.setItem("feeds", JSON.stringify(updated));
+}
+  
