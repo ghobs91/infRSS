@@ -14,6 +14,11 @@ import {
 } from "@/lib/rssUtils";
 import { suggestFeedsByTopic } from "@/lib/feedSuggestions";
 
+interface FeedData {
+  title: string;
+  url: string;
+}
+
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
