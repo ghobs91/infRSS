@@ -10,9 +10,13 @@ import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
   saveFeedToStorage,
-  type FeedData,
 } from "@/lib/rssUtils";
 import { suggestFeedsByTopic } from "@/lib/feedSuggestions";
+
+interface FeedData {
+  title: string;
+  url: string;
+}
 
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
