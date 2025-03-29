@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 await build({
-  entryPoints: [path.resolve(__dirname, '../app/workers/transformer-worker.ts')],
+  entryPoints: [path.resolve(__dirname, '../workers/transformer-worker.ts')],
   outfile: path.resolve(__dirname, '../public/workers/transformer-worker.js'),
   bundle: true,
   format: 'esm',
