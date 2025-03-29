@@ -21,6 +21,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   useEffect(() => {
     const loadSavedFeeds = async () => {
@@ -52,8 +53,10 @@ export default function HomePage() {
   };
 
   const handleTopicSuggest = async () => {
+    setSuggestLoading(true);
     const results = await suggestFeedsWithWorker(topic, []);
     setSuggestedFeeds(results);
+    setSuggestLoading(false);
   };
 
   return (
@@ -82,7 +85,13 @@ export default function HomePage() {
           />
           <Button onClick={handleTopicSuggest}>Suggest</Button>
         </div>
-        <div className="grid gap-3">
+        {suggestLoading && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
+              Suggesting feeds…
+            </div>
+          )}
+          <div className="grid gap-3">
           {suggestedFeeds.map((feed) => (
             <Card key={feed.url} className="bg-white border border-gray-200 shadow-sm">
               <CardContent className="p-4">
