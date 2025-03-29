@@ -75,21 +75,17 @@ __turbopack_context__.s({
     "removeFeedFromStorage": (()=>removeFeedFromStorage),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
-const fetchWithCors = async (url)=>{
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    return fetch(proxyUrl);
-};
 async function getFeedUrlFromHtml(siteUrl) {
     try {
         const res = await fetchWithCors(siteUrl);
         const html = await res.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
-        const linkEl = doc.querySelector('link[type="application/rss+xml"], link[type="application/atom+xml"]');
+        const linkEl = doc.querySelector('link[type="application/rss+xml"], link[rel="alternate"][type="application/rss+xml"]');
         if (linkEl && linkEl.getAttribute("href")) {
             const href = linkEl.getAttribute("href");
-            const resolved = new URL(href, siteUrl);
-            return resolved.toString();
+            const url = new URL(href, siteUrl);
+            return url.toString();
         }
         return null;
     } catch (err) {
@@ -109,10 +105,15 @@ async function fetchAndParseRSS(feedUrl) {
             const title = item.querySelector("title")?.textContent || "(No title)";
             const link = item.querySelector("link")?.textContent || "";
             const pubDate = item.querySelector("pubDate")?.textContent || "";
+            const media = item.querySelector("media\\:content, enclosure");
+            const thumbnail = media?.getAttribute("url") || undefined;
+            const sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
             items.push({
                 title,
                 link,
-                pubDate
+                pubDate,
+                thumbnail,
+                sourceDomain
             });
         });
         return {
@@ -124,6 +125,10 @@ async function fetchAndParseRSS(feedUrl) {
         return null;
     }
 }
+const fetchWithCors = async (url)=>{
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    return fetch(proxyUrl);
+};
 function saveFeedToStorage(feed) {
     const stored = localStorage.getItem("feeds");
     const current = stored ? JSON.parse(stored) : [];
@@ -183,7 +188,7 @@ function ManageSubscriptionsPage() {
                 children: "Manage Subscriptions"
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 28,
+                lineNumber: 23,
                 columnNumber: 7
             }, this),
             feeds.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -191,35 +196,63 @@ function ManageSubscriptionsPage() {
                 children: "You have no saved feeds."
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 30,
+                lineNumber: 25,
                 columnNumber: 9
-            }, this) : feeds.map((feed)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
+            }, this) : feeds.map((feed)=>{
+                const domain = new URL(feed.url).hostname.replace("www.", "");
+                return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                     className: "bg-white border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
                             className: "flex-1 p-4",
                             children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "flex items-center gap-2 mb-2",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
+                                            src: `https://www.google.com/s2/favicons?sz=16&domain_url=${feed.url}`,
+                                            className: "w-4 h-4",
+                                            alt: "favicon"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/app/manage/page.tsx",
+                                            lineNumber: 36,
+                                            columnNumber: 19
+                                        }, this),
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: "text-sm text-gray-500",
+                                            children: domain
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/app/manage/page.tsx",
+                                            lineNumber: 41,
+                                            columnNumber: 19
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/app/manage/page.tsx",
+                                    lineNumber: 35,
+                                    columnNumber: 17
+                                }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                     className: "font-medium text-gray-800 break-words",
                                     children: feed.title
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 38,
-                                    columnNumber: 15
+                                    lineNumber: 43,
+                                    columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                     className: "text-sm text-gray-500 break-all",
                                     children: feed.url
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 39,
-                                    columnNumber: 15
+                                    lineNumber: 44,
+                                    columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 37,
-                            columnNumber: 13
+                            lineNumber: 34,
+                            columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "px-4 pb-4 sm:pb-0",
@@ -229,24 +262,25 @@ function ManageSubscriptionsPage() {
                                 children: "Remove"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 42,
-                                columnNumber: 15
+                                lineNumber: 47,
+                                columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 41,
-                            columnNumber: 13
+                            lineNumber: 46,
+                            columnNumber: 15
                         }, this)
                     ]
                 }, feed.url, true, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 33,
-                    columnNumber: 11
-                }, this))
+                    lineNumber: 30,
+                    columnNumber: 13
+                }, this);
+            })
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/manage/page.tsx",
-        lineNumber: 27,
+        lineNumber: 22,
         columnNumber: 5
     }, this);
 }

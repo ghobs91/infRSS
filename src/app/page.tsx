@@ -10,22 +10,21 @@ import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
   saveFeedToStorage,
+  type FeedData,
+  type Article,
 } from "@/lib/rssUtils";
 import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
-interface FeedData {
-  title: string;
-  url: string;
-}
-
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
-  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
 
   useEffect(() => {
     const loadSavedFeeds = async () => {
+      setLoading(true);
       const feeds = loadFeedsFromStorage();
       const allArticles = await Promise.all(
         feeds.map(async (feed) => {
@@ -34,11 +33,13 @@ export default function HomePage() {
         })
       );
       setArticles(allArticles.flat());
+      setLoading(false);
     };
     loadSavedFeeds();
   }, []);
 
   const handleAddFeed = async () => {
+    setLoading(true);
     const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
     if (resolvedFeedUrl) {
       const feedData = await fetchAndParseRSS(resolvedFeedUrl);
@@ -47,10 +48,11 @@ export default function HomePage() {
         setArticles((prev) => [...prev, ...feedData.items]);
       }
     }
+    setLoading(false);
   };
 
   const handleTopicSuggest = async () => {
-    const results = await suggestFeedsWithWorker(topic, []); // API now auto-fetches feeds by topic
+    const results = await suggestFeedsWithWorker(topic, []);
     setSuggestedFeeds(results);
   };
 
@@ -94,17 +96,60 @@ export default function HomePage() {
 
       <section className="space-y-4">
         <h2 className="text-2xl font-semibold text-gray-800">Articles</h2>
+        {loading && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
+            Loading articles…
+          </div>
+        )}
         <div className="grid gap-4">
-          {articles.map((article, idx) => (
-            <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
-              <CardContent className="p-4">
-                <a href={article.link} className="text-lg font-medium text-blue-600 hover:underline">
-                  {article.title}
-                </a>
-                <p className="text-sm text-gray-500">{article.pubDate}</p>
-              </CardContent>
-            </Card>
-          ))}
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="bg-white border border-gray-200 shadow-sm animate-pulse">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-20 h-20 bg-gray-200 rounded" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-gray-200 rounded w-3/4" />
+                        <div className="h-3 bg-gray-100 rounded w-1/2" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            : articles.map((article, idx) => (
+                <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <img
+                        src={article.thumbnail || "/fallback-thumbnail.png"}
+                        alt="thumbnail"
+                        className="w-20 h-20 object-cover rounded border"
+                      />
+                      <div className="flex-1 space-y-1">
+                        <a
+                          href={article.link}
+                          className="text-lg font-medium text-blue-600 hover:underline"
+                        >
+                          {article.title}
+                        </a>
+                        <p className="text-sm text-gray-500">{article.pubDate}</p>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <img
+                            src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.sourceDomain}`}
+                            className="w-4 h-4"
+                            alt="favicon"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = "/favicon.ico";
+                            }}
+                          />
+                          {article.sourceDomain}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
         </div>
       </section>
     </main>
