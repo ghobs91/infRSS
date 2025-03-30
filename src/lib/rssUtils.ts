@@ -61,8 +61,7 @@ export async function fetchAndParseRSS(feedUrl: string): Promise<{ title: string
 }
 
 export const fetchWithCors = async (url: string): Promise<Response> => {
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-  return fetch(proxyUrl);
+  return fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
 };
 
 export function saveFeedToStorage(feed: FeedData) {

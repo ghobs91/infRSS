@@ -1,1 +1,9 @@
-{}
+{
+  "[project]/node_modules/react-pull-to-refresh/dist/index.js [app-client] (ecmascript, next/dynamic entry)": {
+    "id": "[project]/node_modules/react-pull-to-refresh/dist/index.js [app-client] (ecmascript, next/dynamic entry)",
+    "files": [
+      "static/chunks/node_modules_487770a3._.js",
+      "static/chunks/node_modules_react-pull-to-refresh_dist_index_61440d06.js"
+    ]
+  }
+}

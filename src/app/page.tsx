@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,21 +12,20 @@ import {
   loadFeedsFromStorage,
   saveFeedToStorage,
   type FeedData,
-  type Article,
 } from "@/lib/rssUtils";
 import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
+const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: false });
+
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
-  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     const loadSavedFeeds = async () => {
-      setLoading(true);
       const feeds = loadFeedsFromStorage();
       const allArticles = await Promise.all(
         feeds.map(async (feed) => {
@@ -34,14 +34,22 @@ export default function HomePage() {
         })
       );
       setArticles(allArticles.flat());
-      setLoading(false);
     };
+    setIsClient(true);
     loadSavedFeeds();
+
+    const interval = setInterval(() => {
+      loadSavedFeeds();
+    }, 1000 * 60 * 10); // refresh every 10 mins
+
+    return () => clearInterval(interval);
   }, []);
 
   const handleAddFeed = async () => {
-    setLoading(true);
-    const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
+    const input = feedUrlInput.trim();
+    const isLikelyFeed = input.endsWith(".xml") || input.includes("rss");
+  
+    const resolvedFeedUrl = isLikelyFeed ? input : await getFeedUrlFromHtml(input);
     if (resolvedFeedUrl) {
       const feedData = await fetchAndParseRSS(resolvedFeedUrl);
       if (feedData) {
@@ -49,14 +57,12 @@ export default function HomePage() {
         setArticles((prev) => [...prev, ...feedData.items]);
       }
     }
-    setLoading(false);
   };
+  
 
   const handleTopicSuggest = async () => {
-    setSuggestLoading(true);
-    const results = await suggestFeedsWithWorker(topic, []);
+    const results = await suggestFeedsWithWorker(topic, []); // API now auto-fetches feeds by topic
     setSuggestedFeeds(results);
-    setSuggestLoading(false);
   };
 
   return (
@@ -68,7 +74,7 @@ export default function HomePage() {
             placeholder="Enter site URL or RSS feed"
             value={feedUrlInput}
             onChange={(e) => setFeedUrlInput(e.target.value)}
-            className="flex-1 border-gray-800"
+            className="flex-1 border-gray-300"
           />
           <Button onClick={handleAddFeed}>Add Feed</Button>
         </div>
@@ -81,19 +87,13 @@ export default function HomePage() {
             placeholder="Enter a topic you're interested in"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            className="flex-1 border-gray-800"
+            className="flex-1 border-gray-300"
           />
           <Button onClick={handleTopicSuggest}>Suggest</Button>
         </div>
-        {suggestLoading && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
-              Suggesting feeds…
-            </div>
-          )}
-          <div className="grid gap-3">
+        <div className="grid gap-3">
           {suggestedFeeds.map((feed) => (
-            <Card key={feed.url} className="border border-gray-800 shadow-sm">
+            <Card key={feed.url} className="bg-white border border-gray-200 shadow-sm">
               <CardContent className="p-4">
                 <p className="font-medium text-gray-800">{feed.title}</p>
                 <p className="text-sm text-gray-500">{feed.url}</p>
@@ -104,62 +104,52 @@ export default function HomePage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-2xl font-semibold text-gray-800">Articles</h2>
-        {loading && (
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <span className="h-3 w-3 rounded-full bg-blue-500 animate-pulse" />
-            Loading articles…
-          </div>
-        )}
-        <div className="grid gap-4">
-          {loading
-            ? Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="border border-gray-800 shadow-sm animate-pulse">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-semibold text-gray-800">Articles</h2>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const feeds = loadFeedsFromStorage();
+              const allArticles = await Promise.all(
+                feeds.map(async (feed) => {
+                  const data = await fetchAndParseRSS(feed.url);
+                  return data?.items || [];
+                })
+              );
+              setArticles(allArticles.flat());
+            }}
+          >
+            Refresh
+          </Button>
+        </div>
+        {isClient && (
+          <PullToRefresh onRefresh={async () => {
+            const feeds = loadFeedsFromStorage();
+            const allArticles = await Promise.all(
+              feeds.map(async (feed) => {
+                const data = await fetchAndParseRSS(feed.url);
+                return data?.items || [];
+              })
+            );
+            setArticles(allArticles.flat());
+          }}>
+            <div className="grid gap-4">
+              {articles.map((article, idx) => (
+                <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
                   <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-20 h-20 bg-gray-200 rounded" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-3/4" />
-                        <div className="h-3 bg-gray-100 rounded w-1/2" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            : articles.map((article, idx) => (
-                <Card key={idx} className="border border-gray-800 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <img
-                        src={article.thumbnail || "/fallback-thumbnail.png"}
-                        alt="thumbnail"
-                        className="w-20 h-20 object-cover rounded border"
-                      />
-                      <div className="flex-1 space-y-1">
-                        <a
-                          href={article.link}
-                          className="text-lg font-medium text-blue-600 hover:underline"
-                        >
-                          {article.title}
-                        </a>
-                        <p className="text-sm text-gray-500">{article.pubDate}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <img
-                            src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.sourceDomain}`}
-                            className="w-4 h-4"
-                            alt="favicon"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).src = "/favicon.ico";
-                            }}
-                          />
-                          {article.sourceDomain}
-                        </div>
-                      </div>
-                    </div>
+                    <a
+                      href={article.link}
+                      className="text-lg font-medium text-blue-600 hover:underline"
+                    >
+                      {article.title}
+                    </a>
+                    <p className="text-sm text-gray-500">{article.pubDate}</p>
                   </CardContent>
                 </Card>
               ))}
-        </div>
+            </div>
+          </PullToRefresh>
+        )}
       </section>
     </main>
   );

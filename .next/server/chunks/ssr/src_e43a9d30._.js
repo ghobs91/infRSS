@@ -126,8 +126,7 @@ async function fetchAndParseRSS(feedUrl) {
     }
 }
 const fetchWithCors = async (url)=>{
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    return fetch(proxyUrl);
+    return fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
 };
 function saveFeedToStorage(feed) {
     const stored = localStorage.getItem("feeds");
