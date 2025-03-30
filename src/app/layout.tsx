@@ -8,10 +8,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <html lang="en">
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#2196f3" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      </head>
       <body className="bg-gray-50 text-gray-800">
         <div className="flex h-screen">
           {/* Sidebar */}
-          <aside className={`bg-white border-r w-64 p-4 space-y-4 hidden md:block shadow-sm`}>
+          <aside className={`border-r w-64 p-4 space-y-4 hidden md:block shadow-sm`}>
             <h1 className="text-2xl font-semibold mb-6">📡 FeedReader</h1>
             <nav className="space-y-2">
               <Link
@@ -32,7 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
             {/* Mobile header */}
-            <div className="md:hidden p-4 border-b flex items-center justify-between bg-white">
+            <div className="md:hidden p-4 border-b border-gray-800 flex items-center justify-between">
               <h1 className="text-xl font-semibold">FeedReader</h1>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
@@ -44,7 +49,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile menu */}
             {menuOpen && (
-              <div className="md:hidden bg-white border-b px-4 pb-4">
+              <div className="md:hidden border-b border-gray-800 px-4 pb-4">
                 <Link href="/" className="block py-2 text-blue-700 hover:underline">
                   Home
                 </Link>

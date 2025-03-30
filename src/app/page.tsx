@@ -68,7 +68,7 @@ export default function HomePage() {
             placeholder="Enter site URL or RSS feed"
             value={feedUrlInput}
             onChange={(e) => setFeedUrlInput(e.target.value)}
-            className="flex-1 border-gray-300"
+            className="flex-1 border-gray-800"
           />
           <Button onClick={handleAddFeed}>Add Feed</Button>
         </div>
@@ -81,7 +81,7 @@ export default function HomePage() {
             placeholder="Enter a topic you're interested in"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            className="flex-1 border-gray-300"
+            className="flex-1 border-gray-800"
           />
           <Button onClick={handleTopicSuggest}>Suggest</Button>
         </div>
@@ -93,7 +93,7 @@ export default function HomePage() {
           )}
           <div className="grid gap-3">
           {suggestedFeeds.map((feed) => (
-            <Card key={feed.url} className="bg-white border border-gray-200 shadow-sm">
+            <Card key={feed.url} className="border border-gray-800 shadow-sm">
               <CardContent className="p-4">
                 <p className="font-medium text-gray-800">{feed.title}</p>
                 <p className="text-sm text-gray-500">{feed.url}</p>
@@ -114,7 +114,7 @@ export default function HomePage() {
         <div className="grid gap-4">
           {loading
             ? Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="bg-white border border-gray-200 shadow-sm animate-pulse">
+                <Card key={i} className="border border-gray-800 shadow-sm animate-pulse">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className="w-20 h-20 bg-gray-200 rounded" />
@@ -127,7 +127,7 @@ export default function HomePage() {
                 </Card>
               ))
             : articles.map((article, idx) => (
-                <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
+                <Card key={idx} className="border border-gray-800 shadow-sm">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <img

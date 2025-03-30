@@ -29,7 +29,7 @@ export default function ManageSubscriptionsPage() {
           return (
             <Card
               key={feed.url}
-              className="bg-white border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+              className="border border-gray-800 shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
             >
               <CardContent className="flex-1 p-4">
                 <div className="flex items-center gap-2 mb-2">
