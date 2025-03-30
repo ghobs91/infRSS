@@ -12,6 +12,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#2196f3" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.ico" />
       </head>
       <body className="bg-gray-50 text-gray-800">
         <div className="flex h-screen">
