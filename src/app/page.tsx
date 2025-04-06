@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,25 @@ const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: fals
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string }[]>([]);
+  const [visibleCount, setVisibleCount] = useState(50);
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 50);
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const loadSavedFeeds = async () => {
@@ -33,35 +49,41 @@ export default function HomePage() {
           return data?.items || [];
         })
       );
-      setArticles(allArticles.flat());
+      const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      setArticles(sorted);
     };
+
     setIsClient(true);
     loadSavedFeeds();
 
     const interval = setInterval(() => {
       loadSavedFeeds();
-    }, 1000 * 60 * 10); // refresh every 10 mins
+    }, 1000 * 60 * 10);
 
     return () => clearInterval(interval);
   }, []);
 
   const handleAddFeed = async () => {
-    const input = feedUrlInput.trim();
-    const isLikelyFeed = input.endsWith(".xml") || input.includes("rss");
-  
-    const resolvedFeedUrl = isLikelyFeed ? input : await getFeedUrlFromHtml(input);
+    const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
     if (resolvedFeedUrl) {
       const feedData = await fetchAndParseRSS(resolvedFeedUrl);
       if (feedData) {
         saveFeedToStorage({ title: feedData.title, url: resolvedFeedUrl });
-        setArticles((prev) => [...prev, ...feedData.items]);
+        const feeds = loadFeedsFromStorage();
+        const allArticles = await Promise.all(
+          feeds.map(async (feed) => {
+            const data = await fetchAndParseRSS(feed.url);
+            return data?.items || [];
+          })
+        );
+        const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        setArticles(sorted);
       }
     }
   };
-  
 
   const handleTopicSuggest = async () => {
-    const results = await suggestFeedsWithWorker(topic, []); // API now auto-fetches feeds by topic
+    const results = await suggestFeedsWithWorker(topic, []);
     setSuggestedFeeds(results);
   };
 
@@ -69,6 +91,35 @@ export default function HomePage() {
     <main className="space-y-8">
       <section className="space-y-4">
         <h1 className="text-2xl font-semibold text-gray-800">Add Feed</h1>
+        <input
+          type="file"
+          accept=".opml, text/xml"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const text = await file.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(text, "text/xml");
+            const outlines = doc.querySelectorAll("outline[type='rss']");
+            outlines.forEach((el) => {
+              const url = el.getAttribute("xmlUrl");
+              const title = el.getAttribute("title") || el.getAttribute("text") || url;
+              if (url) {
+                saveFeedToStorage({ title: title ?? url, url });
+              }
+            });
+            const feeds = loadFeedsFromStorage();
+            const allArticles = await Promise.all(
+              feeds.map(async (feed) => {
+                const data = await fetchAndParseRSS(feed.url);
+                return data?.items || [];
+              })
+            );
+            const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+            setArticles(sorted);
+          }}
+          className="block mb-2 text-sm text-gray-700"
+        />
         <div className="flex flex-col sm:flex-row gap-3">
           <Input
             placeholder="Enter site URL or RSS feed"
@@ -116,25 +167,32 @@ export default function HomePage() {
                   return data?.items || [];
                 })
               );
-              setArticles(allArticles.flat());
+              const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+              setArticles(sorted);
+              setVisibleCount(50);
             }}
           >
             Refresh
           </Button>
         </div>
+
         {isClient && (
-          <PullToRefresh onRefresh={async () => {
-            const feeds = loadFeedsFromStorage();
-            const allArticles = await Promise.all(
-              feeds.map(async (feed) => {
-                const data = await fetchAndParseRSS(feed.url);
-                return data?.items || [];
-              })
-            );
-            setArticles(allArticles.flat());
-          }}>
+          <PullToRefresh
+            onRefresh={async () => {
+              const feeds = loadFeedsFromStorage();
+              const allArticles = await Promise.all(
+                feeds.map(async (feed) => {
+                  const data = await fetchAndParseRSS(feed.url);
+                  return data?.items || [];
+                })
+              );
+              const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+              setArticles(sorted);
+              setVisibleCount(50);
+            }}
+          >
             <div className="grid gap-4">
-              {articles.map((article, idx) => (
+              {articles.slice(0, visibleCount).map((article, idx) => (
                 <Card key={idx} className="bg-white border border-gray-200 shadow-sm">
                   <CardContent className="p-4">
                     <a
@@ -147,6 +205,7 @@ export default function HomePage() {
                   </CardContent>
                 </Card>
               ))}
+              <div ref={loadMoreRef} className="h-10" />
             </div>
           </PullToRefresh>
         )}

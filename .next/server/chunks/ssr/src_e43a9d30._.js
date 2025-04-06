@@ -105,9 +105,30 @@ async function fetchAndParseRSS(feedUrl) {
             const title = item.querySelector("title")?.textContent || "(No title)";
             const link = item.querySelector("link")?.textContent || "";
             const pubDate = item.querySelector("pubDate")?.textContent || "";
-            const media = item.querySelector("media\\:content, enclosure");
-            const thumbnail = media?.getAttribute("url") || undefined;
-            const sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
+            // Extended thumbnail logic
+            let thumbnail;
+            const mediaThumb = item.querySelector("media\\:thumbnail");
+            const mediaContent = item.querySelector("media\\:content");
+            const enclosure = item.querySelector("enclosure");
+            if (mediaThumb?.getAttribute("url")) {
+                thumbnail = mediaThumb.getAttribute("url") || undefined;
+            } else if (mediaContent?.getAttribute("url")?.includes("image")) {
+                thumbnail = mediaContent.getAttribute("url") || undefined;
+            } else if (enclosure?.getAttribute("type")?.startsWith("image")) {
+                thumbnail = enclosure.getAttribute("url") || undefined;
+            } else {
+                const desc = item.querySelector("description")?.textContent || "";
+                const content = item.querySelector("content\\:encoded")?.textContent || "";
+                const combined = desc + content;
+                const match = combined.match(/<img[^>]+src=["']([^"']+)["']/);
+                if (match) thumbnail = match[1];
+            }
+            let sourceDomain = "";
+            try {
+                sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
+            } catch  {
+                console.warn("Invalid article link:", link);
+            }
             items.push({
                 title,
                 link,
