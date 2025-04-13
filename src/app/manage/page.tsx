@@ -20,16 +20,16 @@ export default function ManageSubscriptionsPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-gray-800">Manage Subscriptions</h2>
+      <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Manage Subscriptions</h2>
       {feeds.length === 0 ? (
-        <p className="text-gray-500">You have no saved feeds.</p>
+        <p className="text-[var(--text-secondary)]">You have no saved feeds.</p>
       ) : (
         feeds.map((feed) => {
           const domain = new URL(feed.url).hostname.replace("www.", "");
           return (
             <Card
               key={feed.url}
-              className="border border-gray-800 shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
+              className="shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
             >
               <CardContent className="flex-1 p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -38,10 +38,10 @@ export default function ManageSubscriptionsPage() {
                     className="w-4 h-4"
                     alt="favicon"
                   />
-                  <p className="text-sm text-gray-500">{domain}</p>
+                  <p className="text-sm text-[var(--text-secondary)]">{domain}</p>
                 </div>
-                <p className="font-medium text-gray-800 break-words">{feed.title}</p>
-                <p className="text-sm text-gray-500 break-all">{feed.url}</p>
+                <p className="font-medium text-[var(--text-primary)] break-words">{feed.title}</p>
+                <p className="text-sm text-[var(--text-secondary)] break-all">{feed.url}</p>
               </CardContent>
               <div className="px-4 pb-4 sm:pb-0">
                 <Button onClick={() => removeFeed(feed.url)} variant="destructive">

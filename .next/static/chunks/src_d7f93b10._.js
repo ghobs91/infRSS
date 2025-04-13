@@ -13,7 +13,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 ;
 const Card = ({ className, children, ...props })=>{
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: ` border border-gray-800 rounded-2xl shadow p-4 ${className}`,
+        className: `border border-[var(--card-border)] rounded-2xl shadow p-4 bg-[var(--card-bg)] ${className}`,
         ...props,
         children: children
     }, void 0, false, {
@@ -55,7 +55,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 const Button = ({ className = "", variant = "default", children, ...props })=>{
     const base = "font-semibold px-4 py-2 rounded-xl shadow-sm transition-colors";
     const variants = {
-        default: "bg-blue-600 hover:bg-blue-700 text-white",
+        default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white",
         destructive: "bg-red-600 hover:bg-red-700 text-white"
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -225,7 +225,7 @@ function ManageSubscriptionsPage() {
         className: "space-y-6",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                className: "text-2xl font-semibold text-gray-800",
+                className: "text-2xl font-semibold text-[var(--text-primary)]",
                 children: "Manage Subscriptions"
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
@@ -233,7 +233,7 @@ function ManageSubscriptionsPage() {
                 columnNumber: 7
             }, this),
             feeds.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                className: "text-gray-500",
+                className: "text-[var(--text-secondary)]",
                 children: "You have no saved feeds."
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
@@ -242,7 +242,7 @@ function ManageSubscriptionsPage() {
             }, this) : feeds.map((feed)=>{
                 const domain = new URL(feed.url).hostname.replace("www.", "");
                 return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
-                    className: "border border-gray-800 shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4",
+                    className: "shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
                             className: "flex-1 p-4",
@@ -260,7 +260,7 @@ function ManageSubscriptionsPage() {
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "text-sm text-gray-500",
+                                            className: "text-sm text-[var(--text-secondary)]",
                                             children: domain
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
@@ -274,7 +274,7 @@ function ManageSubscriptionsPage() {
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "font-medium text-gray-800 break-words",
+                                    className: "font-medium text-[var(--text-primary)] break-words",
                                     children: feed.title
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
@@ -282,7 +282,7 @@ function ManageSubscriptionsPage() {
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-sm text-gray-500 break-all",
+                                    className: "text-sm text-[var(--text-secondary)] break-all",
                                     children: feed.url
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",

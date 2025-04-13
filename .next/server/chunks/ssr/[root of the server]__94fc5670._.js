@@ -65,7 +65,7 @@ function Layout({ children }) {
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("meta", {
                         name: "theme-color",
-                        content: "#2196f3"
+                        content: "#3b82f6"
                     }, void 0, false, {
                         fileName: "[project]/src/app/layout.tsx",
                         lineNumber: 13,
@@ -94,15 +94,15 @@ function Layout({ children }) {
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("body", {
-                className: "bg-gray-50 text-gray-800",
+                className: "bg-[var(--background)] text-[var(--foreground)]",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     className: "flex h-screen",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
-                            className: `border-r w-64 p-4 space-y-4 hidden md:block shadow-sm`,
+                            className: `border-r border-[var(--card-border)] w-64 p-4 space-y-4 hidden md:block shadow-sm bg-[var(--card-bg)]`,
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                                    className: "text-2xl font-semibold mb-6",
+                                    className: "text-2xl font-semibold mb-6 text-[var(--primary)]",
                                     children: "📡 FeedReader"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/layout.tsx",
@@ -114,7 +114,7 @@ function Layout({ children }) {
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                             href: "/",
-                                            className: "block py-2 px-3 rounded hover:bg-blue-50 text-blue-700 font-medium",
+                                            className: "block py-2 px-3 rounded hover:bg-[var(--accent)] text-[var(--primary)] font-medium transition-colors",
                                             children: "Home"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",
@@ -123,7 +123,7 @@ function Layout({ children }) {
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                             href: "/manage",
-                                            className: "block py-2 px-3 rounded hover:bg-blue-50 text-blue-700 font-medium",
+                                            className: "block py-2 px-3 rounded hover:bg-[var(--accent)] text-[var(--primary)] font-medium transition-colors",
                                             children: "Manage Subscriptions"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",
@@ -146,10 +146,10 @@ function Layout({ children }) {
                             className: "flex-1 overflow-auto",
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "md:hidden p-4 border-b border-gray-800 flex items-center justify-between",
+                                    className: "md:hidden p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--card-bg)]",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
-                                            className: "text-xl font-semibold",
+                                            className: "text-xl font-semibold text-[var(--primary)]",
                                             children: "FeedReader"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",
@@ -158,7 +158,7 @@ function Layout({ children }) {
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                             onClick: ()=>setMenuOpen(!menuOpen),
-                                            className: "text-gray-700 text-xl focus:outline-none",
+                                            className: "text-[var(--text-primary)] text-xl focus:outline-none",
                                             children: "☰"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",
@@ -172,11 +172,11 @@ function Layout({ children }) {
                                     columnNumber: 13
                                 }, this),
                                 menuOpen && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "md:hidden border-b border-gray-800 px-4 pb-4",
+                                    className: "md:hidden border-b border-[var(--card-border)] px-4 pb-4 bg-[var(--card-bg)]",
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                             href: "/",
-                                            className: "block py-2 text-blue-700 hover:underline",
+                                            className: "block py-2 text-[var(--primary)] hover:underline",
                                             children: "Home"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",
@@ -185,7 +185,7 @@ function Layout({ children }) {
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$client$2f$app$2d$dir$2f$link$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                             href: "/manage",
-                                            className: "block py-2 text-blue-700 hover:underline",
+                                            className: "block py-2 text-[var(--primary)] hover:underline",
                                             children: "Manage Subscriptions"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/layout.tsx",

@@ -10,25 +10,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <link rel="manifest" href="/manifest.webmanifest" />
-        <meta name="theme-color" content="#2196f3" />
+        <meta name="theme-color" content="#3b82f6" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="icon" href="/favicon.ico" />
       </head>
-      <body className="bg-gray-50 text-gray-800">
+      <body className="bg-[var(--background)] text-[var(--foreground)]">
         <div className="flex h-screen">
           {/* Sidebar */}
-          <aside className={`border-r w-64 p-4 space-y-4 hidden md:block shadow-sm`}>
-            <h1 className="text-2xl font-semibold mb-6">📡 FeedReader</h1>
+          <aside className={`border-r border-[var(--card-border)] w-64 p-4 space-y-4 hidden md:block shadow-sm bg-[var(--card-bg)]`}>
+            <h1 className="text-2xl font-semibold mb-6 text-[var(--primary)]">📡 FeedReader</h1>
             <nav className="space-y-2">
               <Link
                 href="/"
-                className="block py-2 px-3 rounded hover:bg-blue-50 text-blue-700 font-medium"
+                className="block py-2 px-3 rounded hover:bg-[var(--accent)] text-[var(--primary)] font-medium transition-colors"
               >
                 Home
               </Link>
               <Link
                 href="/manage"
-                className="block py-2 px-3 rounded hover:bg-blue-50 text-blue-700 font-medium"
+                className="block py-2 px-3 rounded hover:bg-[var(--accent)] text-[var(--primary)] font-medium transition-colors"
               >
                 Manage Subscriptions
               </Link>
@@ -38,11 +38,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
             {/* Mobile header */}
-            <div className="md:hidden p-4 border-b border-gray-800 flex items-center justify-between">
-              <h1 className="text-xl font-semibold">FeedReader</h1>
+            <div className="md:hidden p-4 border-b border-[var(--card-border)] flex items-center justify-between bg-[var(--card-bg)]">
+              <h1 className="text-xl font-semibold text-[var(--primary)]">FeedReader</h1>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="text-gray-700 text-xl focus:outline-none"
+                className="text-[var(--text-primary)] text-xl focus:outline-none"
               >
                 ☰
               </button>
@@ -50,11 +50,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {/* Mobile menu */}
             {menuOpen && (
-              <div className="md:hidden border-b border-gray-800 px-4 pb-4">
-                <Link href="/" className="block py-2 text-blue-700 hover:underline">
+              <div className="md:hidden border-b border-[var(--card-border)] px-4 pb-4 bg-[var(--card-bg)]">
+                <Link href="/" className="block py-2 text-[var(--primary)] hover:underline">
                   Home
                 </Link>
-                <Link href="/manage" className="block py-2 text-blue-700 hover:underline">
+                <Link href="/manage" className="block py-2 text-[var(--primary)] hover:underline">
                   Manage Subscriptions
                 </Link>
               </div>
