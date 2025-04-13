@@ -3,19 +3,15 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArticleSkeleton } from "@/components/ArticleSkeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  getFeedUrlFromHtml,
   fetchAndParseRSS,
   loadFeedsFromStorage,
-  saveFeedToStorage,
   type FeedData,
 } from "@/lib/rssUtils";
-import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
 const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: false });
 
@@ -99,42 +95,9 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
   );
 };
 
-// Suggested Feed component to reduce re-renders
-const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (feed: FeedData) => void }) => {
-  return (
-    <Card key={feed.url} className="shadow-sm">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img
-              src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
-              className="w-6 h-6"
-              alt="favicon"
-            />
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
-              <p className="text-xs text-[var(--text-secondary)]">{feed.url}</p>
-            </div>
-          </div>
-          <Button 
-            variant="default" 
-            className="text-sm py-1 px-3"
-            onClick={() => onSubscribe(feed)}
-          >
-            Subscribe
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
 export default function HomePage() {
-  const [feedUrlInput, setFeedUrlInput] = useState("");
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
   const [visibleCount, setVisibleCount] = useState(20);
-  const [topic, setTopic] = useState("");
-  const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -142,6 +105,28 @@ export default function HomePage() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastRefreshTime = useRef<number>(0);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add a style tag to hide the refresh indicator when not refreshing
+  useEffect(() => {
+    if (isClient) {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .ptr-element {
+          display: none;
+        }
+        .ptr-refresh .ptr-element {
+          display: block;
+        }
+        .ptr-pull .ptr-element {
+          display: block;
+        }
+      `;
+      document.head.appendChild(style);
+      return () => {
+        document.head.removeChild(style);
+      };
+    }
+  }, [isClient]);
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
@@ -228,42 +213,6 @@ export default function HomePage() {
     };
   }, []);
 
-  // Handle adding a new feed
-  const handleAddFeed = useCallback(async () => {
-    if (!feedUrlInput.trim()) return;
-    
-    setIsLoading(true);
-    try {
-      const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
-      if (resolvedFeedUrl) {
-        const feedData = await fetchAndParseRSS(resolvedFeedUrl);
-        if (feedData) {
-          saveFeedToStorage({ title: feedData.title, url: resolvedFeedUrl });
-          setFeedUrlInput(""); // Clear input after successful add
-          
-          // Refresh articles
-          handleRefresh();
-        }
-      }
-    } catch (error) {
-      console.error("Error adding feed:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [feedUrlInput]);
-
-  // Handle topic suggestion
-  const handleTopicSuggest = useCallback(async () => {
-    if (!topic.trim()) return;
-    
-    try {
-      const results = await suggestFeedsWithWorker(topic, []);
-      setSuggestedFeeds(results);
-    } catch (error) {
-      console.error("Error suggesting feeds:", error);
-    }
-  }, [topic]);
-
   // Handle refreshing feeds
   const handleRefresh = useCallback(async () => {
     // Prevent multiple refreshes in quick succession
@@ -308,100 +257,37 @@ export default function HomePage() {
     }
   }, []);
 
-  // Handle subscribing to a suggested feed
-  const handleSubscribeToFeed = useCallback((feed: FeedData) => {
-    saveFeedToStorage({ title: feed.title, url: feed.url });
-    setFeedUrlInput(""); // Clear input
-    handleRefresh(); // Refresh articles
-    setSuggestedFeeds([]); // Clear suggestions
-  }, []);
-
   return (
-    <main className="space-y-8">
+    <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
       <section className="space-y-4">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Add Feed</h1>
-        <input
-          type="file"
-          accept=".opml, text/xml"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setIsLoading(true);
-            try {
-              const text = await file.text();
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(text, "text/xml");
-              const outlines = doc.querySelectorAll("outline[type='rss']");
-              outlines.forEach((el) => {
-                const url = el.getAttribute("xmlUrl");
-                const title = el.getAttribute("title") || el.getAttribute("text") || url;
-                if (url) {
-                  saveFeedToStorage({ title: title ?? url, url });
-                }
-              });
-              handleRefresh();
-            } catch (error) {
-              console.error("Error importing OPML:", error);
-            } finally {
-              setIsLoading(false);
-            }
-          }}
-          className="block mb-2 text-sm text-[var(--text-secondary)]"
-        />
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Input
-            placeholder="Enter site URL or RSS feed"
-            value={feedUrlInput}
-            onChange={(e) => setFeedUrlInput(e.target.value)}
-            className="flex-1"
-          />
-          <Button onClick={handleAddFeed}>Add Feed</Button>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Input
-            placeholder="Enter a topic you're interested in"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            className="flex-1"
-          />
-          <Button onClick={handleTopicSuggest}>Suggest</Button>
-        </div>
-        <div className="grid gap-3">
-          {suggestedFeeds.map((feed) => (
-            <SuggestedFeed 
-              key={feed.url} 
-              feed={feed} 
-              onSubscribe={handleSubscribeToFeed} 
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Articles</h2>
-          <Button
-            variant="default"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? <Spinner size="sm" /> : "Refresh"}
-          </Button>
-        </div>
-
         {isClient && (
           <PullToRefresh
             onRefresh={handleRefresh}
+            distanceToRefresh={70}
+            resistance={2.5}
+            icon={
+              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                <Spinner size="sm" className="mr-2" />
+                <span>Pull to refresh</span>
+              </div>
+            }
+            loading={
+              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                <Spinner size="sm" className="mr-2" />
+                <span>Refreshing...</span>
+              </div>
+            }
           >
             <div className="grid gap-4">
               {isInitialLoad ? (
                 // Show spinner during initial load
                 <div className="flex justify-center items-center py-12">
                   <Spinner size="lg" />
+                </div>
+              ) : isRefreshing ? (
+                // Show spinner during pull-to-refresh
+                <div className="flex justify-center items-center py-4">
+                  <Spinner size="md" />
                 </div>
               ) : isLoading ? (
                 // Show skeleton loaders while loading

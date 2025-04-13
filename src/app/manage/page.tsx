@@ -1,57 +1,253 @@
 // app/manage/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState, useCallback, useEffect } from "react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { removeFeedFromStorage, loadFeedsFromStorage, type FeedData } from "@/lib/rssUtils";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  getFeedUrlFromHtml,
+  fetchAndParseRSS,
+  loadFeedsFromStorage,
+  saveFeedToStorage,
+  type FeedData,
+} from "@/lib/rssUtils";
+import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
-export default function ManageSubscriptionsPage() {
-  const [feeds, setFeeds] = useState<FeedData[]>([]);
+// Suggested Feed component to reduce re-renders
+const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (feed: FeedData) => void }) => {
+  return (
+    <Card key={feed.url} className="shadow-sm">
+      <CardContent className="p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <img
+              src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+              className="w-6 h-6"
+              alt="favicon"
+            />
+            <div>
+              <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
+              <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
+            </div>
+          </div>
+          <Button 
+            variant="default" 
+            className="text-sm py-1 px-3 w-full sm:w-auto"
+            onClick={() => onSubscribe(feed)}
+          >
+            Subscribe
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
+export default function ManagePage() {
+  const [feedUrlInput, setFeedUrlInput] = useState("");
+  const [topic, setTopic] = useState("");
+  const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
+  const [savedFeeds, setSavedFeeds] = useState<FeedData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load saved feeds on initial render
   useEffect(() => {
-    setFeeds(loadFeedsFromStorage());
+    const feeds = loadFeedsFromStorage();
+    setSavedFeeds(feeds);
   }, []);
 
-  const removeFeed = (urlToRemove: string) => {
-    removeFeedFromStorage(urlToRemove);
-    setFeeds((prev) => prev.filter((feed) => feed.url !== urlToRemove));
-  };
+  // Handle adding a feed
+  const handleAddFeed = useCallback(async () => {
+    if (!feedUrlInput.trim()) {
+      setError("Please enter a feed URL");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Check if the URL is already in the saved feeds
+      if (savedFeeds.some(feed => feed.url === feedUrlInput.trim())) {
+        setError("This feed is already added");
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to parse the feed directly first
+      let feedData = await fetchAndParseRSS(feedUrlInput.trim());
+      
+      // If that fails, try to extract the feed URL from the HTML
+      if (!feedData) {
+        const feedUrl = await getFeedUrlFromHtml(feedUrlInput.trim());
+        if (feedUrl) {
+          feedData = await fetchAndParseRSS(feedUrl);
+        }
+      }
+
+      if (feedData) {
+        const newFeed: FeedData = {
+          title: feedData.title || new URL(feedUrlInput.trim()).hostname,
+          url: feedUrlInput.trim(),
+        };
+        
+        saveFeedToStorage(newFeed);
+        setSavedFeeds(prev => [...prev, newFeed]);
+        setFeedUrlInput("");
+      } else {
+        setError("Could not find a valid RSS feed at this URL");
+      }
+    } catch (error) {
+      console.error("Error adding feed:", error);
+      setError("Error adding feed. Please check the URL and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [feedUrlInput, savedFeeds]);
+
+  // Handle suggesting feeds
+  const handleSuggestFeeds = useCallback(async () => {
+    if (!topic.trim()) {
+      setError("Please enter a topic");
+      return;
+    }
+
+    setIsSuggesting(true);
+    setError(null);
+
+    try {
+      const feeds = await suggestFeedsWithWorker(topic.trim(), []);
+      setSuggestedFeeds(feeds);
+    } catch (error) {
+      console.error("Error suggesting feeds:", error);
+      setError("Error suggesting feeds. Please try again.");
+    } finally {
+      setIsSuggesting(false);
+    }
+  }, [topic]);
+
+  // Handle subscribing to a suggested feed
+  const handleSubscribeToFeed = useCallback((feed: FeedData) => {
+    // Check if the feed is already in the saved feeds
+    if (savedFeeds.some(savedFeed => savedFeed.url === feed.url)) {
+      setError("This feed is already added");
+      return;
+    }
+
+    saveFeedToStorage(feed);
+    setSavedFeeds(prev => [...prev, feed]);
+  }, [savedFeeds]);
+
+  // Handle removing a feed
+  const handleRemoveFeed = useCallback((url: string) => {
+    const updatedFeeds = savedFeeds.filter(feed => feed.url !== url);
+    localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
+    setSavedFeeds(updatedFeeds);
+  }, [savedFeeds]);
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Manage Subscriptions</h2>
-      {feeds.length === 0 ? (
-        <p className="text-[var(--text-secondary)]">You have no saved feeds.</p>
-      ) : (
-        feeds.map((feed) => {
-          const domain = new URL(feed.url).hostname.replace("www.", "");
-          return (
-            <Card
-              key={feed.url}
-              className="shadow-sm flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4"
-            >
-              <CardContent className="flex-1 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <img
-                    src={`https://www.google.com/s2/favicons?sz=16&domain_url=${feed.url}`}
-                    className="w-4 h-4"
-                    alt="favicon"
-                  />
-                  <p className="text-sm text-[var(--text-secondary)]">{domain}</p>
-                </div>
-                <p className="font-medium text-[var(--text-primary)] break-words">{feed.title}</p>
-                <p className="text-sm text-[var(--text-secondary)] break-all">{feed.url}</p>
-              </CardContent>
-              <div className="px-4 pb-4 sm:pb-0">
-                <Button onClick={() => removeFeed(feed.url)} variant="destructive">
-                  Remove
-                </Button>
+    <main className="space-y-8 px-4 max-w-4xl mx-auto">
+      <section className="space-y-4">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Add Feed</h2>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="url"
+                placeholder="Enter RSS feed URL"
+                value={feedUrlInput}
+                onChange={(e) => setFeedUrlInput(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="default" 
+                onClick={handleAddFeed}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? <Spinner size="sm" /> : "Add Feed"}
+              </Button>
+            </div>
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                type="text"
+                placeholder="Enter a topic (e.g., 'tech news', 'programming')"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="default" 
+                onClick={handleSuggestFeeds}
+                disabled={isSuggesting}
+                className="w-full sm:w-auto"
+              >
+                {isSuggesting ? <Spinner size="sm" /> : "Suggest"}
+              </Button>
+            </div>
+          </div>
+
+          {suggestedFeeds.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
+              <div className="grid gap-3">
+                {suggestedFeeds.map((feed) => (
+                  <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
+                ))}
               </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Your Feeds</h2>
+        <div className="grid gap-3">
+          {savedFeeds.length === 0 ? (
+            <Card className="shadow-sm">
+              <CardContent className="p-4 text-center">
+                <p className="text-[var(--text-secondary)]">No feeds added yet. Add some feeds to get started.</p>
+              </CardContent>
             </Card>
-          );
-        })
-      )}
-    </div>
+          ) : (
+            savedFeeds.map((feed) => (
+              <Card key={feed.url} className="shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+                        className="w-6 h-6"
+                        alt="favicon"
+                      />
+                      <div>
+                        <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
+                        <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="destructive" 
+                      className="text-sm py-1 px-3 w-full sm:w-auto"
+                      onClick={() => handleRemoveFeed(feed.url)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </section>
+    </main>
   );
 }
