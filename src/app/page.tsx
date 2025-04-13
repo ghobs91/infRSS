@@ -158,7 +158,7 @@ export default function HomePage() {
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-semibold text-gray-800">Articles</h2>
           <Button
-            variant="outline"
+            variant="default"
             onClick={async () => {
               const feeds = loadFeedsFromStorage();
               const allArticles = await Promise.all(
