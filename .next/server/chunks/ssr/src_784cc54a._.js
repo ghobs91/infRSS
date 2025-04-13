@@ -253,56 +253,88 @@ async function getFeedUrlFromHtml(siteUrl) {
         return null;
     }
 }
-async function fetchAndParseRSS(feedUrl) {
+// Function to extract thumbnail from various sources
+async function extractThumbnail(link, content) {
     try {
-        const res = await fetchWithCors(feedUrl);
-        const text = await res.text();
+        // Try to fetch the HTML of the article page
+        const response = await fetch(link);
+        const html = await response.text();
+        // Try to get Open Graph image
+        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+        if (ogMatch && ogMatch[1]) {
+            return ogMatch[1];
+        }
+        // Try to get Twitter image
+        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+        if (twitterMatch && twitterMatch[1]) {
+            return twitterMatch[1];
+        }
+        // If we have content, try to find the first image
+        if (content) {
+            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+            if (imgMatch && imgMatch[1]) {
+                return imgMatch[1];
+            }
+        }
+        return undefined;
+    } catch (error) {
+        console.error("Error extracting thumbnail:", error);
+        return undefined;
+    }
+}
+async function fetchAndParseRSS(url) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(()=>controller.abort(), 10000);
+        const response = await fetch(url, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const text = await response.text();
         const parser = new DOMParser();
-        const doc = parser.parseFromString(text, "application/xml");
-        const title = doc.querySelector("channel > title")?.textContent || "Untitled Feed";
-        const items = [];
-        doc.querySelectorAll("item").forEach((item)=>{
-            const title = item.querySelector("title")?.textContent || "(No title)";
-            const link = item.querySelector("link")?.textContent || "";
-            const pubDate = item.querySelector("pubDate")?.textContent || "";
-            // Extended thumbnail logic
-            let thumbnail;
-            const mediaThumb = item.querySelector("media\\:thumbnail");
-            const mediaContent = item.querySelector("media\\:content");
-            const enclosure = item.querySelector("enclosure");
-            if (mediaThumb?.getAttribute("url")) {
-                thumbnail = mediaThumb.getAttribute("url") || undefined;
-            } else if (mediaContent?.getAttribute("url")?.includes("image")) {
-                thumbnail = mediaContent.getAttribute("url") || undefined;
-            } else if (enclosure?.getAttribute("type")?.startsWith("image")) {
-                thumbnail = enclosure.getAttribute("url") || undefined;
-            } else {
-                const desc = item.querySelector("description")?.textContent || "";
-                const content = item.querySelector("content\\:encoded")?.textContent || "";
-                const combined = desc + content;
-                const match = combined.match(/<img[^>]+src=["']([^"']+)["']/);
-                if (match) thumbnail = match[1];
+        const xmlDoc = parser.parseFromString(text, "text/xml");
+        // Check if it's a valid RSS feed
+        const rssElement = xmlDoc.querySelector("rss, feed");
+        if (!rssElement) {
+            return null;
+        }
+        const channel = xmlDoc.querySelector("channel, feed");
+        if (!channel) {
+            return null;
+        }
+        const title = channel.querySelector("title")?.textContent || "";
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
+            const itemTitle = item.querySelector("title")?.textContent || "";
+            const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
+            const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
+            const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
+            // Try to get enclosure image first
+            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+            // If no enclosure image, try media:content
+            if (!thumbnail) {
+                const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+                thumbnail = mediaContent?.getAttribute("url");
             }
-            let sourceDomain = "";
-            try {
-                sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
-            } catch  {
-                console.warn("Invalid article link:", link);
+            // If still no thumbnail, try to extract from the article
+            if (!thumbnail && itemLink) {
+                thumbnail = await extractThumbnail(itemLink, content);
             }
-            items.push({
-                title,
-                link,
-                pubDate,
-                thumbnail,
-                sourceDomain
-            });
+            return {
+                title: itemTitle,
+                link: itemLink,
+                pubDate: itemPubDate,
+                thumbnail: thumbnail
+            };
         });
         return {
             title,
-            items
+            items: await Promise.all(items)
         };
-    } catch (err) {
-        console.error("Failed to fetch or parse RSS:", err);
+    } catch (error) {
+        console.error("Error fetching RSS:", error);
         return null;
     }
 }
@@ -421,6 +453,7 @@ function formatDate(dateString) {
 // Article component to reduce re-renders
 const Article = ({ article })=>{
     const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [imgError, setImgError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         setMounted(true);
     }, []);
@@ -431,21 +464,23 @@ const Article = ({ article })=>{
             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "flex flex-col sm:flex-row",
                 children: [
-                    article.thumbnail && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    article.thumbnail && !imgError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "w-full sm:w-40 h-40 sm:h-auto relative",
                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                             src: article.thumbnail,
                             alt: article.title,
                             fill: true,
-                            className: "object-cover"
+                            unoptimized: true,
+                            className: "object-cover",
+                            onError: ()=>setImgError(true)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 70,
+                            lineNumber: 72,
                             columnNumber: 15
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 69,
+                        lineNumber: 70,
                         columnNumber: 13
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -454,10 +489,12 @@ const Article = ({ article })=>{
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
                                 href: article.link,
                                 className: "text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2",
+                                target: "_blank",
+                                rel: "noopener noreferrer",
                                 children: article.title
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 79,
+                                lineNumber: 83,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -469,15 +506,16 @@ const Article = ({ article })=>{
                                             src: `https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`,
                                             alt: "favicon",
                                             fill: true,
+                                            unoptimized: true,
                                             className: "object-contain"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 88,
+                                            lineNumber: 94,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 87,
+                                        lineNumber: 93,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -485,13 +523,13 @@ const Article = ({ article })=>{
                                         children: new URL(article.link).hostname.replace("www.", "")
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 96,
+                                        lineNumber: 103,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 85,
+                                lineNumber: 91,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -499,29 +537,29 @@ const Article = ({ article })=>{
                                 children: formatDate(article.pubDate)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 100,
+                                lineNumber: 107,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 78,
+                        lineNumber: 82,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 67,
+                lineNumber: 68,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 66,
+            lineNumber: 67,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 65,
+        lineNumber: 66,
         columnNumber: 5
     }, this);
 };
@@ -695,20 +733,20 @@ function HomePage() {
                             className: "mr-2"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 284,
+                            lineNumber: 291,
                             columnNumber: 17
                         }, void 0),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Pull to refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 285,
+                            lineNumber: 292,
                             columnNumber: 17
                         }, void 0)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 283,
+                    lineNumber: 290,
                     columnNumber: 15
                 }, void 0),
                 loading: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -719,20 +757,20 @@ function HomePage() {
                             className: "mr-2"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 290,
+                            lineNumber: 297,
                             columnNumber: 17
                         }, void 0),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Refreshing..."
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 291,
+                            lineNumber: 298,
                             columnNumber: 17
                         }, void 0)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 289,
+                    lineNumber: 296,
                     columnNumber: 15
                 }, void 0),
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -745,12 +783,12 @@ function HomePage() {
                                 size: "lg"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 299,
+                                lineNumber: 306,
                                 columnNumber: 19
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 298,
+                            lineNumber: 305,
                             columnNumber: 17
                         }, this) : isRefreshing ? // Show spinner during pull-to-refresh
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -759,12 +797,12 @@ function HomePage() {
                                 size: "md"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 304,
+                                lineNumber: 311,
                                 columnNumber: 19
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 303,
+                            lineNumber: 310,
                             columnNumber: 17
                         }, this) : isLoading ? // Show skeleton loaders while loading
                         Array.from({
@@ -776,12 +814,12 @@ function HomePage() {
                                 },
                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 316,
+                                    lineNumber: 323,
                                     columnNumber: 21
                                 }, this)
                             }, `skeleton-${idx}`, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 309,
+                                lineNumber: 316,
                                 columnNumber: 19
                             }, this)) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                             className: "shadow-sm",
@@ -792,24 +830,24 @@ function HomePage() {
                                     children: "No articles found. Add some feeds to get started."
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 322,
+                                    lineNumber: 329,
                                     columnNumber: 21
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 321,
+                                lineNumber: 328,
                                 columnNumber: 19
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 320,
+                            lineNumber: 327,
                             columnNumber: 17
                         }, this) : // Show actual articles
                         visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(Article, {
                                 article: article
                             }, `${article.link}-${idx}`, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 328,
+                                lineNumber: 335,
                                 columnNumber: 19
                             }, this)),
                         articles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -822,33 +860,33 @@ function HomePage() {
                                 children: "Load More"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 333,
+                                lineNumber: 340,
                                 columnNumber: 19
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 332,
+                            lineNumber: 339,
                             columnNumber: 17
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 295,
+                    lineNumber: 302,
                     columnNumber: 13
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 278,
+                lineNumber: 285,
                 columnNumber: 11
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 276,
+            lineNumber: 283,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 275,
+        lineNumber: 282,
         columnNumber: 5
     }, this);
 }

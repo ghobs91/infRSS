@@ -32,55 +32,104 @@ export async function getFeedUrlFromHtml(siteUrl: string): Promise<string | null
   }
 }
 
-export async function fetchAndParseRSS(feedUrl: string): Promise<{ title: string; items: Article[] } | null> {
+// Function to extract thumbnail from various sources
+async function extractThumbnail(link: string, content?: string): Promise<string | undefined> {
   try {
-    const res = await fetchWithCors(feedUrl);
-    const text = await res.text();
+    // Try to fetch the HTML of the article page
+    const response = await fetch(link);
+    const html = await response.text();
+
+    // Try to get Open Graph image
+    const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) ||
+                   html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+    if (ogMatch && ogMatch[1]) {
+      return ogMatch[1];
+    }
+
+    // Try to get Twitter image
+    const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) ||
+                        html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+    if (twitterMatch && twitterMatch[1]) {
+      return twitterMatch[1];
+    }
+
+    // If we have content, try to find the first image
+    if (content) {
+      const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+      if (imgMatch && imgMatch[1]) {
+        return imgMatch[1];
+      }
+    }
+
+    return undefined;
+  } catch (error) {
+    console.error("Error extracting thumbnail:", error);
+    return undefined;
+  }
+}
+
+export async function fetchAndParseRSS(url: string): Promise<{ title: string; items: any[] } | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const text = await response.text();
     const parser = new DOMParser();
-    const doc = parser.parseFromString(text, "application/xml");
+    const xmlDoc = parser.parseFromString(text, "text/xml");
 
-    const title = doc.querySelector("channel > title")?.textContent || "Untitled Feed";
-    const items: Article[] = [];
+    // Check if it's a valid RSS feed
+    const rssElement = xmlDoc.querySelector("rss, feed");
+    if (!rssElement) {
+      return null;
+    }
 
-    doc.querySelectorAll("item").forEach((item) => {
-      const title = item.querySelector("title")?.textContent || "(No title)";
-      const link = item.querySelector("link")?.textContent || "";
-      const pubDate = item.querySelector("pubDate")?.textContent || "";
+    const channel = xmlDoc.querySelector("channel, feed");
+    if (!channel) {
+      return null;
+    }
 
-      // Extended thumbnail logic
-      let thumbnail: string | undefined;
-
-      const mediaThumb = item.querySelector("media\\:thumbnail");
-      const mediaContent = item.querySelector("media\\:content");
-      const enclosure = item.querySelector("enclosure");
-
-      if (mediaThumb?.getAttribute("url")) {
-        thumbnail = mediaThumb.getAttribute("url") || undefined;
-      } else if (mediaContent?.getAttribute("url")?.includes("image")) {
-        thumbnail = mediaContent.getAttribute("url") || undefined;
-      } else if (enclosure?.getAttribute("type")?.startsWith("image")) {
-        thumbnail = enclosure.getAttribute("url") || undefined;
-      } else {
-        const desc = item.querySelector("description")?.textContent || "";
-        const content = item.querySelector("content\\:encoded")?.textContent || "";
-        const combined = desc + content;
-        const match = combined.match(/<img[^>]+src=["']([^"']+)["']/);
-        if (match) thumbnail = match[1];
+    const title = channel.querySelector("title")?.textContent || "";
+    const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item) => {
+      const itemTitle = item.querySelector("title")?.textContent || "";
+      const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
+      const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
+      const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
+      
+      // Try to get enclosure image first
+      let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+      
+      // If no enclosure image, try media:content
+      if (!thumbnail) {
+        const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+        thumbnail = mediaContent?.getAttribute("url");
       }
 
-      let sourceDomain = "";
-      try {
-        sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
-      } catch {
-        console.warn("Invalid article link:", link);
+      // If still no thumbnail, try to extract from the article
+      if (!thumbnail && itemLink) {
+        thumbnail = await extractThumbnail(itemLink, content);
       }
 
-      items.push({ title, link, pubDate, thumbnail, sourceDomain });
+      return {
+        title: itemTitle,
+        link: itemLink,
+        pubDate: itemPubDate,
+        thumbnail: thumbnail,
+      };
     });
 
-    return { title, items };
-  } catch (err) {
-    console.error("Failed to fetch or parse RSS:", err);
+    return {
+      title,
+      items: await Promise.all(items),
+    };
+  } catch (error) {
+    console.error("Error fetching RSS:", error);
     return null;
   }
 }
