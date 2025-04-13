@@ -25,7 +25,6 @@ interface FeedData {
   
     const { pipeline, env } = await import("@xenova/transformers");
   
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (env.backends as any).onnx = "wasm";
     env.allowLocalModels = false;
     env.useBrowserCache = true;

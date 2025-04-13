@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArticleSkeleton } from "@/components/ArticleSkeleton";
@@ -10,7 +11,6 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
-  type FeedData,
 } from "@/lib/rssUtils";
 
 const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: false });
@@ -60,11 +60,12 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
       <CardContent className="p-0">
         <div className="flex flex-col sm:flex-row">
           {article.thumbnail && (
-            <div className="w-full sm:w-40 h-40 sm:h-auto">
-              <img 
+            <div className="w-full sm:w-40 h-40 sm:h-auto relative">
+              <Image 
                 src={article.thumbnail} 
                 alt={article.title}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
               />
             </div>
           )}
@@ -76,11 +77,14 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
               {article.title}
             </a>
             <div className="flex items-center gap-2 my-1">
-              <img
-                src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                className="w-4 h-4"
-                alt="favicon"
-              />
+              <div className="w-4 h-4 relative">
+                <Image
+                  src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
+                  alt="favicon"
+                  fill
+                  className="object-contain"
+                />
+              </div>
               <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                 {new URL(article.link).hostname.replace("www.", "")}
               </p>
@@ -133,6 +137,50 @@ export default function HomePage() {
     return articles.slice(0, visibleCount);
   }, [articles, visibleCount]);
 
+  // Handle refreshing feeds
+  const handleRefresh = useCallback(async () => {
+    // Prevent multiple refreshes in quick succession
+    const now = Date.now();
+    if (now - lastRefreshTime.current < 5000) { // 5 second cooldown
+      return;
+    }
+    
+    lastRefreshTime.current = now;
+    setIsRefreshing(true);
+    
+    try {
+      const feeds = loadFeedsFromStorage();
+      if (feeds.length === 0) {
+        setIsRefreshing(false);
+        return;
+      }
+
+      // Fetch feeds in parallel with a timeout
+      const fetchPromises = feeds.map(async (feed) => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
+          const data = await fetchAndParseRSS(feed.url);
+          clearTimeout(timeoutId);
+          return data?.items || [];
+        } catch (error) {
+          console.error(`Error fetching feed ${feed.url}:`, error);
+          return [];
+        }
+      });
+
+      const allArticles = await Promise.all(fetchPromises);
+      const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      setArticles(sorted);
+      setVisibleCount(20); // Reset visible count
+    } catch (error) {
+      console.error("Error refreshing feeds:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
   // Intersection observer for infinite scrolling
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -144,13 +192,14 @@ export default function HomePage() {
       { threshold: 0.5 }
     );
 
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
     }
 
     return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current);
+      if (currentRef) {
+        observer.unobserve(currentRef);
       }
     };
   }, [isLoading, articles.length]);
@@ -207,55 +256,12 @@ export default function HomePage() {
 
     return () => {
       clearInterval(interval);
-      if (refreshTimeoutRef.current) {
-        clearTimeout(refreshTimeoutRef.current);
+      const currentTimeoutRef = refreshTimeoutRef.current;
+      if (currentTimeoutRef) {
+        clearTimeout(currentTimeoutRef);
       }
     };
-  }, []);
-
-  // Handle refreshing feeds
-  const handleRefresh = useCallback(async () => {
-    // Prevent multiple refreshes in quick succession
-    const now = Date.now();
-    if (now - lastRefreshTime.current < 5000) { // 5 second cooldown
-      return;
-    }
-    
-    lastRefreshTime.current = now;
-    setIsRefreshing(true);
-    
-    try {
-      const feeds = loadFeedsFromStorage();
-      if (feeds.length === 0) {
-        setIsRefreshing(false);
-        return;
-      }
-
-      // Fetch feeds in parallel with a timeout
-      const fetchPromises = feeds.map(async (feed) => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
-          const data = await fetchAndParseRSS(feed.url);
-          clearTimeout(timeoutId);
-          return data?.items || [];
-        } catch (error) {
-          console.error(`Error fetching feed ${feed.url}:`, error);
-          return [];
-        }
-      });
-
-      const allArticles = await Promise.all(fetchPromises);
-      const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-      setArticles(sorted);
-      setVisibleCount(20); // Reset visible count
-    } catch (error) {
-      console.error("Error refreshing feeds:", error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
+  }, [handleRefresh]);
 
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">

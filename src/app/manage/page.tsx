@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import Image from "next/image";
 import {
   getFeedUrlFromHtml,
   fetchAndParseRSS,
@@ -22,11 +23,14 @@ const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (fe
       <CardContent className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <img
-              src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
-              className="w-6 h-6"
-              alt="favicon"
-            />
+            <div className="w-6 h-6 relative">
+              <Image
+                src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+                className="object-contain"
+                alt="favicon"
+                fill
+              />
+            </div>
             <div>
               <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
               <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
@@ -224,11 +228,14 @@ export default function ManagePage() {
                 <CardContent className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
-                        className="w-6 h-6"
-                        alt="favicon"
-                      />
+                      <div className="w-6 h-6 relative">
+                        <Image
+                          src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+                          className="object-contain"
+                          alt="favicon"
+                          fill
+                        />
+                      </div>
                       <div>
                         <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
                         <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
