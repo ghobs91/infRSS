@@ -114,6 +114,41 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
   );
 };
 
+// Add a custom style to the head to control pull-to-refresh behavior
+const PullToRefreshStyles = () => {
+  return (
+    <style jsx global>{`
+      .ptr-element {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        color: var(--text-secondary);
+        z-index: 10;
+        display: none;
+        text-align: center;
+        height: 50px;
+        padding: 12px;
+      }
+      .ptr-refresh .ptr-element {
+        display: block;
+      }
+      .ptr-pull .ptr-element {
+        display: block;
+      }
+      .ptr-content {
+        min-height: calc(100vh - 64px);
+      }
+      /* Ensure content is scrollable */
+      .ptr-track {
+        overflow-y: auto !important;
+        position: relative;
+        z-index: 1;
+      }
+    `}</style>
+  );
+};
+
 export default function HomePage() {
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
   const [visibleCount, setVisibleCount] = useState(20);
@@ -124,28 +159,6 @@ export default function HomePage() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastRefreshTime = useRef<number>(0);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Add a style tag to hide the refresh indicator when not refreshing
-  useEffect(() => {
-    if (isClient) {
-      const style = document.createElement('style');
-      style.innerHTML = `
-        .ptr-element {
-          display: none;
-        }
-        .ptr-refresh .ptr-element {
-          display: block;
-        }
-        .ptr-pull .ptr-element {
-          display: block;
-        }
-      `;
-      document.head.appendChild(style);
-      return () => {
-        document.head.removeChild(style);
-      };
-    }
-  }, [isClient]);
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
@@ -279,77 +292,89 @@ export default function HomePage() {
   }, [handleRefresh]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
-      <section className="space-y-4">
-        {isClient && (
-          <PullToRefresh
-            onRefresh={handleRefresh}
-            distanceToRefresh={70}
-            resistance={2.5}
-            icon={
-              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                <Spinner size="sm" className="mr-2" />
-                <span>Pull to refresh</span>
-              </div>
-            }
-            loading={
-              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                <Spinner size="sm" className="mr-2" />
-                <span>Refreshing...</span>
-              </div>
-            }
-          >
-            <div className="grid gap-4">
-              {isInitialLoad ? (
-                // Show spinner during initial load
-                <div className="flex justify-center items-center py-12">
-                  <Spinner size="lg" />
+    <>
+      <PullToRefreshStyles />
+      <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
+        <section className="space-y-4">
+          {isClient && (
+            <PullToRefresh
+              onRefresh={handleRefresh}
+              distanceToRefresh={70}
+              resistance={2.5}
+              hammerOptions={{
+                touchAction: 'pan-y',
+                recognizers: {
+                  pan: {
+                    threshold: 5,
+                    direction: 'DIRECTION_DOWN'
+                  }
+                }
+              }}
+              icon={
+                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                  <Spinner size="sm" className="mr-2" />
+                  <span>Pull to refresh</span>
                 </div>
-              ) : isRefreshing ? (
-                // Show spinner during pull-to-refresh
-                <div className="flex justify-center items-center py-4">
-                  <Spinner size="md" />
+              }
+              loading={
+                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                  <Spinner size="sm" className="mr-2" />
+                  <span>Refreshing...</span>
                 </div>
-              ) : isLoading ? (
-                // Show skeleton loaders while loading
-                Array.from({ length: 10 }).map((_, idx) => (
-                  <div 
-                    key={`skeleton-${idx}`} 
-                    style={{ 
-                      animationDelay: `${idx * 100}ms`,
-                      animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
-                    }}
-                  >
-                    <ArticleSkeleton />
+              }
+            >
+              <div className="grid gap-4 min-h-[calc(100vh-64px)]">
+                {isInitialLoad ? (
+                  // Show spinner during initial load
+                  <div className="flex justify-center items-center py-12">
+                    <Spinner size="lg" />
                   </div>
-                ))
-              ) : articles.length === 0 ? (
-                <Card className="shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                // Show actual articles
-                visibleArticles.map((article, idx) => (
-                  <Article key={`${article.link}-${idx}`} article={article} />
-                ))
-              )}
-              {articles.length > visibleCount && (
-                <div ref={loadMoreRef} className="h-10 flex justify-center">
-                  <Button 
-                    variant="default" 
-                    onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
-                    className="w-full"
-                  >
-                    Load More
-                  </Button>
-                </div>
-              )}
-            </div>
-          </PullToRefresh>
-        )}
-      </section>
-    </main>
+                ) : isRefreshing ? (
+                  // Show spinner during pull-to-refresh
+                  <div className="flex justify-center items-center py-4">
+                    <Spinner size="md" />
+                  </div>
+                ) : isLoading ? (
+                  // Show skeleton loaders while loading
+                  Array.from({ length: 10 }).map((_, idx) => (
+                    <div 
+                      key={`skeleton-${idx}`} 
+                      style={{ 
+                        animationDelay: `${idx * 100}ms`,
+                        animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
+                      }}
+                    >
+                      <ArticleSkeleton />
+                    </div>
+                  ))
+                ) : articles.length === 0 ? (
+                  <Card className="shadow-sm">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  // Show actual articles
+                  visibleArticles.map((article, idx) => (
+                    <Article key={`${article.link}-${idx}`} article={article} />
+                  ))
+                )}
+                {articles.length > visibleCount && (
+                  <div ref={loadMoreRef} className="h-10 flex justify-center">
+                    <Button 
+                      variant="default" 
+                      onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
+                      className="w-full"
+                    >
+                      Load More
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </PullToRefresh>
+          )}
+        </section>
+      </main>
+    </>
   );
 }

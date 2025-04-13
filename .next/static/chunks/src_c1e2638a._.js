@@ -176,56 +176,88 @@ async function getFeedUrlFromHtml(siteUrl) {
         return null;
     }
 }
-async function fetchAndParseRSS(feedUrl) {
+// Function to extract thumbnail from various sources
+async function extractThumbnail(link, content) {
     try {
-        const res = await fetchWithCors(feedUrl);
-        const text = await res.text();
+        // Try to fetch the HTML of the article page
+        const response = await fetch(link);
+        const html = await response.text();
+        // Try to get Open Graph image
+        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+        if (ogMatch && ogMatch[1]) {
+            return ogMatch[1];
+        }
+        // Try to get Twitter image
+        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+        if (twitterMatch && twitterMatch[1]) {
+            return twitterMatch[1];
+        }
+        // If we have content, try to find the first image
+        if (content) {
+            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+            if (imgMatch && imgMatch[1]) {
+                return imgMatch[1];
+            }
+        }
+        return undefined;
+    } catch (error) {
+        console.error("Error extracting thumbnail:", error);
+        return undefined;
+    }
+}
+async function fetchAndParseRSS(url) {
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(()=>controller.abort(), 10000);
+        const response = await fetch(url, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const text = await response.text();
         const parser = new DOMParser();
-        const doc = parser.parseFromString(text, "application/xml");
-        const title = doc.querySelector("channel > title")?.textContent || "Untitled Feed";
-        const items = [];
-        doc.querySelectorAll("item").forEach((item)=>{
-            const title = item.querySelector("title")?.textContent || "(No title)";
-            const link = item.querySelector("link")?.textContent || "";
-            const pubDate = item.querySelector("pubDate")?.textContent || "";
-            // Extended thumbnail logic
-            let thumbnail;
-            const mediaThumb = item.querySelector("media\\:thumbnail");
-            const mediaContent = item.querySelector("media\\:content");
-            const enclosure = item.querySelector("enclosure");
-            if (mediaThumb?.getAttribute("url")) {
-                thumbnail = mediaThumb.getAttribute("url") || undefined;
-            } else if (mediaContent?.getAttribute("url")?.includes("image")) {
-                thumbnail = mediaContent.getAttribute("url") || undefined;
-            } else if (enclosure?.getAttribute("type")?.startsWith("image")) {
-                thumbnail = enclosure.getAttribute("url") || undefined;
-            } else {
-                const desc = item.querySelector("description")?.textContent || "";
-                const content = item.querySelector("content\\:encoded")?.textContent || "";
-                const combined = desc + content;
-                const match = combined.match(/<img[^>]+src=["']([^"']+)["']/);
-                if (match) thumbnail = match[1];
+        const xmlDoc = parser.parseFromString(text, "text/xml");
+        // Check if it's a valid RSS feed
+        const rssElement = xmlDoc.querySelector("rss, feed");
+        if (!rssElement) {
+            return null;
+        }
+        const channel = xmlDoc.querySelector("channel, feed");
+        if (!channel) {
+            return null;
+        }
+        const title = channel.querySelector("title")?.textContent || "";
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
+            const itemTitle = item.querySelector("title")?.textContent || "";
+            const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
+            const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
+            const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
+            // Try to get enclosure image first
+            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+            // If no enclosure image, try media:content
+            if (!thumbnail) {
+                const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+                thumbnail = mediaContent?.getAttribute("url");
             }
-            let sourceDomain = "";
-            try {
-                sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "";
-            } catch  {
-                console.warn("Invalid article link:", link);
+            // If still no thumbnail, try to extract from the article
+            if (!thumbnail && itemLink) {
+                thumbnail = await extractThumbnail(itemLink, content);
             }
-            items.push({
-                title,
-                link,
-                pubDate,
-                thumbnail,
-                sourceDomain
-            });
+            return {
+                title: itemTitle,
+                link: itemLink,
+                pubDate: itemPubDate,
+                thumbnail: thumbnail
+            };
         });
         return {
             title,
-            items
+            items: await Promise.all(items)
         };
-    } catch (err) {
-        console.error("Failed to fetch or parse RSS:", err);
+    } catch (error) {
+        console.error("Error fetching RSS:", error);
         return null;
     }
 }
@@ -441,10 +473,11 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$i
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/button.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/card.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/spinner.tsx [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/image.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/rssUtils.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useTransformerWorker$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/useTransformerWorker.ts [app-client] (ecmascript)");
 ;
-var _s = __turbopack_context__.k.signature();
+var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature();
 "use client";
 ;
 ;
@@ -453,8 +486,16 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
-// Suggested Feed component to reduce re-renders
+;
+// SuggestedFeed component to reduce re-renders
 const SuggestedFeed = ({ feed, onSubscribe })=>{
+    _s();
+    const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "SuggestedFeed.useEffect": ()=>{
+            setMounted(true);
+        }
+    }["SuggestedFeed.useEffect"], []);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
         className: "shadow-sm",
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
@@ -465,14 +506,23 @@ const SuggestedFeed = ({ feed, onSubscribe })=>{
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                         className: "flex items-center gap-3",
                         children: [
-                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                src: `https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`,
-                                className: "w-6 h-6",
-                                alt: "favicon"
+                            mounted && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "w-6 h-6 relative",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                    src: `https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`,
+                                    className: "object-contain",
+                                    alt: "favicon",
+                                    fill: true,
+                                    unoptimized: true
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/manage/page.tsx",
+                                    lineNumber: 34,
+                                    columnNumber: 17
+                                }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 25,
-                                columnNumber: 13
+                                lineNumber: 33,
+                                columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 children: [
@@ -481,7 +531,7 @@ const SuggestedFeed = ({ feed, onSubscribe })=>{
                                         children: feed.title
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 31,
+                                        lineNumber: 44,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -489,51 +539,148 @@ const SuggestedFeed = ({ feed, onSubscribe })=>{
                                         children: feed.url
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 32,
+                                        lineNumber: 45,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 30,
+                                lineNumber: 43,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 24,
+                        lineNumber: 31,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
                         variant: "default",
-                        className: "text-sm py-1 px-3 w-full sm:w-auto",
                         onClick: ()=>onSubscribe(feed),
+                        className: "whitespace-nowrap",
                         children: "Subscribe"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 35,
+                        lineNumber: 48,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 23,
+                lineNumber: 30,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/app/manage/page.tsx",
-            lineNumber: 22,
+            lineNumber: 29,
             columnNumber: 7
         }, this)
     }, feed.url, false, {
         fileName: "[project]/src/app/manage/page.tsx",
-        lineNumber: 21,
+        lineNumber: 28,
         columnNumber: 5
     }, this);
 };
+_s(SuggestedFeed, "LrrVfNW3d1raFE0BNzCTILYmIfo=");
 _c = SuggestedFeed;
+// SavedFeed component
+const SavedFeed = ({ feed, onRemove })=>{
+    _s1();
+    const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "SavedFeed.useEffect": ()=>{
+            setMounted(true);
+        }
+    }["SavedFeed.useEffect"], []);
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
+        className: "shadow-sm",
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
+            className: "p-4",
+            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                className: "flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+                children: [
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                        className: "flex items-center gap-3",
+                        children: [
+                            mounted && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "w-6 h-6 relative",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                    src: `https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`,
+                                    className: "object-contain",
+                                    alt: "favicon",
+                                    fill: true,
+                                    unoptimized: true
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/manage/page.tsx",
+                                    lineNumber: 76,
+                                    columnNumber: 17
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/manage/page.tsx",
+                                lineNumber: 75,
+                                columnNumber: 15
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                children: [
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: "font-medium text-[var(--text-primary)]",
+                                        children: feed.title
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/manage/page.tsx",
+                                        lineNumber: 86,
+                                        columnNumber: 15
+                                    }, this),
+                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                        className: "text-xs text-[var(--text-secondary)] break-all",
+                                        children: feed.url
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/manage/page.tsx",
+                                        lineNumber: 87,
+                                        columnNumber: 15
+                                    }, this)
+                                ]
+                            }, void 0, true, {
+                                fileName: "[project]/src/app/manage/page.tsx",
+                                lineNumber: 85,
+                                columnNumber: 13
+                            }, this)
+                        ]
+                    }, void 0, true, {
+                        fileName: "[project]/src/app/manage/page.tsx",
+                        lineNumber: 73,
+                        columnNumber: 11
+                    }, this),
+                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                        variant: "destructive",
+                        onClick: ()=>onRemove(feed.url),
+                        className: "whitespace-nowrap",
+                        children: "Remove"
+                    }, void 0, false, {
+                        fileName: "[project]/src/app/manage/page.tsx",
+                        lineNumber: 90,
+                        columnNumber: 11
+                    }, this)
+                ]
+            }, void 0, true, {
+                fileName: "[project]/src/app/manage/page.tsx",
+                lineNumber: 72,
+                columnNumber: 9
+            }, this)
+        }, void 0, false, {
+            fileName: "[project]/src/app/manage/page.tsx",
+            lineNumber: 71,
+            columnNumber: 7
+        }, this)
+    }, feed.url, false, {
+        fileName: "[project]/src/app/manage/page.tsx",
+        lineNumber: 70,
+        columnNumber: 5
+    }, this);
+};
+_s1(SavedFeed, "LrrVfNW3d1raFE0BNzCTILYmIfo=");
+_c1 = SavedFeed;
 function ManagePage() {
-    _s();
+    _s2();
     const [feedUrlInput, setFeedUrlInput] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [topic, setTopic] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])("");
     const [suggestedFeeds, setSuggestedFeeds] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])([]);
@@ -673,7 +820,7 @@ function ManagePage() {
                                     children: "Add Feed"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 157,
+                                    lineNumber: 212,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -687,7 +834,7 @@ function ManagePage() {
                                             className: "flex-1"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 159,
+                                            lineNumber: 214,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -699,18 +846,18 @@ function ManagePage() {
                                                 size: "sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 172,
+                                                lineNumber: 227,
                                                 columnNumber: 30
                                             }, this) : "Add Feed"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 166,
+                                            lineNumber: 221,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 158,
+                                    lineNumber: 213,
                                     columnNumber: 13
                                 }, this),
                                 error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -718,13 +865,13 @@ function ManagePage() {
                                     children: error
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 175,
+                                    lineNumber: 230,
                                     columnNumber: 23
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 156,
+                            lineNumber: 211,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -735,7 +882,7 @@ function ManagePage() {
                                     children: "Suggest Feeds"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 179,
+                                    lineNumber: 234,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -749,7 +896,7 @@ function ManagePage() {
                                             className: "flex-1"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 181,
+                                            lineNumber: 236,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -761,24 +908,24 @@ function ManagePage() {
                                                 size: "sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 194,
+                                                lineNumber: 249,
                                                 columnNumber: 33
                                             }, this) : "Suggest"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 188,
+                                            lineNumber: 243,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 180,
+                                    lineNumber: 235,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 178,
+                            lineNumber: 233,
                             columnNumber: 11
                         }, this),
                         suggestedFeeds.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -789,7 +936,7 @@ function ManagePage() {
                                     children: "Suggested Feeds"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 201,
+                                    lineNumber: 256,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -799,29 +946,29 @@ function ManagePage() {
                                             onSubscribe: handleSubscribeToFeed
                                         }, feed.url, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 204,
+                                            lineNumber: 259,
                                             columnNumber: 19
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 202,
+                                    lineNumber: 257,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 200,
+                            lineNumber: 255,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 155,
+                    lineNumber: 210,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 154,
+                lineNumber: 209,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -832,7 +979,7 @@ function ManagePage() {
                         children: "Your Feeds"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 213,
+                        lineNumber: 268,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -846,116 +993,50 @@ function ManagePage() {
                                     children: "No feeds added yet. Add some feeds to get started."
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 218,
+                                    lineNumber: 273,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 217,
+                                lineNumber: 272,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 216,
+                            lineNumber: 271,
                             columnNumber: 13
-                        }, this) : savedFeeds.map((feed)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
-                                className: "shadow-sm",
-                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
-                                    className: "p-4",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        className: "flex flex-col sm:flex-row sm:items-center justify-between gap-3",
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                className: "flex items-center gap-3",
-                                                children: [
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("img", {
-                                                        src: `https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`,
-                                                        className: "w-6 h-6",
-                                                        alt: "favicon"
-                                                    }, void 0, false, {
-                                                        fileName: "[project]/src/app/manage/page.tsx",
-                                                        lineNumber: 227,
-                                                        columnNumber: 23
-                                                    }, this),
-                                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                                        children: [
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                                className: "font-medium text-[var(--text-primary)]",
-                                                                children: feed.title
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/src/app/manage/page.tsx",
-                                                                lineNumber: 233,
-                                                                columnNumber: 25
-                                                            }, this),
-                                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                                className: "text-xs text-[var(--text-secondary)] break-all",
-                                                                children: feed.url
-                                                            }, void 0, false, {
-                                                                fileName: "[project]/src/app/manage/page.tsx",
-                                                                lineNumber: 234,
-                                                                columnNumber: 25
-                                                            }, this)
-                                                        ]
-                                                    }, void 0, true, {
-                                                        fileName: "[project]/src/app/manage/page.tsx",
-                                                        lineNumber: 232,
-                                                        columnNumber: 23
-                                                    }, this)
-                                                ]
-                                            }, void 0, true, {
-                                                fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 226,
-                                                columnNumber: 21
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
-                                                variant: "destructive",
-                                                className: "text-sm py-1 px-3 w-full sm:w-auto",
-                                                onClick: ()=>handleRemoveFeed(feed.url),
-                                                children: "Remove"
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 237,
-                                                columnNumber: 21
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 225,
-                                        columnNumber: 19
-                                    }, this)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 224,
-                                    columnNumber: 17
-                                }, this)
+                        }, this) : savedFeeds.map((feed)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(SavedFeed, {
+                                feed: feed,
+                                onRemove: handleRemoveFeed
                             }, feed.url, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 223,
+                                lineNumber: 278,
                                 columnNumber: 15
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 214,
+                        lineNumber: 269,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 212,
+                lineNumber: 267,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/manage/page.tsx",
-        lineNumber: 153,
+        lineNumber: 208,
         columnNumber: 5
     }, this);
 }
-_s(ManagePage, "PhYlFgmsg1tN+VqJgZnoA8w493A=");
-_c1 = ManagePage;
-var _c, _c1;
+_s2(ManagePage, "PhYlFgmsg1tN+VqJgZnoA8w493A=");
+_c2 = ManagePage;
+var _c, _c1, _c2;
 __turbopack_context__.k.register(_c, "SuggestedFeed");
-__turbopack_context__.k.register(_c1, "ManagePage");
+__turbopack_context__.k.register(_c1, "SavedFeed");
+__turbopack_context__.k.register(_c2, "ManagePage");
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
     __turbopack_context__.k.registerExports(module, globalThis.$RefreshHelpers$);
 }
