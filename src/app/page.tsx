@@ -283,9 +283,9 @@ export default function HomePage() {
                 articles.slice(0, visibleCount).map((article, idx) => (
                   <Card key={idx} className="shadow-sm overflow-hidden">
                     <CardContent className="p-0">
-                      <div className="flex">
+                      <div className="flex flex-col sm:flex-row">
                         {article.thumbnail && (
-                          <div className="w-40 h-auto">
+                          <div className="w-full sm:w-40 h-40 sm:h-auto">
                             <img 
                               src={article.thumbnail} 
                               alt={article.title}
@@ -293,10 +293,10 @@ export default function HomePage() {
                             />
                           </div>
                         )}
-                        <div className="flex-1 p-4">
+                        <div className="flex-1 p-3 sm:p-4">
                           <a
                             href={article.link}
-                            className="text-lg font-medium text-[var(--primary)] hover:underline"
+                            className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
                           >
                             {article.title}
                           </a>
@@ -306,11 +306,11 @@ export default function HomePage() {
                               className="w-4 h-4"
                               alt="favicon"
                             />
-                            <p className="text-sm text-[var(--text-secondary)]">
+                            <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                               {new URL(article.link).hostname.replace("www.", "")}
                             </p>
                           </div>
-                          <p className="text-sm text-[var(--text-secondary)]">
+                          <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                             {formatDate(article.pubDate)}
                           </p>
                         </div>
