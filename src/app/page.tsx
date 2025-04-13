@@ -99,6 +99,36 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
   );
 };
 
+// Suggested Feed component to reduce re-renders
+const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (feed: FeedData) => void }) => {
+  return (
+    <Card key={feed.url} className="shadow-sm">
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img
+              src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+              className="w-6 h-6"
+              alt="favicon"
+            />
+            <div>
+              <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
+              <p className="text-xs text-[var(--text-secondary)]">{feed.url}</p>
+            </div>
+          </div>
+          <Button 
+            variant="default" 
+            className="text-sm py-1 px-3"
+            onClick={() => onSubscribe(feed)}
+          >
+            Subscribe
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
@@ -278,6 +308,14 @@ export default function HomePage() {
     }
   }, []);
 
+  // Handle subscribing to a suggested feed
+  const handleSubscribeToFeed = useCallback((feed: FeedData) => {
+    saveFeedToStorage({ title: feed.title, url: feed.url });
+    setFeedUrlInput(""); // Clear input
+    handleRefresh(); // Refresh articles
+    setSuggestedFeeds([]); // Clear suggestions
+  }, []);
+
   return (
     <main className="space-y-8">
       <section className="space-y-4">
@@ -334,12 +372,11 @@ export default function HomePage() {
         </div>
         <div className="grid gap-3">
           {suggestedFeeds.map((feed) => (
-            <Card key={feed.url} className="shadow-sm">
-              <CardContent className="p-4">
-                <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
-                <p className="text-sm text-[var(--text-secondary)]">{feed.url}</p>
-              </CardContent>
-            </Card>
+            <SuggestedFeed 
+              key={feed.url} 
+              feed={feed} 
+              onSubscribe={handleSubscribeToFeed} 
+            />
           ))}
         </div>
       </section>

@@ -1,4 +1,3 @@
 {
-  "/api/proxy": "pages/api/proxy.js",
   "/api/suggest": "pages/api/suggest.js"
 }
