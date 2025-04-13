@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -57,42 +57,117 @@ function formatDate(dateString: string): string {
   }
 }
 
+// Article component to reduce re-renders
+const Article = ({ article }: { article: { title: string; link: string; pubDate: string; thumbnail?: string } }) => {
+  return (
+    <Card className="shadow-sm overflow-hidden">
+      <CardContent className="p-0">
+        <div className="flex flex-col sm:flex-row">
+          {article.thumbnail && (
+            <div className="w-full sm:w-40 h-40 sm:h-auto">
+              <img 
+                src={article.thumbnail} 
+                alt={article.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <div className="flex-1 p-3 sm:p-4">
+            <a
+              href={article.link}
+              className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
+            >
+              {article.title}
+            </a>
+            <div className="flex items-center gap-2 my-1">
+              <img
+                src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
+                className="w-4 h-4"
+                alt="favicon"
+              />
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+                {new URL(article.link).hostname.replace("www.", "")}
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+              {formatDate(article.pubDate)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function HomePage() {
   const [feedUrlInput, setFeedUrlInput] = useState("");
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
-  const [visibleCount, setVisibleCount] = useState(50);
+  const [visibleCount, setVisibleCount] = useState(20);
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const lastRefreshTime = useRef<number>(0);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Memoize visible articles to prevent unnecessary re-renders
+  const visibleArticles = useMemo(() => {
+    return articles.slice(0, visibleCount);
+  }, [articles, visibleCount]);
+
+  // Intersection observer for infinite scrolling
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          setVisibleCount((prev) => prev + 50);
+        if (entries[0].isIntersecting && !isLoading) {
+          setVisibleCount((prev) => Math.min(prev + 20, articles.length));
         }
       },
-      { threshold: 1.0 }
+      { threshold: 0.5 }
     );
 
-    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, []);
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
 
+    return () => {
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
+      }
+    };
+  }, [isLoading, articles.length]);
+
+  // Load saved feeds on initial render
   useEffect(() => {
     const loadSavedFeeds = async () => {
       setIsLoading(true);
       try {
         const feeds = loadFeedsFromStorage();
-        const allArticles = await Promise.all(
-          feeds.map(async (feed) => {
+        if (feeds.length === 0) {
+          setIsLoading(false);
+          setIsInitialLoad(false);
+          return;
+        }
+
+        // Fetch feeds in parallel with a timeout
+        const fetchPromises = feeds.map(async (feed) => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             const data = await fetchAndParseRSS(feed.url);
+            clearTimeout(timeoutId);
             return data?.items || [];
-          })
-        );
+          } catch (error) {
+            console.error(`Error fetching feed ${feed.url}:`, error);
+            return [];
+          }
+        });
+
+        const allArticles = await Promise.all(fetchPromises);
         const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
         setArticles(sorted);
       } catch (error) {
@@ -106,14 +181,27 @@ export default function HomePage() {
     setIsClient(true);
     loadSavedFeeds();
 
+    // Set up periodic refresh with a reasonable interval
     const interval = setInterval(() => {
-      loadSavedFeeds();
-    }, 1000 * 60 * 10);
+      const now = Date.now();
+      // Only refresh if it's been at least 10 minutes since the last refresh
+      if (now - lastRefreshTime.current > 10 * 60 * 1000) {
+        handleRefresh();
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
   }, []);
 
-  const handleAddFeed = async () => {
+  // Handle adding a new feed
+  const handleAddFeed = useCallback(async () => {
+    if (!feedUrlInput.trim()) return;
+    
     setIsLoading(true);
     try {
       const resolvedFeedUrl = await getFeedUrlFromHtml(feedUrlInput);
@@ -121,15 +209,10 @@ export default function HomePage() {
         const feedData = await fetchAndParseRSS(resolvedFeedUrl);
         if (feedData) {
           saveFeedToStorage({ title: feedData.title, url: resolvedFeedUrl });
-          const feeds = loadFeedsFromStorage();
-          const allArticles = await Promise.all(
-            feeds.map(async (feed) => {
-              const data = await fetchAndParseRSS(feed.url);
-              return data?.items || [];
-            })
-          );
-          const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-          setArticles(sorted);
+          setFeedUrlInput(""); // Clear input after successful add
+          
+          // Refresh articles
+          handleRefresh();
         }
       }
     } catch (error) {
@@ -137,32 +220,63 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [feedUrlInput]);
 
-  const handleTopicSuggest = async () => {
-    const results = await suggestFeedsWithWorker(topic, []);
-    setSuggestedFeeds(results);
-  };
+  // Handle topic suggestion
+  const handleTopicSuggest = useCallback(async () => {
+    if (!topic.trim()) return;
+    
+    try {
+      const results = await suggestFeedsWithWorker(topic, []);
+      setSuggestedFeeds(results);
+    } catch (error) {
+      console.error("Error suggesting feeds:", error);
+    }
+  }, [topic]);
 
-  const handleRefresh = async () => {
-    setIsLoading(true);
+  // Handle refreshing feeds
+  const handleRefresh = useCallback(async () => {
+    // Prevent multiple refreshes in quick succession
+    const now = Date.now();
+    if (now - lastRefreshTime.current < 5000) { // 5 second cooldown
+      return;
+    }
+    
+    lastRefreshTime.current = now;
+    setIsRefreshing(true);
+    
     try {
       const feeds = loadFeedsFromStorage();
-      const allArticles = await Promise.all(
-        feeds.map(async (feed) => {
+      if (feeds.length === 0) {
+        setIsRefreshing(false);
+        return;
+      }
+
+      // Fetch feeds in parallel with a timeout
+      const fetchPromises = feeds.map(async (feed) => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
           const data = await fetchAndParseRSS(feed.url);
+          clearTimeout(timeoutId);
           return data?.items || [];
-        })
-      );
+        } catch (error) {
+          console.error(`Error fetching feed ${feed.url}:`, error);
+          return [];
+        }
+      });
+
+      const allArticles = await Promise.all(fetchPromises);
       const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
       setArticles(sorted);
-      setVisibleCount(50);
+      setVisibleCount(20); // Reset visible count
     } catch (error) {
       console.error("Error refreshing feeds:", error);
     } finally {
-      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  };
+  }, []);
 
   return (
     <main className="space-y-8">
@@ -187,15 +301,7 @@ export default function HomePage() {
                   saveFeedToStorage({ title: title ?? url, url });
                 }
               });
-              const feeds = loadFeedsFromStorage();
-              const allArticles = await Promise.all(
-                feeds.map(async (feed) => {
-                  const data = await fetchAndParseRSS(feed.url);
-                  return data?.items || [];
-                })
-              );
-              const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-              setArticles(sorted);
+              handleRefresh();
             } catch (error) {
               console.error("Error importing OPML:", error);
             } finally {
@@ -244,8 +350,9 @@ export default function HomePage() {
           <Button
             variant="default"
             onClick={handleRefresh}
+            disabled={isRefreshing}
           >
-            Refresh
+            {isRefreshing ? <Spinner size="sm" /> : "Refresh"}
           </Button>
         </div>
 
@@ -280,46 +387,21 @@ export default function HomePage() {
                 </Card>
               ) : (
                 // Show actual articles
-                articles.slice(0, visibleCount).map((article, idx) => (
-                  <Card key={idx} className="shadow-sm overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex flex-col sm:flex-row">
-                        {article.thumbnail && (
-                          <div className="w-full sm:w-40 h-40 sm:h-auto">
-                            <img 
-                              src={article.thumbnail} 
-                              alt={article.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 p-3 sm:p-4">
-                          <a
-                            href={article.link}
-                            className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
-                          >
-                            {article.title}
-                          </a>
-                          <div className="flex items-center gap-2 my-1">
-                            <img
-                              src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                              className="w-4 h-4"
-                              alt="favicon"
-                            />
-                            <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                              {new URL(article.link).hostname.replace("www.", "")}
-                            </p>
-                          </div>
-                          <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                            {formatDate(article.pubDate)}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                visibleArticles.map((article, idx) => (
+                  <Article key={`${article.link}-${idx}`} article={article} />
                 ))
               )}
-              <div ref={loadMoreRef} className="h-10" />
+              {articles.length > visibleCount && (
+                <div ref={loadMoreRef} className="h-10 flex justify-center">
+                  <Button 
+                    variant="default" 
+                    onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
+                    className="w-full"
+                  >
+                    Load More
+                  </Button>
+                </div>
+              )}
             </div>
           </PullToRefresh>
         )}
