@@ -16,21 +16,30 @@ import {
 } from "@/lib/rssUtils";
 import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
 
-// Suggested Feed component to reduce re-renders
+// SuggestedFeed component to reduce re-renders
 const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (feed: FeedData) => void }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <Card key={feed.url} className="shadow-sm">
       <CardContent className="p-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-6 relative">
-              <Image
-                src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
-                className="object-contain"
-                alt="favicon"
-                fill
-              />
-            </div>
+            {mounted && (
+              <div className="w-6 h-6 relative">
+                <Image
+                  src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+                  className="object-contain"
+                  alt="favicon"
+                  fill
+                  unoptimized
+                />
+              </div>
+            )}
             <div>
               <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
               <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
@@ -38,10 +47,52 @@ const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (fe
           </div>
           <Button 
             variant="default" 
-            className="text-sm py-1 px-3 w-full sm:w-auto"
             onClick={() => onSubscribe(feed)}
+            className="whitespace-nowrap"
           >
             Subscribe
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// SavedFeed component
+const SavedFeed = ({ feed, onRemove }: { feed: { title: string; url: string }, onRemove: (url: string) => void }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <Card key={feed.url} className="shadow-sm">
+      <CardContent className="p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {mounted && (
+              <div className="w-6 h-6 relative">
+                <Image
+                  src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
+                  className="object-contain"
+                  alt="favicon"
+                  fill
+                  unoptimized
+                />
+              </div>
+            )}
+            <div>
+              <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
+              <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
+            </div>
+          </div>
+          <Button 
+            variant="destructive" 
+            onClick={() => onRemove(feed.url)}
+            className="whitespace-nowrap"
+          >
+            Remove
           </Button>
         </div>
       </CardContent>
@@ -224,33 +275,7 @@ export default function ManagePage() {
             </Card>
           ) : (
             savedFeeds.map((feed) => (
-              <Card key={feed.url} className="shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 relative">
-                        <Image
-                          src={`https://www.google.com/s2/favicons?sz=32&domain_url=${feed.url}`}
-                          className="object-contain"
-                          alt="favicon"
-                          fill
-                        />
-                      </div>
-                      <div>
-                        <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
-                        <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
-                      </div>
-                    </div>
-                    <Button 
-                      variant="destructive" 
-                      className="text-sm py-1 px-3 w-full sm:w-auto"
-                      onClick={() => handleRemoveFeed(feed.url)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <SavedFeed key={feed.url} feed={feed} onRemove={handleRemoveFeed} />
             ))
           )}
         </div>

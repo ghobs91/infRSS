@@ -55,17 +55,27 @@ function formatDate(dateString: string): string {
 
 // Article component to reduce re-renders
 const Article = ({ article }: { article: { title: string; link: string; pubDate: string; thumbnail?: string } }) => {
+  const [mounted, setMounted] = useState(false);
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <Card className="shadow-sm overflow-hidden">
       <CardContent className="p-0">
         <div className="flex flex-col sm:flex-row">
-          {article.thumbnail && (
+          {article.thumbnail && !imgError && (
             <div className="w-full sm:w-40 h-40 sm:h-auto relative">
+              {/* Use unoptimized prop for external images */}
               <Image 
                 src={article.thumbnail} 
                 alt={article.title}
                 fill
+                unoptimized
                 className="object-cover"
+                onError={() => setImgError(true)}
               />
             </div>
           )}
@@ -73,18 +83,23 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
             <a
               href={article.link}
               className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               {article.title}
             </a>
             <div className="flex items-center gap-2 my-1">
-              <div className="w-4 h-4 relative">
-                <Image
-                  src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                  alt="favicon"
-                  fill
-                  className="object-contain"
-                />
-              </div>
+              {mounted && (
+                <div className="w-4 h-4 relative">
+                  <Image
+                    src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
+                    alt="favicon"
+                    fill
+                    unoptimized
+                    className="object-contain"
+                  />
+                </div>
+              )}
               <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                 {new URL(article.link).hostname.replace("www.", "")}
               </p>

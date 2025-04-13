@@ -7,5 +7,15 @@ const withPWA = require("next-pwa")({
   
   module.exports = withPWA({
     // your existing config
+    images: {
+      domains: ['www.google.com'],
+      remotePatterns: [
+        {
+          protocol: 'https',
+          hostname: 'www.google.com',
+          pathname: '/s2/favicons/**',
+        },
+      ],
+    },
   });
   

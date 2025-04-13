@@ -869,6 +869,10 @@
     background-color: var(--color-white);
   }
 
+  .object-contain {
+    object-fit: contain;
+  }
+
   .object-cover {
     object-fit: cover;
   }
@@ -993,6 +997,10 @@
 
   .break-all {
     word-break: break-all;
+  }
+
+  .whitespace-nowrap {
+    white-space: nowrap;
   }
 
   .text-\[var\(--foreground\)\] {
