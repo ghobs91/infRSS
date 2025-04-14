@@ -1,0 +1,3 @@
+{
+  "/api/fetch-rss/route": "app/api/fetch-rss/route.js"
+}

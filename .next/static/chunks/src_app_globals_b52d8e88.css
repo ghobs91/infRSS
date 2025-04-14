@@ -529,6 +529,10 @@
     min-height: 160px;
   }
 
+  .min-h-\[calc\(100vh-64px\)\] {
+    min-height: calc(100vh - 64px);
+  }
+
   .min-h-screen {
     min-height: 100vh;
   }
