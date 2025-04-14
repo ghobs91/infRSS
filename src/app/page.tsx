@@ -11,9 +11,16 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
+  type Article,
 } from "@/lib/rssUtils";
-
-const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: false });
+import { AlertCircle } from "lucide-react";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
+import { Navigation } from "@/components/Navigation";
+import { ArticleCard } from "@/components/ArticleCard";
 
 // Format date to "Month Day, Year" (e.g., "April 13th, 2025")
 function formatDate(dateString: string): string {
@@ -150,81 +157,61 @@ const PullToRefreshStyles = () => {
 };
 
 export default function HomePage() {
-  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
-  const [visibleCount, setVisibleCount] = useState(20);
-  const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const lastRefreshTime = useRef<number>(0);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Memoize visible articles to prevent unnecessary re-renders
-  const visibleArticles = useMemo(() => {
-    return articles.slice(0, visibleCount);
-  }, [articles, visibleCount]);
-
-  // Handle refreshing feeds
   const handleRefresh = useCallback(async () => {
-    // Prevent multiple refreshes in quick succession
-    const now = Date.now();
-    if (now - lastRefreshTime.current < 5000) { // 5 second cooldown
-      return;
-    }
-    
-    lastRefreshTime.current = now;
-    setIsRefreshing(true);
-    
+    setIsLoading(true);
+    setError(null);
     try {
       const feeds = loadFeedsFromStorage();
-      if (feeds.length === 0) {
-        setIsRefreshing(false);
-        return;
+      const allArticles: Article[] = [];
+
+      for (const feed of feeds) {
+        const result = await fetchAndParseRSS(feed.url);
+        if (result) {
+          const feedDomain = new URL(feed.url).hostname;
+          const articles = result.items.map(item => ({
+            ...item,
+            sourceDomain: feedDomain
+          }));
+          allArticles.push(...articles);
+        }
       }
 
-      // Fetch feeds in parallel with a timeout
-      const fetchPromises = feeds.map(async (feed) => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
-          const data = await fetchAndParseRSS(feed.url);
-          clearTimeout(timeoutId);
-          return data?.items || [];
-        } catch (error) {
-          console.error(`Error fetching feed ${feed.url}:`, error);
-          return [];
-        }
+      // Sort by date, newest first
+      const sortedArticles = allArticles.sort((a, b) => {
+        return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
       });
 
-      const allArticles = await Promise.all(fetchPromises);
-      const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-      setArticles(sorted);
-      setVisibleCount(20); // Reset visible count
-    } catch (error) {
-      console.error("Error refreshing feeds:", error);
+      setArticles(sortedArticles);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load articles');
     } finally {
-      setIsRefreshing(false);
+      setIsLoading(false);
     }
   }, []);
 
-  // Intersection observer for infinite scrolling
   useEffect(() => {
+    handleRefresh();
+  }, [handleRefresh]);
+
+  useEffect(() => {
+    const currentRef = loadMoreRef.current;
+    if (!currentRef) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoading) {
-          setVisibleCount((prev) => Math.min(prev + 20, articles.length));
+        if (entries[0].isIntersecting && !isLoading && articles.length > 0) {
+          // Load more logic here if needed
         }
       },
-      { threshold: 0.5 }
+      { threshold: 1.0 }
     );
 
-    const currentRef = loadMoreRef.current;
-    if (currentRef) {
-      observer.observe(currentRef);
-    }
-
+    observer.observe(currentRef);
     return () => {
       if (currentRef) {
         observer.unobserve(currentRef);
@@ -232,149 +219,46 @@ export default function HomePage() {
     };
   }, [isLoading, articles.length]);
 
-  // Load saved feeds on initial render
-  useEffect(() => {
-    const loadSavedFeeds = async () => {
-      setIsLoading(true);
-      try {
-        const feeds = loadFeedsFromStorage();
-        if (feeds.length === 0) {
-          setIsLoading(false);
-          setIsInitialLoad(false);
-          return;
-        }
-
-        // Fetch feeds in parallel with a timeout
-        const fetchPromises = feeds.map(async (feed) => {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
-            const data = await fetchAndParseRSS(feed.url);
-            clearTimeout(timeoutId);
-            return data?.items || [];
-          } catch (error) {
-            console.error(`Error fetching feed ${feed.url}:`, error);
-            return [];
-          }
-        });
-
-        const allArticles = await Promise.all(fetchPromises);
-        const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-        setArticles(sorted);
-      } catch (error) {
-        console.error("Error loading feeds:", error);
-      } finally {
-        setIsLoading(false);
-        setIsInitialLoad(false);
-      }
-    };
-
-    setIsClient(true);
-    loadSavedFeeds();
-
-    // Set up periodic refresh with a reasonable interval
-    const interval = setInterval(() => {
-      const now = Date.now();
-      // Only refresh if it's been at least 10 minutes since the last refresh
-      if (now - lastRefreshTime.current > 10 * 60 * 1000) {
-        handleRefresh();
-      }
-    }, 10 * 60 * 1000); // Check every 10 minutes
-
-    return () => {
-      clearInterval(interval);
-      const currentTimeoutRef = refreshTimeoutRef.current;
-      if (currentTimeoutRef) {
-        clearTimeout(currentTimeoutRef);
-      }
-    };
-  }, [handleRefresh]);
-
   return (
-    <>
-      <PullToRefreshStyles />
-      <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
+    <main className="container mx-auto p-4">
+      <Navigation />
+      
+      <div className="mt-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         <section className="space-y-4">
-          {isClient && (
-            <PullToRefresh
-              onRefresh={handleRefresh}
-              distanceToRefresh={70}
-              resistance={2.5}
-              hammerOptions={{
-                touchAction: 'pan-y',
-                recognizers: {
-                  pan: {
-                    threshold: 5,
-                    direction: 'DIRECTION_DOWN'
-                  }
-                }
-              }}
-              icon={
-                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                  <Spinner size="sm" className="mr-2" />
-                  <span>Pull to refresh</span>
+          {articles.length === 0 && !isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">
+                No articles found. Add some RSS feeds to get started!
+              </p>
+            </div>
+          ) : (
+            <>
+              {isLoading && articles.length === 0 ? (
+                <div className="space-y-4">
+                  <ArticleSkeleton />
+                  <ArticleSkeleton />
+                  <ArticleSkeleton />
                 </div>
-              }
-              loading={
-                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                  <Spinner size="sm" className="mr-2" />
-                  <span>Refreshing...</span>
+              ) : (
+                <div className="space-y-4">
+                  {articles.map((article, index) => (
+                    <ArticleCard key={`${article.link}-${index}`} article={article} />
+                  ))}
                 </div>
-              }
-            >
-              <div className="grid gap-4 min-h-[calc(100vh-64px)]">
-                {isInitialLoad ? (
-                  // Show spinner during initial load
-                  <div className="flex justify-center items-center py-12">
-                    <Spinner size="lg" />
-                  </div>
-                ) : isRefreshing ? (
-                  // Show spinner during pull-to-refresh
-                  <div className="flex justify-center items-center py-4">
-                    <Spinner size="md" />
-                  </div>
-                ) : isLoading ? (
-                  // Show skeleton loaders while loading
-                  Array.from({ length: 10 }).map((_, idx) => (
-                    <div 
-                      key={`skeleton-${idx}`} 
-                      style={{ 
-                        animationDelay: `${idx * 100}ms`,
-                        animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
-                      }}
-                    >
-                      <ArticleSkeleton />
-                    </div>
-                  ))
-                ) : articles.length === 0 ? (
-                  <Card className="shadow-sm">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  // Show actual articles
-                  visibleArticles.map((article, idx) => (
-                    <Article key={`${article.link}-${idx}`} article={article} />
-                  ))
-                )}
-                {articles.length > visibleCount && (
-                  <div ref={loadMoreRef} className="h-10 flex justify-center">
-                    <Button 
-                      variant="default" 
-                      onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
-                      className="w-full"
-                    >
-                      Load More
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </PullToRefresh>
+              )}
+            </>
           )}
+          <div ref={loadMoreRef} className="h-4" />
         </section>
-      </main>
-    </>
+      </div>
+    </main>
   );
 }

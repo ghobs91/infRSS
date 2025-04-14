@@ -22,7 +22,7 @@ interface ArticleItem {
 }
 
 // Helper function to fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 10000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   
@@ -30,13 +30,20 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
+      headers: {
+        ...options.headers,
+        'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
+      }
     });
     clearTimeout(id);
     return response;
   } catch (error) {
     clearTimeout(id);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeout}ms`);
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeout}ms for URL: ${url}`);
+      }
+      throw new Error(`Failed to fetch ${url}: ${error.message}`);
     }
     throw error;
   }
@@ -116,8 +123,8 @@ async function extractThumbnail(content: string, url: string): Promise<string | 
 
 export async function fetchAndParseRSS(url: string): Promise<{ title: string; items: any[] } | null> {
   try {
-    // Use our API endpoint to fetch the RSS feed
-    const response = await fetchWithTimeout('/api/fetch-rss', {
+    // Use our proxy endpoint to fetch the RSS feed
+    const response = await fetchWithTimeout('/api/proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -176,55 +183,61 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       };
     });
 
-    // Process thumbnails in batches
+    // Process thumbnails in batches with increased concurrency
     const processedItems = await batchProcess(items, async (item) => {
       const result = { ...item };
       
-      if (!result.thumbnail && result.link) {
+      // Skip article page fetch if we already have a thumbnail from RSS
+      if (result.thumbnail) {
+        const { content: _, ...cleanResult } = result;
+        return cleanResult;
+      }
+
+      // Only try to fetch article page if we have a link and no thumbnail yet
+      if (result.link) {
         try {
-          const pageResponse = await fetchWithTimeout('/api/fetch-rss', {
+          const pageResponse = await fetchWithTimeout('/api/proxy', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ url: result.link }),
-          }, 10000); // Increased timeout to 10 seconds for article pages
+          }, 10000); // Reduced timeout since we're processing more concurrently
 
           if (pageResponse.ok) {
             const { data: html } = await pageResponse.json();
             
-            // Try to get Open Graph image
+            // Try to get Open Graph image first (most reliable)
             const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) ||
                           html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
             if (ogMatch && ogMatch[1]) {
-              result.thumbnail = ogMatch[1];
-              return result;
-            }
-
-            // Try to get Twitter image if no OG image
-            const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) ||
-                               html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-            if (twitterMatch && twitterMatch[1]) {
-              result.thumbnail = twitterMatch[1];
-              return result;
-            }
-
-            // If still no thumbnail, try to find first image in content
-            if (result.content) {
-              const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-              if (imgMatch && imgMatch[1]) {
-                result.thumbnail = imgMatch[1];
+              result.thumbnail = `/api/proxy?url=${encodeURIComponent(ogMatch[1])}`;
+            } else {
+              // Try to get Twitter image as fallback
+              const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) ||
+                                 html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+              if (twitterMatch && twitterMatch[1]) {
+                result.thumbnail = `/api/proxy?url=${encodeURIComponent(twitterMatch[1])}`;
+              } else if (result.content) {
+                // Last resort: try to find first image in content
+                const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+                if (imgMatch && imgMatch[1]) {
+                  result.thumbnail = `/api/proxy?url=${encodeURIComponent(imgMatch[1])}`;
+                }
               }
             }
           }
         } catch (error) {
-          console.error("Error fetching article page:", error);
+          // Don't log timeout errors as they're expected occasionally
+          if (!(error instanceof Error && error.message.includes('timed out'))) {
+            console.error("Error fetching article page:", error);
+          }
         }
       }
       
       const { content: _, ...cleanResult } = result;
       return cleanResult;
-    }, 3); // Process 3 items concurrently
+    }, 5); // Increased concurrency from 3 to 5
 
     return {
       title,

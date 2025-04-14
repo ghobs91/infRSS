@@ -236,18 +236,28 @@ __turbopack_context__.s({
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
 // Helper function to fetch with timeout
-async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+async function fetchWithTimeout(url, options = {}, timeout = 15000) {
     const controller = new AbortController();
     const id = setTimeout(()=>controller.abort(), timeout);
     try {
         const response = await fetch(url, {
             ...options,
-            signal: controller.signal
+            signal: controller.signal,
+            headers: {
+                ...options.headers,
+                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
+            }
         });
         clearTimeout(id);
         return response;
     } catch (error) {
         clearTimeout(id);
+        if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+                throw new Error(`Request timed out after ${timeout}ms for URL: ${url}`);
+            }
+            throw new Error(`Failed to fetch ${url}: ${error.message}`);
+        }
         throw error;
     }
 }
@@ -290,38 +300,28 @@ async function getFeedUrlFromHtml(siteUrl) {
     }
 }
 // Function to extract thumbnail from various sources
-async function extractThumbnail(link, content) {
+async function extractThumbnail(content, url) {
     try {
-        // Try to fetch the HTML of the article page
-        const response = await fetch(link);
-        const html = await response.text();
-        // Try to get Open Graph image
-        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
-        if (ogMatch && ogMatch[1]) {
-            return ogMatch[1];
-        }
-        // Try to get Twitter image
-        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-        if (twitterMatch && twitterMatch[1]) {
-            return twitterMatch[1];
-        }
-        // If we have content, try to find the first image
-        if (content) {
-            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-            if (imgMatch && imgMatch[1]) {
-                return imgMatch[1];
-            }
-        }
-        return undefined;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, 'text/html');
+        // Try to find the first image in the content
+        const firstImage = doc.querySelector('img');
+        if (!firstImage) return undefined;
+        const imageUrl = firstImage.getAttribute('src');
+        if (!imageUrl) return undefined;
+        // Convert relative URLs to absolute
+        const absoluteUrl = new URL(imageUrl, new URL(url).origin).toString();
+        // Return the proxied URL
+        return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
     } catch (error) {
-        console.error("Error extracting thumbnail:", error);
+        console.warn('Error extracting thumbnail:', error);
         return undefined;
     }
 }
 async function fetchAndParseRSS(url) {
     try {
-        // Use our API endpoint to fetch the RSS feed
-        const response = await fetchWithTimeout('/api/fetch-rss', {
+        // Use our proxy endpoint to fetch the RSS feed
+        const response = await fetchWithTimeout('/api/proxy', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -352,11 +352,18 @@ async function fetchAndParseRSS(url) {
             const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
             const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
             // Try to get enclosure image first
-            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url") || undefined;
+            let thumbnail = undefined;
+            const enclosureUrl = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+            if (enclosureUrl) {
+                thumbnail = `/api/proxy?url=${encodeURIComponent(enclosureUrl)}`;
+            }
             // If no enclosure image, try media:content
             if (!thumbnail) {
                 const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                thumbnail = mediaContent?.getAttribute("url") || undefined;
+                const mediaUrl = mediaContent?.getAttribute("url");
+                if (mediaUrl) {
+                    thumbnail = `/api/proxy?url=${encodeURIComponent(mediaUrl)}`;
+                }
             }
             return {
                 title: itemTitle,
@@ -366,14 +373,20 @@ async function fetchAndParseRSS(url) {
                 content
             };
         });
-        // Process thumbnails in batches
+        // Process thumbnails in batches with increased concurrency
         const processedItems = await batchProcess(items, async (item)=>{
             const result = {
                 ...item
             };
-            if (!result.thumbnail && result.link) {
+            // Skip article page fetch if we already have a thumbnail from RSS
+            if (result.thumbnail) {
+                const { content: _, ...cleanResult } = result;
+                return cleanResult;
+            }
+            // Only try to fetch article page if we have a link and no thumbnail yet
+            if (result.link) {
                 try {
-                    const pageResponse = await fetchWithTimeout('/api/fetch-rss', {
+                    const pageResponse = await fetchWithTimeout('/api/proxy', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -381,36 +394,37 @@ async function fetchAndParseRSS(url) {
                         body: JSON.stringify({
                             url: result.link
                         })
-                    }, 5000); // 5 second timeout for article pages
+                    }, 10000); // Reduced timeout since we're processing more concurrently
                     if (pageResponse.ok) {
                         const { data: html } = await pageResponse.json();
-                        // Try to get Open Graph image
+                        // Try to get Open Graph image first (most reliable)
                         const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
                         if (ogMatch && ogMatch[1]) {
-                            result.thumbnail = ogMatch[1];
-                            return result;
-                        }
-                        // Try to get Twitter image if no OG image
-                        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-                        if (twitterMatch && twitterMatch[1]) {
-                            result.thumbnail = twitterMatch[1];
-                            return result;
-                        }
-                        // If still no thumbnail, try to find first image in content
-                        if (result.content) {
-                            const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-                            if (imgMatch && imgMatch[1]) {
-                                result.thumbnail = imgMatch[1];
+                            result.thumbnail = `/api/proxy?url=${encodeURIComponent(ogMatch[1])}`;
+                        } else {
+                            // Try to get Twitter image as fallback
+                            const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+                            if (twitterMatch && twitterMatch[1]) {
+                                result.thumbnail = `/api/proxy?url=${encodeURIComponent(twitterMatch[1])}`;
+                            } else if (result.content) {
+                                // Last resort: try to find first image in content
+                                const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+                                if (imgMatch && imgMatch[1]) {
+                                    result.thumbnail = `/api/proxy?url=${encodeURIComponent(imgMatch[1])}`;
+                                }
                             }
                         }
                     }
                 } catch (error) {
-                    console.error("Error fetching article page:", error);
+                    // Don't log timeout errors as they're expected occasionally
+                    if (!(error instanceof Error && error.message.includes('timed out'))) {
+                        console.error("Error fetching article page:", error);
+                    }
                 }
             }
             const { content: _, ...cleanResult } = result;
             return cleanResult;
-        }, 3); // Process 3 items concurrently
+        }, 5); // Increased concurrency from 3 to 5
         return {
             title,
             items: processedItems

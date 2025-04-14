@@ -132,6 +132,52 @@ __turbopack_context__.s({
     "removeFeedFromStorage": (()=>removeFeedFromStorage),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
+// Helper function to fetch with timeout
+async function fetchWithTimeout(url, options = {}, timeout = 15000) {
+    const controller = new AbortController();
+    const id = setTimeout(()=>controller.abort(), timeout);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                ...options.headers,
+                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
+            }
+        });
+        clearTimeout(id);
+        return response;
+    } catch (error) {
+        clearTimeout(id);
+        if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+                throw new Error(`Request timed out after ${timeout}ms for URL: ${url}`);
+            }
+            throw new Error(`Failed to fetch ${url}: ${error.message}`);
+        }
+        throw error;
+    }
+}
+// Batch process promises with concurrency limit
+async function batchProcess(items, processItem, concurrency = 3) {
+    const results = [];
+    const inProgress = new Set();
+    for (const item of items){
+        if (inProgress.size >= concurrency) {
+            await Promise.race(inProgress);
+        }
+        const processPromise = Promise.resolve().then(async ()=>{
+            try {
+                results.push(await processItem(item));
+            } finally{
+                inProgress.delete(processPromise);
+            }
+        });
+        inProgress.add(processPromise);
+    }
+    await Promise.all(inProgress);
+    return results;
+}
 async function getFeedUrlFromHtml(siteUrl) {
     try {
         const res = await fetchWithCors(siteUrl);
@@ -151,46 +197,40 @@ async function getFeedUrlFromHtml(siteUrl) {
     }
 }
 // Function to extract thumbnail from various sources
-async function extractThumbnail(link, content) {
+async function extractThumbnail(content, url) {
     try {
-        // Try to fetch the HTML of the article page
-        const response = await fetch(link);
-        const html = await response.text();
-        // Try to get Open Graph image
-        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
-        if (ogMatch && ogMatch[1]) {
-            return ogMatch[1];
-        }
-        // Try to get Twitter image
-        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-        if (twitterMatch && twitterMatch[1]) {
-            return twitterMatch[1];
-        }
-        // If we have content, try to find the first image
-        if (content) {
-            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-            if (imgMatch && imgMatch[1]) {
-                return imgMatch[1];
-            }
-        }
-        return undefined;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(content, 'text/html');
+        // Try to find the first image in the content
+        const firstImage = doc.querySelector('img');
+        if (!firstImage) return undefined;
+        const imageUrl = firstImage.getAttribute('src');
+        if (!imageUrl) return undefined;
+        // Convert relative URLs to absolute
+        const absoluteUrl = new URL(imageUrl, new URL(url).origin).toString();
+        // Return the proxied URL
+        return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
     } catch (error) {
-        console.error("Error extracting thumbnail:", error);
+        console.warn('Error extracting thumbnail:', error);
         return undefined;
     }
 }
 async function fetchAndParseRSS(url) {
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(()=>controller.abort(), 10000);
-        const response = await fetch(url, {
-            signal: controller.signal
+        // Use our proxy endpoint to fetch the RSS feed
+        const response = await fetchWithTimeout('/api/proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url
+            })
         });
-        clearTimeout(timeoutId);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const text = await response.text();
+        const { data: text } = await response.json();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(text, "text/xml");
         // Check if it's a valid RSS feed
@@ -203,32 +243,88 @@ async function fetchAndParseRSS(url) {
             return null;
         }
         const title = channel.querySelector("title")?.textContent || "";
-        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map((item)=>{
             const itemTitle = item.querySelector("title")?.textContent || "";
             const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
             const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
             const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
             // Try to get enclosure image first
-            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+            let thumbnail = undefined;
+            const enclosureUrl = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+            if (enclosureUrl) {
+                thumbnail = `/api/proxy?url=${encodeURIComponent(enclosureUrl)}`;
+            }
             // If no enclosure image, try media:content
             if (!thumbnail) {
                 const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                thumbnail = mediaContent?.getAttribute("url");
-            }
-            // If still no thumbnail, try to extract from the article
-            if (!thumbnail && itemLink) {
-                thumbnail = await extractThumbnail(itemLink, content);
+                const mediaUrl = mediaContent?.getAttribute("url");
+                if (mediaUrl) {
+                    thumbnail = `/api/proxy?url=${encodeURIComponent(mediaUrl)}`;
+                }
             }
             return {
                 title: itemTitle,
                 link: itemLink,
                 pubDate: itemPubDate,
-                thumbnail: thumbnail
+                thumbnail,
+                content
             };
         });
+        // Process thumbnails in batches with increased concurrency
+        const processedItems = await batchProcess(items, async (item)=>{
+            const result = {
+                ...item
+            };
+            // Skip article page fetch if we already have a thumbnail from RSS
+            if (result.thumbnail) {
+                const { content: _, ...cleanResult } = result;
+                return cleanResult;
+            }
+            // Only try to fetch article page if we have a link and no thumbnail yet
+            if (result.link) {
+                try {
+                    const pageResponse = await fetchWithTimeout('/api/proxy', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            url: result.link
+                        })
+                    }, 10000); // Reduced timeout since we're processing more concurrently
+                    if (pageResponse.ok) {
+                        const { data: html } = await pageResponse.json();
+                        // Try to get Open Graph image first (most reliable)
+                        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+                        if (ogMatch && ogMatch[1]) {
+                            result.thumbnail = `/api/proxy?url=${encodeURIComponent(ogMatch[1])}`;
+                        } else {
+                            // Try to get Twitter image as fallback
+                            const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+                            if (twitterMatch && twitterMatch[1]) {
+                                result.thumbnail = `/api/proxy?url=${encodeURIComponent(twitterMatch[1])}`;
+                            } else if (result.content) {
+                                // Last resort: try to find first image in content
+                                const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+                                if (imgMatch && imgMatch[1]) {
+                                    result.thumbnail = `/api/proxy?url=${encodeURIComponent(imgMatch[1])}`;
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    // Don't log timeout errors as they're expected occasionally
+                    if (!(error instanceof Error && error.message.includes('timed out'))) {
+                        console.error("Error fetching article page:", error);
+                    }
+                }
+            }
+            const { content: _, ...cleanResult } = result;
+            return cleanResult;
+        }, 5); // Increased concurrency from 3 to 5
         return {
             title,
-            items: await Promise.all(items)
+            items: processedItems
         };
     } catch (error) {
         console.error("Error fetching RSS:", error);
