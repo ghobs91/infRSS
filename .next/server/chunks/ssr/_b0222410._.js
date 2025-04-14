@@ -133,52 +133,6 @@ __turbopack_context__.s({
     "removeFeedFromStorage": (()=>removeFeedFromStorage),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
-// Helper function to fetch with timeout
-async function fetchWithTimeout(url, options = {}, timeout = 15000) {
-    const controller = new AbortController();
-    const id = setTimeout(()=>controller.abort(), timeout);
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-            headers: {
-                ...options.headers,
-                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
-            }
-        });
-        clearTimeout(id);
-        return response;
-    } catch (error) {
-        clearTimeout(id);
-        if (error instanceof Error) {
-            if (error.name === 'AbortError') {
-                throw new Error(`Request timed out after ${timeout}ms for URL: ${url}`);
-            }
-            throw new Error(`Failed to fetch ${url}: ${error.message}`);
-        }
-        throw error;
-    }
-}
-// Batch process promises with concurrency limit
-async function batchProcess(items, processItem, concurrency = 3) {
-    const results = [];
-    const inProgress = new Set();
-    for (const item of items){
-        if (inProgress.size >= concurrency) {
-            await Promise.race(inProgress);
-        }
-        const processPromise = Promise.resolve().then(async ()=>{
-            try {
-                results.push(await processItem(item));
-            } finally{
-                inProgress.delete(processPromise);
-            }
-        });
-        inProgress.add(processPromise);
-    }
-    await Promise.all(inProgress);
-    return results;
-}
 async function getFeedUrlFromHtml(siteUrl) {
     try {
         const res = await fetchWithCors(siteUrl);
@@ -197,22 +151,47 @@ async function getFeedUrlFromHtml(siteUrl) {
         return null;
     }
 }
+// Function to extract thumbnail from various sources
+async function extractThumbnail(link, content) {
+    try {
+        // Try to fetch the HTML of the article page
+        const response = await fetch(link);
+        const html = await response.text();
+        // Try to get Open Graph image
+        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+        if (ogMatch && ogMatch[1]) {
+            return ogMatch[1];
+        }
+        // Try to get Twitter image
+        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+        if (twitterMatch && twitterMatch[1]) {
+            return twitterMatch[1];
+        }
+        // If we have content, try to find the first image
+        if (content) {
+            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+            if (imgMatch && imgMatch[1]) {
+                return imgMatch[1];
+            }
+        }
+        return undefined;
+    } catch (error) {
+        console.error("Error extracting thumbnail:", error);
+        return undefined;
+    }
+}
 async function fetchAndParseRSS(url) {
     try {
-        // Use our proxy endpoint to fetch the RSS feed
-        const response = await fetchWithTimeout('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url
-            })
+        const controller = new AbortController();
+        const timeoutId = setTimeout(()=>controller.abort(), 10000);
+        const response = await fetch(url, {
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const { data: text } = await response.json();
+        const text = await response.text();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(text, "text/xml");
         // Check if it's a valid RSS feed
@@ -225,90 +204,32 @@ async function fetchAndParseRSS(url) {
             return null;
         }
         const title = channel.querySelector("title")?.textContent || "";
-        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map((item)=>{
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
             const itemTitle = item.querySelector("title")?.textContent || "";
             const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
             const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
             const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
             // Try to get enclosure image first
-            let thumbnail = undefined;
-            const enclosureUrl = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
-            if (enclosureUrl) {
-                thumbnail = `/api/proxy?url=${encodeURIComponent(enclosureUrl)}`;
-            }
+            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
             // If no enclosure image, try media:content
             if (!thumbnail) {
                 const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                const mediaUrl = mediaContent?.getAttribute("url");
-                if (mediaUrl) {
-                    thumbnail = `/api/proxy?url=${encodeURIComponent(mediaUrl)}`;
-                }
+                thumbnail = mediaContent?.getAttribute("url");
+            }
+            // If still no thumbnail, try to extract from the article
+            if (!thumbnail && itemLink) {
+                thumbnail = await extractThumbnail(itemLink, content);
             }
             return {
                 title: itemTitle,
                 link: itemLink,
                 pubDate: itemPubDate,
-                thumbnail,
-                content
+                thumbnail: thumbnail
             };
         });
-        // Process thumbnails in batches with increased concurrency
-        const processedItems = await batchProcess(items, async (item)=>{
-            const result = {
-                ...item
-            };
-            // Skip article page fetch if we already have a thumbnail from RSS
-            if (result.thumbnail) {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { content, ...cleanResult } = result;
-                return cleanResult;
-            }
-            // Only try to fetch article page if we have a link and no thumbnail yet
-            if (result.link) {
-                try {
-                    const pageResponse = await fetchWithTimeout('/api/proxy', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            url: result.link
-                        })
-                    }, 10000); // Reduced timeout since we're processing more concurrently
-                    if (pageResponse.ok) {
-                        const { data: html } = await pageResponse.json();
-                        // Try to get Open Graph image first (most reliable)
-                        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
-                        if (ogMatch && ogMatch[1]) {
-                            result.thumbnail = `/api/proxy?url=${encodeURIComponent(ogMatch[1])}`;
-                        } else {
-                            // Try to get Twitter image as fallback
-                            const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-                            if (twitterMatch && twitterMatch[1]) {
-                                result.thumbnail = `/api/proxy?url=${encodeURIComponent(twitterMatch[1])}`;
-                            } else if (result.content) {
-                                // Last resort: try to find first image in content
-                                const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-                                if (imgMatch && imgMatch[1]) {
-                                    result.thumbnail = `/api/proxy?url=${encodeURIComponent(imgMatch[1])}`;
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    // Don't log timeout errors as they're expected occasionally
-                    if (!(error instanceof Error && error.message.includes('timed out'))) {
-                        console.error("Error fetching article page:", error);
-                    }
-                }
-            }
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { content, ...cleanResult } = result;
-            return cleanResult;
-        }, 5); // Increased concurrency from 3 to 5
         return {
             title,
-            items: processedItems
+            items: await Promise.all(items)
         };
     } catch (error) {
         console.error("Error fetching RSS:", error);
@@ -782,9 +703,11 @@ function ManagePage() {
                     feedData = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["fetchAndParseRSS"])(feedUrl);
                 }
             }
-            if (feedData) {
+            if (feedData && feedData.length > 0) {
+                // Get the feed title from the first article or use the hostname
+                const feedTitle = feedData[0].title || new URL(feedUrlInput.trim()).hostname;
                 const newFeed = {
-                    title: feedData.title || new URL(feedUrlInput.trim()).hostname,
+                    title: feedTitle,
                     url: feedUrlInput.trim()
                 };
                 (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["saveFeedToStorage"])(newFeed);
@@ -895,7 +818,7 @@ function ManagePage() {
                                     children: "Add Feed"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 249,
+                                    lineNumber: 252,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -909,7 +832,7 @@ function ManagePage() {
                                             className: "flex-1"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 251,
+                                            lineNumber: 254,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -921,18 +844,18 @@ function ManagePage() {
                                                 size: "sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 264,
+                                                lineNumber: 267,
                                                 columnNumber: 30
                                             }, this) : "Add Feed"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 258,
+                                            lineNumber: 261,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 250,
+                                    lineNumber: 253,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -946,20 +869,20 @@ function ManagePage() {
                                             disabled: isImporting
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 268,
+                                            lineNumber: 271,
                                             columnNumber: 15
                                         }, this),
                                         isImporting && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 275,
+                                            lineNumber: 278,
                                             columnNumber: 31
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 267,
+                                    lineNumber: 270,
                                     columnNumber: 13
                                 }, this),
                                 error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -967,13 +890,13 @@ function ManagePage() {
                                     children: error
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 277,
+                                    lineNumber: 280,
                                     columnNumber: 23
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 248,
+                            lineNumber: 251,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -984,7 +907,7 @@ function ManagePage() {
                                     children: "Suggest Feeds"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 281,
+                                    lineNumber: 284,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -998,7 +921,7 @@ function ManagePage() {
                                             className: "flex-1"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 283,
+                                            lineNumber: 286,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -1010,24 +933,24 @@ function ManagePage() {
                                                 size: "sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/manage/page.tsx",
-                                                lineNumber: 296,
+                                                lineNumber: 299,
                                                 columnNumber: 33
                                             }, this) : "Suggest"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 290,
+                                            lineNumber: 293,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 282,
+                                    lineNumber: 285,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 280,
+                            lineNumber: 283,
                             columnNumber: 11
                         }, this),
                         suggestedFeeds.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1038,7 +961,7 @@ function ManagePage() {
                                     children: "Suggested Feeds"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 303,
+                                    lineNumber: 306,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1048,29 +971,29 @@ function ManagePage() {
                                             onSubscribe: handleSubscribeToFeed
                                         }, feed.url, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 306,
+                                            lineNumber: 309,
                                             columnNumber: 19
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 304,
+                                    lineNumber: 307,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 302,
+                            lineNumber: 305,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 247,
+                    lineNumber: 250,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 246,
+                lineNumber: 249,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -1081,7 +1004,7 @@ function ManagePage() {
                         children: "Your Feeds"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 315,
+                        lineNumber: 318,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1095,41 +1018,41 @@ function ManagePage() {
                                     children: "No feeds added yet. Add some feeds to get started."
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 320,
+                                    lineNumber: 323,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 319,
+                                lineNumber: 322,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 318,
+                            lineNumber: 321,
                             columnNumber: 13
                         }, this) : savedFeeds.map((feed)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(SavedFeed, {
                                 feed: feed,
                                 onRemove: handleRemoveFeed
                             }, feed.url, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 325,
+                                lineNumber: 328,
                                 columnNumber: 15
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 316,
+                        lineNumber: 319,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 314,
+                lineNumber: 317,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/manage/page.tsx",
-        lineNumber: 245,
+        lineNumber: 248,
         columnNumber: 5
     }, this);
 }

@@ -186,7 +186,6 @@ var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_
 // lib/rssUtils.ts
 __turbopack_context__.s({
     "fetchAndParseRSS": (()=>fetchAndParseRSS),
-    "fetchWithCors": (()=>fetchWithCors),
     "getFeedUrlFromHtml": (()=>getFeedUrlFromHtml),
     "loadArticleThumbnails": (()=>loadArticleThumbnails),
     "loadFeedsFromStorage": (()=>loadFeedsFromStorage),
@@ -258,115 +257,170 @@ async function getFeedUrlFromHtml(siteUrl) {
         return null;
     }
 }
-async function fetchAndParseRSS(url, fetchThumbnails = false) {
+async function getThumbnailFromUrl(url) {
     try {
-        // Use our proxy endpoint to fetch the RSS feed
-        const response = await fetchWithTimeout('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url
-            })
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const { data: text } = await response.json();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(text, "text/xml");
-        // Check if it's a valid RSS feed
-        const rssElement = xmlDoc.querySelector("rss, feed");
-        if (!rssElement) {
-            return null;
-        }
-        const channel = xmlDoc.querySelector("channel, feed");
-        if (!channel) {
-            return null;
-        }
-        const title = channel.querySelector("title")?.textContent || "";
-        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map((item)=>{
-            const itemTitle = item.querySelector("title")?.textContent || "";
-            const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
-            const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
-            const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
-            // Try to get enclosure image first
-            let thumbnail = undefined;
-            const enclosureUrl = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
-            if (enclosureUrl) {
-                thumbnail = `/api/proxy?url=${encodeURIComponent(enclosureUrl)}`;
+        const response = await fetchWithTimeout(url, {}, 5000);
+        const html = await response.text();
+        return extractThumbnailFromHtml(html);
+    } catch (error) {
+        console.error("Error fetching thumbnail:", error);
+        return undefined;
+    }
+}
+async function fetchAndParseRSS(feedUrl, fetchThumbnails = false) {
+    try {
+        console.log(`Fetching RSS feed: ${feedUrl}`);
+        // Use the CORS proxy to fetch the feed
+        const response = await fetchWithCors(feedUrl);
+        const text = await response.text();
+        // First try to parse as XML
+        try {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, 'text/xml');
+            // Check for parsing errors
+            const parserError = xmlDoc.querySelector('parsererror');
+            if (parserError) {
+                throw new Error('XML parsing failed');
             }
-            // If no enclosure image, try media:content
-            if (!thumbnail) {
-                const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                const mediaUrl = mediaContent?.getAttribute("url");
-                if (mediaUrl) {
-                    thumbnail = `/api/proxy?url=${encodeURIComponent(mediaUrl)}`;
-                }
-            }
-            return {
-                title: itemTitle,
-                link: itemLink,
-                pubDate: itemPubDate,
-                thumbnail,
-                content: fetchThumbnails ? content : undefined
-            };
-        });
-        // Only process thumbnails if requested
-        if (fetchThumbnails) {
-            const processedItems = await batchProcess(items, async (item)=>{
-                const result = {
-                    ...item
-                };
-                if (result.thumbnail) {
-                    const { content, ...cleanResult } = result;
-                    return cleanResult;
-                }
-                if (result.link) {
+            // Extract items from the feed
+            const items = xmlDoc.querySelectorAll('item, entry');
+            if (items.length > 0) {
+                console.log(`Found ${items.length} items in XML feed`);
+                const articles = [];
+                for (const item of items){
                     try {
-                        const pageResponse = await fetchWithTimeout('/api/proxy', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                url: result.link
-                            })
-                        }, 10000);
-                        if (pageResponse.ok) {
-                            const { data: html } = await pageResponse.json();
-                            result.thumbnail = await extractThumbnailFromHtml(html, result.link);
+                        const title = item.querySelector('title')?.textContent?.trim() || 'Untitled';
+                        const link = item.querySelector('link')?.textContent?.trim() || '';
+                        const pubDate = item.querySelector('pubDate, published, updated')?.textContent?.trim() || new Date().toISOString();
+                        const content = item.querySelector('description, content\\:encoded, summary, content')?.textContent?.trim() || '';
+                        // Get source domain
+                        let sourceDomain = '';
+                        try {
+                            sourceDomain = new URL(link || feedUrl).hostname;
+                        } catch  {
+                            console.warn(`Failed to parse URL for source domain: ${link || feedUrl}`);
+                            sourceDomain = new URL(feedUrl).hostname;
                         }
+                        const article = {
+                            title,
+                            link,
+                            pubDate,
+                            content,
+                            thumbnail: '',
+                            sourceDomain
+                        };
+                        // Fetch thumbnail if requested
+                        if (fetchThumbnails && link) {
+                            try {
+                                article.thumbnail = await getThumbnailFromUrl(link);
+                            } catch (error) {
+                                console.warn(`Failed to fetch thumbnail for ${link}:`, error);
+                            // Continue without thumbnail
+                            }
+                        }
+                        articles.push(article);
                     } catch (error) {
-                        if (!(error instanceof Error && error.message.includes('timed out'))) {
-                            console.error("Error fetching article page:", error);
-                        }
+                        console.warn(`Failed to process XML item:`, error);
+                    // Continue with next item
                     }
                 }
-                const { content, ...cleanResult } = result;
-                return cleanResult;
-            }, 5);
-            return {
-                title,
-                items: processedItems
-            };
+                return articles;
+            }
+        } catch  {
+            console.log(`XML parsing failed for ${feedUrl}, checking if it's HTML`);
         }
-        // Return items without processing thumbnails
-        return {
-            title,
-            items: items.map(({ content, ...item })=>({
-                    ...item,
-                    sourceDomain: new URL(url).hostname
-                }))
-        };
+        // Check if the response is HTML
+        if (text.trim().startsWith('<!DOCTYPE html') || text.trim().startsWith('<html')) {
+            console.log(`Received HTML instead of XML for ${feedUrl}, attempting to extract RSS feed URL`);
+            // Try to extract the RSS feed URL from the HTML
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(text, 'text/html');
+            const baseUrl = new URL(feedUrl);
+            // Look for RSS feed links
+            const rssLinks = Array.from(htmlDoc.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"], link[rel="alternate"][type="application/rss+xml"], link[rel="alternate"][type="application/atom+xml"]'));
+            if (rssLinks.length > 0) {
+                // Get the first RSS feed URL
+                const rssLink = rssLinks[0].getAttribute('href');
+                if (rssLink) {
+                    // Resolve the URL if it's relative
+                    const absoluteRssUrl = new URL(rssLink, baseUrl.origin).toString();
+                    console.log(`Found RSS feed URL: ${absoluteRssUrl}, fetching it instead`);
+                    // Recursively fetch the actual RSS feed
+                    return fetchAndParseRSS(absoluteRssUrl, fetchThumbnails);
+                }
+            }
+            // If we couldn't find an RSS feed URL, try to extract articles from the HTML
+            console.log(`No RSS feed URL found in HTML for ${feedUrl}, attempting to extract articles from HTML`);
+            // Look for article-like elements
+            const articleElements = htmlDoc.querySelectorAll('article, .article, .post, .entry, .item, .feed-item');
+            if (articleElements.length > 0) {
+                console.log(`Found ${articleElements.length} article-like elements in HTML`);
+                const articles = [];
+                for (const element of articleElements){
+                    try {
+                        // Extract title
+                        const titleElement = element.querySelector('h1, h2, h3, .title, .headline');
+                        const title = titleElement?.textContent?.trim() || 'Untitled';
+                        // Extract link
+                        const linkElement = element.querySelector('a[href]');
+                        const link = linkElement?.getAttribute('href') || '';
+                        const absoluteLink = link ? new URL(link, baseUrl.origin).toString() : '';
+                        // Extract date
+                        const dateElement = element.querySelector('time, .date, .published, .pubdate');
+                        const pubDate = dateElement?.getAttribute('datetime') || dateElement?.textContent?.trim() || new Date().toISOString();
+                        // Extract content
+                        const contentElement = element.querySelector('.content, .excerpt, .summary, .description');
+                        const content = contentElement?.textContent?.trim() || '';
+                        // Get source domain
+                        let sourceDomain = '';
+                        try {
+                            if (absoluteLink) {
+                                sourceDomain = new URL(absoluteLink).hostname;
+                            } else {
+                                sourceDomain = baseUrl.hostname;
+                            }
+                        } catch  {
+                            console.warn(`Failed to parse URL for source domain: ${absoluteLink || feedUrl}`);
+                            sourceDomain = baseUrl.hostname;
+                        }
+                        // Create article object
+                        const article = {
+                            title,
+                            link: absoluteLink,
+                            pubDate,
+                            content,
+                            thumbnail: '',
+                            sourceDomain
+                        };
+                        // Fetch thumbnail if requested
+                        if (fetchThumbnails && absoluteLink) {
+                            try {
+                                article.thumbnail = await getThumbnailFromUrl(absoluteLink);
+                            } catch (error) {
+                                console.warn(`Failed to fetch thumbnail for ${absoluteLink}:`, error);
+                            // Continue without thumbnail
+                            }
+                        }
+                        articles.push(article);
+                    } catch (error) {
+                        console.warn(`Failed to process HTML element:`, error);
+                    // Continue with next element
+                    }
+                }
+                if (articles.length > 0) {
+                    return articles;
+                }
+            }
+        }
+        // If we get here, we couldn't parse the response as XML or HTML
+        throw new Error(`Failed to parse feed: ${feedUrl}`);
     } catch (error) {
-        console.error("Error fetching RSS:", error);
-        return null;
+        console.error(`Error fetching and parsing RSS feed ${feedUrl}:`, error);
+        throw error;
     }
 }
 // Helper function to extract thumbnail from HTML
-async function extractThumbnailFromHtml(html, articleUrl) {
+async function extractThumbnailFromHtml(html) {
     // Try to get Open Graph image first (most reliable)
     const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
     if (ogMatch && ogMatch[1]) {
@@ -398,7 +452,7 @@ async function loadArticleThumbnails(articles) {
             }, 10000);
             if (pageResponse.ok) {
                 const { data: html } = await pageResponse.json();
-                const thumbnail = await extractThumbnailFromHtml(html, article.link);
+                const thumbnail = await extractThumbnailFromHtml(html);
                 return {
                     ...article,
                     thumbnail
@@ -412,9 +466,43 @@ async function loadArticleThumbnails(articles) {
         return article;
     }, 5);
 }
-const fetchWithCors = async (url)=>{
-    return fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
-};
+// Helper function to fetch with CORS proxy
+async function fetchWithCors(url, retries = 2) {
+    try {
+        const response = await fetch(`/api/proxy?url=${encodeURIComponent(url)}`, {
+            headers: {
+                'Accept': 'application/rss+xml, application/xml, application/atom+xml, text/xml, */*'
+            }
+        });
+        if (!response.ok) {
+            // Retry on specific error status codes
+            if ((response.status === 504 || response.status === 502 || response.status === 500) && retries > 0) {
+                console.log(`Retrying fetch for ${url} (${retries} retries left) - Status: ${response.status}`);
+                // Exponential backoff: wait longer between each retry
+                const backoffTime = (3 - retries) * 1000; // 1s, 2s, 3s
+                await new Promise((resolve)=>setTimeout(resolve, backoffTime));
+                return fetchWithCors(url, retries - 1);
+            }
+            // For timeout errors, provide a more helpful error message
+            if (response.status === 504) {
+                throw new Error(`Request timed out for ${url}. The server took too long to respond.`);
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response;
+    } catch (error) {
+        console.error(`Error fetching ${url}:`, error);
+        // Retry on network errors if we have retries left
+        if (retries > 0) {
+            console.log(`Retrying fetch for ${url} after network error (${retries} retries left)`);
+            // Exponential backoff: wait longer between each retry
+            const backoffTime = (3 - retries) * 1000; // 1s, 2s, 3s
+            await new Promise((resolve)=>setTimeout(resolve, backoffTime));
+            return fetchWithCors(url, retries - 1);
+        }
+        throw error;
+    }
+}
 function saveFeedToStorage(feed) {
     const stored = localStorage.getItem("feeds");
     const current = stored ? JSON.parse(stored) : [];
@@ -593,11 +681,31 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/card.tsx [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/utils.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/image.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+;
+var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
 ;
 function ArticleCard({ article }) {
+    _s();
+    const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
+    const [previewText, setPreviewText] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "ArticleCard.useEffect": ()=>{
+            setMounted(true);
+            // Extract preview text from the article content if available
+            if (article.content) {
+                // Remove HTML tags and get plain text
+                const plainText = article.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                // Limit to approximately 2 lines (around 150 characters)
+                setPreviewText(plainText.length > 150 ? plainText.substring(0, 150) + '...' : plainText);
+            }
+        }
+    }["ArticleCard.useEffect"], [
+        article.content
+    ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
         className: "shadow-sm overflow-hidden",
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
@@ -619,12 +727,12 @@ function ArticleCard({ article }) {
                             unoptimized: true
                         }, void 0, false, {
                             fileName: "[project]/src/components/ArticleCard.tsx",
-                            lineNumber: 22,
+                            lineNumber: 38,
                             columnNumber: 15
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/ArticleCard.tsx",
-                        lineNumber: 21,
+                        lineNumber: 37,
                         columnNumber: 13
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -635,24 +743,42 @@ function ArticleCard({ article }) {
                                 children: article.title
                             }, void 0, false, {
                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                lineNumber: 33,
+                                lineNumber: 49,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                className: "flex items-center gap-2 text-sm text-muted-foreground",
+                                className: "flex items-center gap-2 text-sm text-muted-foreground mb-2",
                                 children: [
+                                    mounted && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                        className: "w-4 h-4 relative",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"], {
+                                            src: `https://www.google.com/s2/favicons?sz=32&domain_url=${article.link}`,
+                                            alt: "",
+                                            fill: true,
+                                            className: "object-contain",
+                                            unoptimized: true
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/ArticleCard.tsx",
+                                            lineNumber: 53,
+                                            columnNumber: 19
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/components/ArticleCard.tsx",
+                                        lineNumber: 52,
+                                        columnNumber: 17
+                                    }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: article.sourceDomain
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 35,
+                                        lineNumber: 62,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "•"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 36,
+                                        lineNumber: 63,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("time", {
@@ -660,38 +786,47 @@ function ArticleCard({ article }) {
                                         children: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["formatDate"])(article.pubDate)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 37,
+                                        lineNumber: 64,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                lineNumber: 34,
+                                lineNumber: 50,
                                 columnNumber: 13
+                            }, this),
+                            previewText && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                className: "text-sm text-muted-foreground line-clamp-2",
+                                children: previewText
+                            }, void 0, false, {
+                                fileName: "[project]/src/components/ArticleCard.tsx",
+                                lineNumber: 67,
+                                columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/ArticleCard.tsx",
-                        lineNumber: 32,
+                        lineNumber: 48,
                         columnNumber: 11
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/ArticleCard.tsx",
-                lineNumber: 14,
+                lineNumber: 30,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/components/ArticleCard.tsx",
-            lineNumber: 13,
+            lineNumber: 29,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/ArticleCard.tsx",
-        lineNumber: 12,
+        lineNumber: 28,
         columnNumber: 5
     }, this);
 }
+_s(ArticleCard, "n0Z3MarPvE4Cfe1SpiUgiaKt2zk=");
 _c = ArticleCard;
 var _c;
 __turbopack_context__.k.register(_c, "ArticleCard");
@@ -952,15 +1087,23 @@ function HomePage() {
             try {
                 const feeds = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["loadFeedsFromStorage"])();
                 const feedPromises = feeds.map({
-                    "HomePage.useCallback[loadArticles].feedPromises": (feed)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["fetchAndParseRSS"])(feed.url, false)
+                    "HomePage.useCallback[loadArticles].feedPromises": (feed)=>(0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["fetchAndParseRSS"])(feed.url, false).catch({
+                            "HomePage.useCallback[loadArticles].feedPromises": (err)=>{
+                                console.error(`Failed to fetch feed ${feed.url}:`, err);
+                                return null;
+                            }
+                        }["HomePage.useCallback[loadArticles].feedPromises"])
                 }["HomePage.useCallback[loadArticles].feedPromises"]);
                 const feedResults = await Promise.all(feedPromises);
-                // Combine all articles and sort by date
+                // Combine all articles and sort by date, filtering out invalid ones
                 const articles = feedResults.filter({
-                    "HomePage.useCallback[loadArticles].articles": (result)=>result !== null
+                    "HomePage.useCallback[loadArticles].articles": (result)=>Array.isArray(result) && result.length > 0
                 }["HomePage.useCallback[loadArticles].articles"]).flatMap({
-                    "HomePage.useCallback[loadArticles].articles": (result)=>result.items
-                }["HomePage.useCallback[loadArticles].articles"]).sort({
+                    "HomePage.useCallback[loadArticles].articles": (result)=>result
+                }["HomePage.useCallback[loadArticles].articles"]).filter({
+                    "HomePage.useCallback[loadArticles].articles": (article)=>article && article.link && article.title
+                }["HomePage.useCallback[loadArticles].articles"]) // Filter out invalid articles
+                .sort({
                     "HomePage.useCallback[loadArticles].articles": (a, b)=>new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime()
                 }["HomePage.useCallback[loadArticles].articles"]);
                 setAllArticles(articles);
@@ -1053,7 +1196,7 @@ function HomePage() {
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$Navigation$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Navigation"], {}, void 0, false, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 221,
+                lineNumber: 225,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1064,10 +1207,10 @@ function HomePage() {
                         children: [
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
                                 className: "text-2xl font-bold",
-                                children: "Your Articles"
+                                children: "Newsfeed"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 225,
+                                lineNumber: 229,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1080,26 +1223,26 @@ function HomePage() {
                                         className: "h-4 w-4"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 232,
+                                        lineNumber: 236,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                         children: "Refresh"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 233,
+                                        lineNumber: 237,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 226,
+                                lineNumber: 230,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 224,
+                        lineNumber: 228,
                         columnNumber: 9
                     }, this),
                     error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Alert"], {
@@ -1109,27 +1252,27 @@ function HomePage() {
                                 className: "h-4 w-4"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 239,
+                                lineNumber: 243,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AlertTitle"], {
                                 children: "Error"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 240,
+                                lineNumber: 244,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AlertDescription"], {
                                 children: error
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 241,
+                                lineNumber: 245,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 238,
+                        lineNumber: 242,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -1141,12 +1284,12 @@ function HomePage() {
                                 children: "No articles found. Add some RSS feeds to get started!"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 248,
+                                lineNumber: 252,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 247,
+                            lineNumber: 251,
                             columnNumber: 13
                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
                             children: [
@@ -1155,23 +1298,23 @@ function HomePage() {
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 256,
+                                            lineNumber: 260,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 257,
+                                            lineNumber: 261,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 258,
+                                            lineNumber: 262,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 255,
+                                    lineNumber: 259,
                                     columnNumber: 17
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "space-y-4",
@@ -1179,12 +1322,12 @@ function HomePage() {
                                             article: article
                                         }, `${article.link}-${index}`, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 263,
+                                            lineNumber: 267,
                                             columnNumber: 21
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 261,
+                                    lineNumber: 265,
                                     columnNumber: 17
                                 }, this),
                                 isLoadingMore && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1193,12 +1336,12 @@ function HomePage() {
                                         className: "animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 271,
+                                        lineNumber: 275,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 270,
+                                    lineNumber: 274,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1206,26 +1349,26 @@ function HomePage() {
                                     className: "h-10"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 276,
+                                    lineNumber: 280,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true)
                     }, void 0, false, {
                         fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 245,
+                        lineNumber: 249,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 223,
+                lineNumber: 227,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 220,
+        lineNumber: 224,
         columnNumber: 5
     }, this);
 }

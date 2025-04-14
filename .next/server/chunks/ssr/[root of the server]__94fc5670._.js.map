@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 39, "column": 0}, "map": {"version":3,"sources":["file:///Users/andrewg/Projects/infrss/src/app/layout.tsx"],"sourcesContent":["\"use client\";\nimport \"./globals.css\";\n\nexport default function Layout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <head>\n        <link rel=\"manifest\" href=\"/manifest.webmanifest\" />\n        <meta name=\"theme-color\" content=\"#3b82f6\" />\n        <link rel=\"apple-touch-icon\" href=\"/icons/icon-192.png\" />\n        <link rel=\"icon\" href=\"/favicon.ico\" />\n      </head>\n      <body className=\"bg-[var(--background)] text-[var(--foreground)]\">\n        <div className=\"min-h-screen\">\n          {children}\n        </div>\n      </body>\n    </html>\n  );\n}\n"],"names":[],"mappings":";;;;AAAA;;;AAGe,SAAS,OAAO,EAAE,QAAQ,EAAiC;IACxE,qBACE,8OAAC;QAAK,MAAK;;0BACT,8OAAC;;kCACC,8OAAC;wBAAK,KAAI;wBAAW,MAAK;;;;;;kCAC1B,8OAAC;wBAAK,MAAK;wBAAc,SAAQ;;;;;;kCACjC,8OAAC;wBAAK,KAAI;wBAAmB,MAAK;;;;;;kCAClC,8OAAC;wBAAK,KAAI;wBAAO,MAAK;;;;;;;;;;;;0BAExB,8OAAC;gBAAK,WAAU;0BACd,cAAA,8OAAC;oBAAI,WAAU;8BACZ;;;;;;;;;;;;;;;;;AAKX","debugId":null}}]
-}

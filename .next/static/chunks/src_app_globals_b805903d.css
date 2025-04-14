@@ -339,20 +339,12 @@
     top: calc(var(--spacing) * 0);
   }
 
-  .top-4 {
-    top: calc(var(--spacing) * 4);
-  }
-
   .right-0 {
     right: calc(var(--spacing) * 0);
   }
 
   .left-0 {
     left: calc(var(--spacing) * 0);
-  }
-
-  .left-4 {
-    left: calc(var(--spacing) * 4);
   }
 
   .isolate {
@@ -610,10 +602,6 @@
     height: calc(var(--spacing) * 20);
   }
 
-  .h-24 {
-    height: calc(var(--spacing) * 24);
-  }
-
   .h-40 {
     height: calc(var(--spacing) * 40);
   }
@@ -632,10 +620,6 @@
 
   .min-h-\[160px\] {
     min-height: 160px;
-  }
-
-  .min-h-\[calc\(100vh-64px\)\] {
-    min-height: calc(100vh - 64px);
   }
 
   .min-h-screen {
@@ -680,10 +664,6 @@
 
   .w-20 {
     width: calc(var(--spacing) * 20);
-  }
-
-  .w-24 {
-    width: calc(var(--spacing) * 24);
   }
 
   .w-40 {
@@ -778,18 +758,6 @@
     resize: both;
   }
 
-  .columns-2 {
-    columns: 2;
-  }
-
-  .columns-3 {
-    columns: 3;
-  }
-
-  .columns-4 {
-    columns: 4;
-  }
-
   .flex-col {
     flex-direction: column;
   }
@@ -812,10 +780,6 @@
 
   .justify-center {
     justify-content: center;
-  }
-
-  .justify-end {
-    justify-content: flex-end;
   }
 
   .gap-1 {
@@ -850,12 +814,6 @@
     --tw-space-y-reverse: 0;
     margin-block-start: calc(calc(var(--spacing) * 4) * var(--tw-space-y-reverse));
     margin-block-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-y-reverse)));
-  }
-
-  :where(.space-y-6 > :not(:last-child)) {
-    --tw-space-y-reverse: 0;
-    margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
-    margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
   }
 
   :where(.space-y-8 > :not(:last-child)) {
@@ -1468,10 +1426,6 @@
     -moz-osx-font-smoothing: auto;
   }
 
-  .placeholder-gray-400::placeholder {
-    color: var(--color-gray-400);
-  }
-
   .shadow {
     --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, #0000001a), 0 1px 2px -1px var(--tw-shadow-color, #0000001a);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -1479,11 +1433,6 @@
 
   .shadow-lg {
     --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, #0000001a), 0 4px 6px -4px var(--tw-shadow-color, #0000001a);
-    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-  }
-
-  .shadow-md {
-    --tw-shadow: 0 4px 6px -1px var(--tw-shadow-color, #0000001a), 0 2px 4px -2px var(--tw-shadow-color, #0000001a);
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
 
@@ -1630,12 +1579,6 @@
   }
 
   @media (hover: hover) {
-    .hover\:bg-\[var\(--accent\)\]:hover {
-      background-color: var(--accent);
-    }
-  }
-
-  @media (hover: hover) {
     .hover\:bg-\[var\(--background-hover\)\]:hover {
       background-color: var(--background-hover);
     }
@@ -1644,18 +1587,6 @@
   @media (hover: hover) {
     .hover\:bg-\[var\(--primary-hover\)\]:hover {
       background-color: var(--primary-hover);
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:bg-blue-50:hover {
-      background-color: var(--color-blue-50);
-    }
-  }
-
-  @media (hover: hover) {
-    .hover\:bg-blue-700:hover {
-      background-color: var(--color-blue-700);
     }
   }
 
@@ -1678,10 +1609,6 @@
 
   .focus\:ring-\[var\(--primary\)\]:focus {
     --tw-ring-color: var(--primary);
-  }
-
-  .focus\:ring-blue-500:focus {
-    --tw-ring-color: var(--color-blue-500);
   }
 
   .focus\:outline-none:focus {
@@ -1720,20 +1647,8 @@
   }
 
   @media (width >= 40rem) {
-    .sm\:justify-between {
-      justify-content: space-between;
-    }
-  }
-
-  @media (width >= 40rem) {
     .sm\:p-4 {
       padding: calc(var(--spacing) * 4);
-    }
-  }
-
-  @media (width >= 40rem) {
-    .sm\:pb-0 {
-      padding-bottom: calc(var(--spacing) * 0);
     }
   }
 
@@ -1748,18 +1663,6 @@
     .sm\:text-sm {
       font-size: var(--text-sm);
       line-height: var(--tw-leading, var(--text-sm--line-height));
-    }
-  }
-
-  @media (width >= 48rem) {
-    .md\:block {
-      display: block;
-    }
-  }
-
-  @media (width >= 48rem) {
-    .md\:hidden {
-      display: none;
     }
   }
 

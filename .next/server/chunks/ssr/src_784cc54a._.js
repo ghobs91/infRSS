@@ -232,55 +232,10 @@ __turbopack_context__.s({
     "fetchWithCors": (()=>fetchWithCors),
     "getFeedUrlFromHtml": (()=>getFeedUrlFromHtml),
     "loadFeedsFromStorage": (()=>loadFeedsFromStorage),
+    "parseOPMLFile": (()=>parseOPMLFile),
     "removeFeedFromStorage": (()=>removeFeedFromStorage),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
-// Helper function to fetch with timeout
-async function fetchWithTimeout(url, options = {}, timeout = 15000) {
-    const controller = new AbortController();
-    const id = setTimeout(()=>controller.abort(), timeout);
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-            headers: {
-                ...options.headers,
-                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
-            }
-        });
-        clearTimeout(id);
-        return response;
-    } catch (error) {
-        clearTimeout(id);
-        if (error instanceof Error) {
-            if (error.name === 'AbortError') {
-                throw new Error(`Request timed out after ${timeout}ms for URL: ${url}`);
-            }
-            throw new Error(`Failed to fetch ${url}: ${error.message}`);
-        }
-        throw error;
-    }
-}
-// Batch process promises with concurrency limit
-async function batchProcess(items, processItem, concurrency = 3) {
-    const results = [];
-    const inProgress = new Set();
-    for (const item of items){
-        if (inProgress.size >= concurrency) {
-            await Promise.race(inProgress);
-        }
-        const processPromise = Promise.resolve().then(async ()=>{
-            try {
-                results.push(await processItem(item));
-            } finally{
-                inProgress.delete(processPromise);
-            }
-        });
-        inProgress.add(processPromise);
-    }
-    await Promise.all(inProgress);
-    return results;
-}
 async function getFeedUrlFromHtml(siteUrl) {
     try {
         const res = await fetchWithCors(siteUrl);
@@ -300,40 +255,46 @@ async function getFeedUrlFromHtml(siteUrl) {
     }
 }
 // Function to extract thumbnail from various sources
-async function extractThumbnail(content, url) {
+async function extractThumbnail(link, content) {
     try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(content, 'text/html');
-        // Try to find the first image in the content
-        const firstImage = doc.querySelector('img');
-        if (!firstImage) return undefined;
-        const imageUrl = firstImage.getAttribute('src');
-        if (!imageUrl) return undefined;
-        // Convert relative URLs to absolute
-        const absoluteUrl = new URL(imageUrl, new URL(url).origin).toString();
-        // Return the proxied URL
-        return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
+        // Try to fetch the HTML of the article page
+        const response = await fetch(link);
+        const html = await response.text();
+        // Try to get Open Graph image
+        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
+        if (ogMatch && ogMatch[1]) {
+            return ogMatch[1];
+        }
+        // Try to get Twitter image
+        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
+        if (twitterMatch && twitterMatch[1]) {
+            return twitterMatch[1];
+        }
+        // If we have content, try to find the first image
+        if (content) {
+            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
+            if (imgMatch && imgMatch[1]) {
+                return imgMatch[1];
+            }
+        }
+        return undefined;
     } catch (error) {
-        console.warn('Error extracting thumbnail:', error);
+        console.error("Error extracting thumbnail:", error);
         return undefined;
     }
 }
 async function fetchAndParseRSS(url) {
     try {
-        // Use our proxy endpoint to fetch the RSS feed
-        const response = await fetchWithTimeout('/api/proxy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url
-            })
+        const controller = new AbortController();
+        const timeoutId = setTimeout(()=>controller.abort(), 10000);
+        const response = await fetch(url, {
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        const { data: text } = await response.json();
+        const text = await response.text();
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(text, "text/xml");
         // Check if it's a valid RSS feed
@@ -346,88 +307,32 @@ async function fetchAndParseRSS(url) {
             return null;
         }
         const title = channel.querySelector("title")?.textContent || "";
-        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map((item)=>{
+        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
             const itemTitle = item.querySelector("title")?.textContent || "";
             const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
             const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
             const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
             // Try to get enclosure image first
-            let thumbnail = undefined;
-            const enclosureUrl = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
-            if (enclosureUrl) {
-                thumbnail = `/api/proxy?url=${encodeURIComponent(enclosureUrl)}`;
-            }
+            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
             // If no enclosure image, try media:content
             if (!thumbnail) {
                 const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                const mediaUrl = mediaContent?.getAttribute("url");
-                if (mediaUrl) {
-                    thumbnail = `/api/proxy?url=${encodeURIComponent(mediaUrl)}`;
-                }
+                thumbnail = mediaContent?.getAttribute("url");
+            }
+            // If still no thumbnail, try to extract from the article
+            if (!thumbnail && itemLink) {
+                thumbnail = await extractThumbnail(itemLink, content);
             }
             return {
                 title: itemTitle,
                 link: itemLink,
                 pubDate: itemPubDate,
-                thumbnail,
-                content
+                thumbnail: thumbnail
             };
         });
-        // Process thumbnails in batches with increased concurrency
-        const processedItems = await batchProcess(items, async (item)=>{
-            const result = {
-                ...item
-            };
-            // Skip article page fetch if we already have a thumbnail from RSS
-            if (result.thumbnail) {
-                const { content: _, ...cleanResult } = result;
-                return cleanResult;
-            }
-            // Only try to fetch article page if we have a link and no thumbnail yet
-            if (result.link) {
-                try {
-                    const pageResponse = await fetchWithTimeout('/api/proxy', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            url: result.link
-                        })
-                    }, 10000); // Reduced timeout since we're processing more concurrently
-                    if (pageResponse.ok) {
-                        const { data: html } = await pageResponse.json();
-                        // Try to get Open Graph image first (most reliable)
-                        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
-                        if (ogMatch && ogMatch[1]) {
-                            result.thumbnail = `/api/proxy?url=${encodeURIComponent(ogMatch[1])}`;
-                        } else {
-                            // Try to get Twitter image as fallback
-                            const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-                            if (twitterMatch && twitterMatch[1]) {
-                                result.thumbnail = `/api/proxy?url=${encodeURIComponent(twitterMatch[1])}`;
-                            } else if (result.content) {
-                                // Last resort: try to find first image in content
-                                const imgMatch = result.content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-                                if (imgMatch && imgMatch[1]) {
-                                    result.thumbnail = `/api/proxy?url=${encodeURIComponent(imgMatch[1])}`;
-                                }
-                            }
-                        }
-                    }
-                } catch (error) {
-                    // Don't log timeout errors as they're expected occasionally
-                    if (!(error instanceof Error && error.message.includes('timed out'))) {
-                        console.error("Error fetching article page:", error);
-                    }
-                }
-            }
-            const { content: _, ...cleanResult } = result;
-            return cleanResult;
-        }, 5); // Increased concurrency from 3 to 5
         return {
             title,
-            items: processedItems
+            items: await Promise.all(items)
         };
     } catch (error) {
         console.error("Error fetching RSS:", error);
@@ -455,8 +360,36 @@ function loadFeedsFromStorage() {
 function removeFeedFromStorage(url) {
     const stored = localStorage.getItem("feeds");
     const current = stored ? JSON.parse(stored) : [];
-    const updated = current.filter((feed)=>feed.url !== url);
+    const updated = current.filter((f)=>f.url !== url);
     localStorage.setItem("feeds", JSON.stringify(updated));
+}
+async function parseOPMLFile(file) {
+    return new Promise((resolve, reject)=>{
+        const reader = new FileReader();
+        reader.onload = async (e)=>{
+            try {
+                const text = e.target?.result;
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, "text/xml");
+                // Check if it's a valid OPML file
+                const opmlElement = xmlDoc.querySelector("opml");
+                if (!opmlElement) {
+                    throw new Error("Invalid OPML file");
+                }
+                // Get all outline elements that have an xmlUrl attribute (these are the feed entries)
+                const outlines = Array.from(xmlDoc.querySelectorAll("outline[xmlUrl]"));
+                const feeds = outlines.map((outline)=>({
+                        title: outline.getAttribute("title") || outline.getAttribute("text") || "",
+                        url: outline.getAttribute("xmlUrl") || ""
+                    })).filter((feed)=>feed.url !== ""); // Filter out any entries without URLs
+                resolve(feeds);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = ()=>reject(new Error("Failed to read file"));
+        reader.readAsText(file);
+    });
 }
 }}),
 "[project]/src/app/page.tsx [app-ssr] (ecmascript)": ((__turbopack_context__) => {
@@ -469,7 +402,6 @@ __turbopack_context__.s({
     "default": (()=>HomePage)
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/styled-jsx/style.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$shared$2f$lib$2f$app$2d$dynamic$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/shared/lib/app-dynamic.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/image.js [app-ssr] (ecmascript)");
@@ -480,7 +412,6 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$s
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/rssUtils.ts [app-ssr] (ecmascript)");
 ;
 "use client";
-;
 ;
 ;
 ;
@@ -661,13 +592,6 @@ const Article = ({ article })=>{
         columnNumber: 5
     }, this);
 };
-// Add a custom style to the head to control pull-to-refresh behavior
-const PullToRefreshStyles = ()=>{
-    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$styled$2d$jsx$2f$style$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
-        id: "2becedb3c7f91bfd",
-        children: ".ptr-element{width:100%;color:var(--text-secondary);z-index:10;text-align:center;height:50px;padding:12px;display:none;position:absolute;top:0;left:0}.ptr-refresh .ptr-element,.ptr-pull .ptr-element{display:block}.ptr-content{min-height:calc(100vh - 64px)}.ptr-track{z-index:1;position:relative;overflow-y:auto!important}"
-    }, void 0, false, void 0, this);
-};
 function HomePage() {
     const [articles, setArticles] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])([]);
     const [visibleCount, setVisibleCount] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(20);
@@ -678,6 +602,29 @@ function HomePage() {
     const loadMoreRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
     const lastRefreshTime = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(0);
     const refreshTimeoutRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
+    // Add a style tag to hide the refresh indicator when not refreshing
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        if (isClient) {
+            const style = document.createElement('style');
+            style.innerHTML = `
+        .ptr-element {
+          display: none;
+        }
+        .ptr-refresh .ptr-element {
+          display: block;
+        }
+        .ptr-pull .ptr-element {
+          display: block;
+        }
+      `;
+            document.head.appendChild(style);
+            return ()=>{
+                document.head.removeChild(style);
+            };
+        }
+    }, [
+        isClient
+    ]);
     // Memoize visible articles to prevent unnecessary re-renders
     const visibleArticles = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         return articles.slice(0, visibleCount);
@@ -799,196 +746,178 @@ function HomePage() {
     }, [
         handleRefresh
     ]);
-    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
-        children: [
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(PullToRefreshStyles, {}, void 0, false, {
-                fileName: "[project]/src/app/page.tsx",
-                lineNumber: 296,
-                columnNumber: 7
-            }, this),
-            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
-                className: "space-y-8 px-4 max-w-4xl mx-auto pt-6",
-                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-                    className: "space-y-4",
-                    children: isClient && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(PullToRefresh, {
-                        onRefresh: handleRefresh,
-                        distanceToRefresh: 70,
-                        resistance: 2.5,
-                        hammerOptions: {
-                            touchAction: 'pan-y',
-                            recognizers: {
-                                pan: {
-                                    threshold: 5,
-                                    direction: 'DIRECTION_DOWN'
-                                }
-                            }
-                        },
-                        icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex justify-center items-center py-2 text-[var(--text-secondary)]",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
-                                    size: "sm",
-                                    className: "mr-2"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 315,
-                                    columnNumber: 19
-                                }, void 0),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    children: "Pull to refresh"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 316,
-                                    columnNumber: 19
-                                }, void 0)
-                            ]
-                        }, void 0, true, {
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
+        className: "space-y-8 px-4 max-w-4xl mx-auto pt-6",
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
+            className: "space-y-4",
+            children: isClient && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(PullToRefresh, {
+                onRefresh: handleRefresh,
+                distanceToRefresh: 70,
+                resistance: 2.5,
+                icon: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "flex justify-center items-center py-2 text-[var(--text-secondary)]",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
+                            size: "sm",
+                            className: "mr-2"
+                        }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 314,
+                            lineNumber: 291,
                             columnNumber: 17
                         }, void 0),
-                        loading: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex justify-center items-center py-2 text-[var(--text-secondary)]",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
-                                    size: "sm",
-                                    className: "mr-2"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 321,
-                                    columnNumber: 19
-                                }, void 0),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                    children: "Refreshing..."
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 322,
-                                    columnNumber: 19
-                                }, void 0)
-                            ]
-                        }, void 0, true, {
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                            children: "Pull to refresh"
+                        }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 320,
+                            lineNumber: 292,
+                            columnNumber: 17
+                        }, void 0)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/app/page.tsx",
+                    lineNumber: 290,
+                    columnNumber: 15
+                }, void 0),
+                loading: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "flex justify-center items-center py-2 text-[var(--text-secondary)]",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
+                            size: "sm",
+                            className: "mr-2"
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.tsx",
+                            lineNumber: 297,
                             columnNumber: 17
                         }, void 0),
-                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "grid gap-4 min-h-[calc(100vh-64px)]",
-                            children: [
-                                isInitialLoad ? // Show spinner during initial load
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "flex justify-center items-center py-12",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
-                                        size: "lg"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 330,
-                                        columnNumber: 21
-                                    }, this)
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                            children: "Refreshing..."
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.tsx",
+                            lineNumber: 298,
+                            columnNumber: 17
+                        }, void 0)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/app/page.tsx",
+                    lineNumber: 296,
+                    columnNumber: 15
+                }, void 0),
+                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "grid gap-4",
+                    children: [
+                        isInitialLoad ? // Show spinner during initial load
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex justify-center items-center py-12",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
+                                size: "lg"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 306,
+                                columnNumber: 19
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.tsx",
+                            lineNumber: 305,
+                            columnNumber: 17
+                        }, this) : isRefreshing ? // Show spinner during pull-to-refresh
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex justify-center items-center py-4",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
+                                size: "md"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 311,
+                                columnNumber: 19
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.tsx",
+                            lineNumber: 310,
+                            columnNumber: 17
+                        }, this) : isLoading ? // Show skeleton loaders while loading
+                        Array.from({
+                            length: 10
+                        }).map((_, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                style: {
+                                    animationDelay: `${idx * 100}ms`,
+                                    animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
+                                },
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
+                                    fileName: "[project]/src/app/page.tsx",
+                                    lineNumber: 323,
+                                    columnNumber: 21
+                                }, this)
+                            }, `skeleton-${idx}`, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 316,
+                                columnNumber: 19
+                            }, this)) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
+                            className: "shadow-sm",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
+                                className: "p-4 text-center",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                    className: "text-[var(--text-secondary)]",
+                                    children: "No articles found. Add some feeds to get started."
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
                                     lineNumber: 329,
-                                    columnNumber: 19
-                                }, this) : isRefreshing ? // Show spinner during pull-to-refresh
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "flex justify-center items-center py-4",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Spinner"], {
-                                        size: "md"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 335,
-                                        columnNumber: 21
-                                    }, this)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 334,
-                                    columnNumber: 19
-                                }, this) : isLoading ? // Show skeleton loaders while loading
-                                Array.from({
-                                    length: 10
-                                }).map((_, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        style: {
-                                            animationDelay: `${idx * 100}ms`,
-                                            animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
-                                        },
-                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleSkeleton$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ArticleSkeleton"], {}, void 0, false, {
-                                            fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 347,
-                                            columnNumber: 23
-                                        }, this)
-                                    }, `skeleton-${idx}`, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 340,
-                                        columnNumber: 21
-                                    }, this)) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
-                                    className: "shadow-sm",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
-                                        className: "p-4 text-center",
-                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "text-[var(--text-secondary)]",
-                                            children: "No articles found. Add some feeds to get started."
-                                        }, void 0, false, {
-                                            fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 353,
-                                            columnNumber: 23
-                                        }, this)
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 352,
-                                        columnNumber: 21
-                                    }, this)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 351,
-                                    columnNumber: 19
-                                }, this) : // Show actual articles
-                                visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(Article, {
-                                        article: article
-                                    }, `${article.link}-${idx}`, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 359,
-                                        columnNumber: 21
-                                    }, this)),
-                                articles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    ref: loadMoreRef,
-                                    className: "h-10 flex justify-center",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
-                                        variant: "default",
-                                        onClick: ()=>setVisibleCount((prev)=>Math.min(prev + 20, articles.length)),
-                                        className: "w-full",
-                                        children: "Load More"
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 364,
-                                        columnNumber: 21
-                                    }, this)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 363,
-                                    columnNumber: 19
+                                    columnNumber: 21
                                 }, this)
-                            ]
-                        }, void 0, true, {
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 328,
+                                columnNumber: 19
+                            }, this)
+                        }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 326,
-                            columnNumber: 15
+                            lineNumber: 327,
+                            columnNumber: 17
+                        }, this) : // Show actual articles
+                        visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(Article, {
+                                article: article
+                            }, `${article.link}-${idx}`, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 335,
+                                columnNumber: 19
+                            }, this)),
+                        articles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            ref: loadMoreRef,
+                            className: "h-10 flex justify-center",
+                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
+                                variant: "default",
+                                onClick: ()=>setVisibleCount((prev)=>Math.min(prev + 20, articles.length)),
+                                className: "w-full",
+                                children: "Load More"
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/page.tsx",
+                                lineNumber: 340,
+                                columnNumber: 19
+                            }, this)
+                        }, void 0, false, {
+                            fileName: "[project]/src/app/page.tsx",
+                            lineNumber: 339,
+                            columnNumber: 17
                         }, this)
-                    }, void 0, false, {
-                        fileName: "[project]/src/app/page.tsx",
-                        lineNumber: 300,
-                        columnNumber: 13
-                    }, this)
-                }, void 0, false, {
+                    ]
+                }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 298,
-                    columnNumber: 9
+                    lineNumber: 302,
+                    columnNumber: 13
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 297,
-                columnNumber: 7
+                lineNumber: 285,
+                columnNumber: 11
             }, this)
-        ]
-    }, void 0, true);
+        }, void 0, false, {
+            fileName: "[project]/src/app/page.tsx",
+            lineNumber: 283,
+            columnNumber: 7
+        }, this)
+    }, void 0, false, {
+        fileName: "[project]/src/app/page.tsx",
+        lineNumber: 282,
+        columnNumber: 5
+    }, this);
 }
 }}),
 

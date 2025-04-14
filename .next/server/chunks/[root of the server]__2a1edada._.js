@@ -60,18 +60,23 @@ var { g: global, __dirname } = __turbopack_context__;
 {
 __turbopack_context__.s({
     "GET": (()=>GET),
-    "POST": (()=>POST)
+    "POST": (()=>POST),
+    "config": (()=>config)
 });
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/server.js [app-route] (ecmascript)");
 ;
-async function fetchWithTimeout(url, timeout = 15000) {
+// Increase the timeout for RSS feeds
+const TIMEOUT = 30000; // 30 seconds
+async function fetchWithTimeout(url, timeout = TIMEOUT) {
     const controller = new AbortController();
     const timeoutId = setTimeout(()=>controller.abort(), timeout);
     try {
         const response = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)'
+                'User-Agent': 'Mozilla/5.0 (compatible; InfrssBot/1.0; +https://infrss.vercel.app)',
+                'Accept': 'application/rss+xml, application/xml, application/atom+xml, text/xml, */*',
+                'Cache-Control': 'no-cache'
             }
         });
         clearTimeout(timeoutId);
@@ -82,34 +87,42 @@ async function fetchWithTimeout(url, timeout = 15000) {
     }
 }
 async function handleFetch(url) {
-    const response = await fetchWithTimeout(url);
-    const contentType = response.headers.get('content-type') || '';
-    // Handle different content types
-    if (contentType.startsWith('image/')) {
-        // For images, return the blob with caching
-        const blob = await response.blob();
-        return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"](blob, {
-            headers: {
-                'Content-Type': contentType,
-                'Cache-Control': 'public, max-age=86400'
-            }
-        });
-    } else if (contentType.includes('html') || contentType.includes('xml')) {
-        // For HTML/XML content, return as text
-        const text = await response.text();
-        return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"](JSON.stringify({
-            data: text
-        }), {
-            headers: {
-                'Content-Type': 'application/json',
-                'Cache-Control': 'public, max-age=3600'
-            }
-        });
-    } else {
-        // For other content types, return error
-        return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"]('Unsupported content type', {
-            status: 400
-        });
+    try {
+        const response = await fetchWithTimeout(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const contentType = response.headers.get('content-type') || '';
+        // Handle different content types
+        if (contentType.startsWith('image/')) {
+            // For images, return the blob with caching
+            const blob = await response.blob();
+            return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"](blob, {
+                headers: {
+                    'Content-Type': contentType,
+                    'Cache-Control': 'public, max-age=86400'
+                }
+            });
+        } else if (contentType.includes('html') || contentType.includes('xml') || contentType.includes('rss') || contentType.includes('atom') || contentType.includes('text/plain')) {
+            // For HTML/XML/RSS content, return as text
+            const text = await response.text();
+            return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"](JSON.stringify({
+                data: text
+            }), {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'public, max-age=3600'
+                }
+            });
+        } else {
+            // For other content types, return error
+            return new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$server$2e$js__$5b$app$2d$route$5d$__$28$ecmascript$29$__["NextResponse"]('Unsupported content type', {
+                status: 400
+            });
+        }
+    } catch (error) {
+        console.error('Error in handleFetch:', error);
+        throw error;
     }
 }
 async function GET(request) {
@@ -166,6 +179,11 @@ async function POST(request) {
         });
     }
 }
+const config = {
+    api: {
+        responseLimit: '8mb'
+    }
+};
 }}),
 
 };

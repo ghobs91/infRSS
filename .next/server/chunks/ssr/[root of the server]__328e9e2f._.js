@@ -404,7 +404,7 @@ const Navigation = ()=>{
     const getPageTitle = ()=>{
         switch(pathname){
             case '/':
-                return 'Articles';
+                return 'Home';
             case '/manage':
                 return 'Manage Feeds';
             default:

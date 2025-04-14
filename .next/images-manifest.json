@@ -24,7 +24,9 @@
     "path": "/_next/image",
     "loader": "default",
     "loaderFile": "",
-    "domains": [],
+    "domains": [
+      "www.google.com"
+    ],
     "disableStaticImages": false,
     "minimumCacheTTL": 60,
     "formats": [
@@ -33,7 +35,13 @@
     "dangerouslyAllowSVG": false,
     "contentSecurityPolicy": "script-src 'none'; frame-src 'none'; sandbox;",
     "contentDispositionType": "attachment",
-    "remotePatterns": [],
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "^(?:^(?:www\\.google\\.com)$)$",
+        "pathname": "^(?:\\/s2\\/favicons(?:\\/(?!\\.{1,2}(?:\\/|$))(?:(?:(?!(?:^|\\/)\\.{1,2}(?:\\/|$)).)*?)|$))$"
+      }
+    ],
     "unoptimized": false,
     "sizes": [
       640,
