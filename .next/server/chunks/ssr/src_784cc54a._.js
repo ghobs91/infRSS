@@ -323,11 +323,22 @@ async function fetchAndParseRSS(url) {
             if (!thumbnail && itemLink) {
                 thumbnail = await extractThumbnail(itemLink, content);
             }
+            // Extract source domain from the link
+            let sourceDomain = "";
+            try {
+                if (itemLink) {
+                    sourceDomain = new URL(itemLink).hostname.replace("www.", "");
+                }
+            } catch (error) {
+                console.error("Error extracting source domain:", error);
+            }
             return {
                 title: itemTitle,
                 link: itemLink,
                 pubDate: itemPubDate,
-                thumbnail: thumbnail
+                thumbnail: thumbnail,
+                content: content,
+                sourceDomain: sourceDomain
             };
         });
         return {

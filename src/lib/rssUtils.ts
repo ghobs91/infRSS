@@ -10,7 +10,8 @@ interface Article {
   link: string;
   pubDate: string;
   thumbnail?: string;
-  sourceDomain: string;
+  content?: string;
+  sourceDomain?: string;
 }
 
 export async function getFeedUrlFromHtml(siteUrl: string): Promise<string | null> {
@@ -116,11 +117,23 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
         thumbnail = await extractThumbnail(itemLink, content);
       }
 
+      // Extract source domain from the link
+      let sourceDomain = "";
+      try {
+        if (itemLink) {
+          sourceDomain = new URL(itemLink).hostname.replace("www.", "");
+        }
+      } catch (error) {
+        console.error("Error extracting source domain:", error);
+      }
+
       return {
         title: itemTitle,
         link: itemLink,
         pubDate: itemPubDate,
         thumbnail: thumbnail,
+        content: content,
+        sourceDomain: sourceDomain
       };
     });
 

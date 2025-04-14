@@ -146,9 +146,9 @@ export default function ManagePage() {
         }
       }
 
-      if (feedData && feedData.length > 0) {
-        // Get the feed title from the first article or use the hostname
-        const feedTitle = feedData[0].title || new URL(feedUrlInput.trim()).hostname;
+      if (feedData && feedData.items && feedData.items.length > 0) {
+        // Get the feed title from the feed data or use the hostname
+        const feedTitle = feedData.title || new URL(feedUrlInput.trim()).hostname;
         
         const newFeed: FeedData = {
           title: feedTitle,

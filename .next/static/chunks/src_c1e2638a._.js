@@ -246,11 +246,22 @@ async function fetchAndParseRSS(url) {
             if (!thumbnail && itemLink) {
                 thumbnail = await extractThumbnail(itemLink, content);
             }
+            // Extract source domain from the link
+            let sourceDomain = "";
+            try {
+                if (itemLink) {
+                    sourceDomain = new URL(itemLink).hostname.replace("www.", "");
+                }
+            } catch (error) {
+                console.error("Error extracting source domain:", error);
+            }
             return {
                 title: itemTitle,
                 link: itemLink,
                 pubDate: itemPubDate,
-                thumbnail: thumbnail
+                thumbnail: thumbnail,
+                content: content,
+                sourceDomain: sourceDomain
             };
         });
         return {
@@ -752,9 +763,9 @@ function ManagePage() {
                         feedData = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["fetchAndParseRSS"])(feedUrl);
                     }
                 }
-                if (feedData && feedData.length > 0) {
-                    // Get the feed title from the first article or use the hostname
-                    const feedTitle = feedData[0].title || new URL(feedUrlInput.trim()).hostname;
+                if (feedData && feedData.items && feedData.items.length > 0) {
+                    // Get the feed title from the feed data or use the hostname
+                    const feedTitle = feedData.title || new URL(feedUrlInput.trim()).hostname;
                     const newFeed = {
                         title: feedTitle,
                         url: feedUrlInput.trim()

@@ -1,6 +1,6 @@
 {
-  "/_not-found/page": "/_not-found",
   "/favicon.ico/route": "/favicon.ico",
+  "/_not-found/page": "/_not-found",
   "/manage/page": "/manage",
   "/page": "/",
   "/api/fetch-rss/route": "/api/fetch-rss",
