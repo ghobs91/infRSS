@@ -12,6 +12,7 @@ import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
   saveFeedToStorage,
+  parseOPMLFile,
   type FeedData,
 } from "@/lib/rssUtils";
 import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
@@ -107,6 +108,7 @@ export default function ManagePage() {
   const [savedFeeds, setSavedFeeds] = useState<FeedData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load saved feeds on initial render
@@ -204,6 +206,41 @@ export default function ManagePage() {
     setSavedFeeds(updatedFeeds);
   }, [savedFeeds]);
 
+  // Handle importing OPML file
+  const handleImportOPML = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    setError(null);
+
+    try {
+      const feeds = await parseOPMLFile(file);
+      
+      // Filter out feeds that are already saved
+      const newFeeds = feeds.filter(feed => 
+        !savedFeeds.some(savedFeed => savedFeed.url === feed.url)
+      );
+
+      // Save new feeds
+      newFeeds.forEach(feed => saveFeedToStorage(feed));
+      
+      // Update state with new feeds
+      setSavedFeeds(prev => [...prev, ...newFeeds]);
+      
+      // Clear the file input
+      event.target.value = '';
+      
+      // Show success message
+      setError(`Successfully imported ${newFeeds.length} new feeds${newFeeds.length < feeds.length ? ` (${feeds.length - newFeeds.length} were already saved)` : ''}`);
+    } catch (error) {
+      console.error("Error importing OPML file:", error);
+      setError("Error importing OPML file. Please make sure it's a valid OPML file.");
+    } finally {
+      setIsImporting(false);
+    }
+  }, [savedFeeds]);
+
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto">
       <section className="space-y-4">
@@ -227,7 +264,17 @@ export default function ManagePage() {
                 {isLoading ? <Spinner size="sm" /> : "Add Feed"}
               </Button>
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
+            <div className="flex items-center gap-2">
+              <Input
+                type="file"
+                accept=".opml,.xml"
+                onChange={handleImportOPML}
+                className="flex-1"
+                disabled={isImporting}
+              />
+              {isImporting && <Spinner size="sm" />}
+            </div>
+            {error && <p className={`text-sm ${error.includes("Successfully") ? "text-green-500" : "text-red-500"}`}>{error}</p>}
           </div>
 
           <div className="space-y-2">

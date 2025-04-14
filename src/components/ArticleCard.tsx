@@ -1,6 +1,7 @@
 import { type Article } from "@/lib/rssUtils";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
+import Image from "next/image";
 
 interface ArticleCardProps {
   article: Article;
@@ -17,12 +18,14 @@ export function ArticleCard({ article }: ArticleCardProps) {
           className="flex hover:bg-muted/50 transition-colors"
         >
           {article.thumbnail && (
-            <div className="w-40 h-auto">
-              <img
+            <div className="w-40 h-auto relative">
+              <Image
                 src={article.thumbnail}
                 alt=""
-                className="w-full h-full object-cover"
-                loading="lazy"
+                width={160}
+                height={120}
+                className="object-cover"
+                unoptimized
               />
             </div>
           )}

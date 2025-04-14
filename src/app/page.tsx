@@ -1,19 +1,17 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import dynamic from "next/dynamic";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArticleSkeleton } from "@/components/ArticleSkeleton";
-import { Spinner } from "@/components/ui/spinner";
 import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
+  loadArticleThumbnails,
   type Article,
 } from "@/lib/rssUtils";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import {
   Alert,
   AlertDescription,
@@ -21,6 +19,7 @@ import {
 } from "@/components/ui/alert";
 import { Navigation } from "@/components/Navigation";
 import { ArticleCard } from "@/components/ArticleCard";
+import { Button } from "@/components/ui/button";
 
 // Format date to "Month Day, Year" (e.g., "April 13th, 2025")
 function formatDate(dateString: string): string {
@@ -121,72 +120,40 @@ const Article = ({ article }: { article: { title: string; link: string; pubDate:
   );
 };
 
-// Add a custom style to the head to control pull-to-refresh behavior
-const PullToRefreshStyles = () => {
-  return (
-    <style jsx global>{`
-      .ptr-element {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        color: var(--text-secondary);
-        z-index: 10;
-        display: none;
-        text-align: center;
-        height: 50px;
-        padding: 12px;
-      }
-      .ptr-refresh .ptr-element {
-        display: block;
-      }
-      .ptr-pull .ptr-element {
-        display: block;
-      }
-      .ptr-content {
-        min-height: calc(100vh - 64px);
-      }
-      /* Ensure content is scrollable */
-      .ptr-track {
-        overflow-y: auto !important;
-        position: relative;
-        z-index: 1;
-      }
-    `}</style>
-  );
-};
-
 export default function HomePage() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [allArticles, setAllArticles] = useState<Article[]>([]);
+  const [displayedArticles, setDisplayedArticles] = useState<Article[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const ARTICLES_PER_PAGE = 30;
 
-  const handleRefresh = useCallback(async () => {
+  // Load articles from feeds
+  const loadArticles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const feeds = loadFeedsFromStorage();
-      const allArticles: Article[] = [];
+      const feedPromises = feeds.map(feed => fetchAndParseRSS(feed.url, false));
+      const feedResults = await Promise.all(feedPromises);
+      
+      // Combine all articles and sort by date
+      const articles = feedResults
+        .filter((result): result is { title: string; items: Article[] } => result !== null)
+        .flatMap(result => result.items)
+        .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
 
-      for (const feed of feeds) {
-        const result = await fetchAndParseRSS(feed.url);
-        if (result) {
-          const feedDomain = new URL(feed.url).hostname;
-          const articles = result.items.map(item => ({
-            ...item,
-            sourceDomain: feedDomain
-          }));
-          allArticles.push(...articles);
-        }
-      }
+      setAllArticles(articles);
+      
+      // Display first batch of articles
+      setDisplayedArticles(articles.slice(0, ARTICLES_PER_PAGE));
+      setHasMore(articles.length > ARTICLES_PER_PAGE);
 
-      // Sort by date, newest first
-      const sortedArticles = allArticles.sort((a, b) => {
-        return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
-      });
-
-      setArticles(sortedArticles);
+      // Start loading thumbnails for displayed articles
+      const articlesWithThumbnails = await loadArticleThumbnails(articles.slice(0, ARTICLES_PER_PAGE));
+      setDisplayedArticles(articlesWithThumbnails);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load articles');
     } finally {
@@ -194,36 +161,79 @@ export default function HomePage() {
     }
   }, []);
 
+  // Initial load
   useEffect(() => {
-    handleRefresh();
-  }, [handleRefresh]);
+    loadArticles();
+  }, [loadArticles]);
 
+  // Load more articles when scrolling to the bottom
+  const loadMoreArticles = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    
+    setIsLoadingMore(true);
+    
+    try {
+      const currentCount = displayedArticles.length;
+      const nextBatch = allArticles.slice(currentCount, currentCount + ARTICLES_PER_PAGE);
+      
+      if (nextBatch.length === 0) {
+        setHasMore(false);
+        setIsLoadingMore(false);
+        return;
+      }
+      
+      // Load thumbnails for the next batch
+      const nextBatchWithThumbnails = await loadArticleThumbnails(nextBatch);
+      
+      setDisplayedArticles(prev => [...prev, ...nextBatchWithThumbnails]);
+      setHasMore(currentCount + nextBatch.length < allArticles.length);
+    } catch (error) {
+      console.error("Error loading more articles:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [allArticles, displayedArticles.length, hasMore, isLoadingMore]);
+
+  // Intersection observer for infinite scrolling
   useEffect(() => {
-    const currentRef = loadMoreRef.current;
-    if (!currentRef) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoading && articles.length > 0) {
-          // Load more logic here if needed
+        if (entries[0].isIntersecting && !isLoading && !isLoadingMore && hasMore) {
+          loadMoreArticles();
         }
       },
-      { threshold: 1.0 }
+      { threshold: 0.5 }
     );
 
-    observer.observe(currentRef);
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
     return () => {
-      if (currentRef) {
-        observer.unobserve(currentRef);
+      if (loadMoreRef.current) {
+        observer.unobserve(loadMoreRef.current);
       }
     };
-  }, [isLoading, articles.length]);
+  }, [isLoading, isLoadingMore, hasMore, loadMoreArticles]);
 
   return (
     <main className="container mx-auto p-4">
       <Navigation />
       
-      <div className="mt-4">
+      <div className="mt-4 max-w-[720px] mx-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">Your Articles</h1>
+          <Button 
+            variant="default" 
+            onClick={loadArticles} 
+            disabled={isLoading}
+            className="flex items-center gap-1 py-1 px-3 text-sm"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
+          </Button>
+        </div>
+
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -233,7 +243,7 @@ export default function HomePage() {
         )}
 
         <section className="space-y-4">
-          {articles.length === 0 && !isLoading ? (
+          {displayedArticles.length === 0 && !isLoading ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
                 No articles found. Add some RSS feeds to get started!
@@ -241,7 +251,7 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              {isLoading && articles.length === 0 ? (
+              {isLoading && displayedArticles.length === 0 ? (
                 <div className="space-y-4">
                   <ArticleSkeleton />
                   <ArticleSkeleton />
@@ -249,14 +259,23 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {articles.map((article, index) => (
+                  {displayedArticles.map((article, index) => (
                     <ArticleCard key={`${article.link}-${index}`} article={article} />
                   ))}
                 </div>
               )}
+              
+              {/* Loading indicator for infinite scroll */}
+              {isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              )}
+              
+              {/* Invisible element to trigger loading more */}
+              <div ref={loadMoreRef} className="h-10" />
             </>
           )}
-          <div ref={loadMoreRef} className="h-4" />
         </section>
       </div>
     </main>
