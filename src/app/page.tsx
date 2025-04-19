@@ -282,72 +282,121 @@ export default function HomePage() {
     <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
       <section className="space-y-4">
         {isClient && (
-          <PullToRefresh
-            onRefresh={handleRefresh}
-            distanceToRefresh={70}
-            resistance={2.5}
-            icon={
-              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                <Spinner size="sm" className="mr-2" />
-                <span>Pull to refresh</span>
-              </div>
-            }
-            loading={
-              <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                <Spinner size="sm" className="mr-2" />
-                <span>Refreshing...</span>
-              </div>
-            }
-          >
-            <div className="grid gap-4">
-              {isInitialLoad ? (
-                // Show spinner during initial load
-                <div className="flex justify-center items-center py-12">
-                  <Spinner size="lg" />
-                </div>
-              ) : isRefreshing ? (
-                // Show spinner during pull-to-refresh
-                <div className="flex justify-center items-center py-4">
-                  <Spinner size="md" />
-                </div>
-              ) : isLoading ? (
-                // Show skeleton loaders while loading
-                Array.from({ length: 10 }).map((_, idx) => (
-                  <div 
-                    key={`skeleton-${idx}`} 
-                    style={{ 
-                      animationDelay: `${idx * 100}ms`,
-                      animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
-                    }}
-                  >
-                    <ArticleSkeleton />
-                  </div>
-                ))
-              ) : articles.length === 0 ? (
-                <Card className="shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
-                  </CardContent>
-                </Card>
-              ) : (
-                // Show actual articles
-                visibleArticles.map((article, idx) => (
-                  <Article key={`${article.link}-${idx}`} article={article} />
-                ))
-              )}
-              {articles.length > visibleCount && (
-                <div ref={loadMoreRef} className="h-10 flex justify-center">
-                  <Button 
-                    variant="default" 
-                    onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
-                    className="w-full"
-                  >
-                    Load More
-                  </Button>
-                </div>
-              )}
+          <>
+            {/* Manual refresh button */}
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="default"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2"
+              >
+                {isRefreshing ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span>Refreshing...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                    <span>Refresh</span>
+                  </>
+                )}
+              </Button>
             </div>
-          </PullToRefresh>
+            <PullToRefresh
+              onRefresh={handleRefresh}
+              distanceToRefresh={100}
+              resistance={2.5}
+              icon={
+                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                  <svg
+                    className="w-4 h-4 mr-2 transform rotate-180"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                  <span>Pull to refresh</span>
+                </div>
+              }
+              loading={
+                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
+                  <Spinner size="sm" className="mr-2" />
+                  <span>Refreshing...</span>
+                </div>
+              }
+            >
+              <div className="grid gap-4">
+                {isInitialLoad ? (
+                  // Show spinner during initial load
+                  <div className="flex justify-center items-center py-12">
+                    <Spinner size="lg" />
+                  </div>
+                ) : isRefreshing ? (
+                  // Show spinner during pull-to-refresh
+                  <div className="flex justify-center items-center py-4">
+                    <Spinner size="md" />
+                  </div>
+                ) : isLoading ? (
+                  // Show skeleton loaders while loading
+                  Array.from({ length: 10 }).map((_, idx) => (
+                    <div 
+                      key={`skeleton-${idx}`} 
+                      style={{ 
+                        animationDelay: `${idx * 100}ms`,
+                        animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
+                      }}
+                    >
+                      <ArticleSkeleton />
+                    </div>
+                  ))
+                ) : articles.length === 0 ? (
+                  <Card className="shadow-sm">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  // Show actual articles
+                  visibleArticles.map((article, idx) => (
+                    <Article key={`${article.link}-${idx}`} article={article} />
+                  ))
+                )}
+                {articles.length > visibleCount && (
+                  <div ref={loadMoreRef} className="h-10 flex justify-center">
+                    <Button 
+                      variant="default" 
+                      onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
+                      className="w-full"
+                    >
+                      Load More
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </PullToRefresh>
+          </>
         )}
       </section>
     </main>
