@@ -150,178 +150,290 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 var { g: global, __dirname, k: __turbopack_refresh__, m: module } = __turbopack_context__;
 {
 // lib/rssUtils.ts
+// ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
+// Import fetchWithCors if it's not already implicitly available in the scope
+// (Assuming it's exported from the same file or imported correctly)
 __turbopack_context__.s({
     "fetchAndParseRSS": (()=>fetchAndParseRSS),
     "fetchWithCors": (()=>fetchWithCors),
     "getFeedUrlFromHtml": (()=>getFeedUrlFromHtml),
     "loadFeedsFromStorage": (()=>loadFeedsFromStorage),
     "parseOPMLFile": (()=>parseOPMLFile),
-    "removeFeedFromStorage": (()=>removeFeedFromStorage),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
-async function getFeedUrlFromHtml(siteUrl) {
-    try {
-        const res = await fetchWithCors(siteUrl);
-        const html = await res.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        const linkEl = doc.querySelector('link[type="application/rss+xml"], link[rel="alternate"][type="application/rss+xml"]');
-        if (linkEl && linkEl.getAttribute("href")) {
-            const href = linkEl.getAttribute("href");
-            const url = new URL(href, siteUrl);
-            return url.toString();
-        }
-        return null;
-    } catch (err) {
-        console.error("Failed to resolve feed URL:", err);
-        return null;
-    }
-}
-// Function to extract thumbnail from various sources
-async function extractThumbnail(link, content) {
-    try {
-        // Try to fetch the HTML of the article page
-        const response = await fetch(link);
-        const html = await response.text();
-        // Try to get Open Graph image
-        const ogMatch = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*property="og:image"[^>]*>/i);
-        if (ogMatch && ogMatch[1]) {
-            return ogMatch[1];
-        }
-        // Try to get Twitter image
-        const twitterMatch = html.match(/<meta[^>]*name="twitter:image"[^>]*content="([^"]*)"[^>]*>/i) || html.match(/<meta[^>]*content="([^"]*)"[^>]*name="twitter:image"[^>]*>/i);
-        if (twitterMatch && twitterMatch[1]) {
-            return twitterMatch[1];
-        }
-        // If we have content, try to find the first image
-        if (content) {
-            const imgMatch = content.match(/<img[^>]*src="([^"]*)"[^>]*>/i);
-            if (imgMatch && imgMatch[1]) {
-                return imgMatch[1];
-            }
-        }
-        return undefined;
-    } catch (error) {
-        console.error("Error extracting thumbnail:", error);
-        return undefined;
-    }
-}
 async function fetchAndParseRSS(url) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(()=>controller.abort(), 10000);
-        const response = await fetch(url, {
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        const timeoutId = setTimeout(()=>controller.abort(), 10000); // 10 second timeout
+        // *** Use fetchWithCors here instead of direct fetch ***
+        const response = await fetchWithCors(url);
+        // Note: You might need to adjust how you handle the signal if fetchWithCors doesn't support it directly.
+        // If the proxy handles timeouts, you might remove the AbortController here.
+        // If the proxy *doesn't* handle timeouts, the timeout here won't abort the *proxy's* fetch,
+        // only the fetch *to* the proxy. You might need timeout logic within the /api/proxy endpoint itself.
+        // For now, let's assume the proxy forwards the request quickly or handles its own timeout.
+        clearTimeout(timeoutId); // Keep this for the fetch *to* the proxy
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            // Consider logging the response body for more details on proxy errors
+            const errorText = await response.text().catch(()=>'Could not read error response');
+            console.error(`Proxy fetch failed for ${url}. Status: ${response.status}, Body: ${errorText}`);
+            // Don't throw an error, just return null to allow the app to continue
+            return null;
         }
-        const text = await response.text();
+        let text = await response.text();
+        // Check if the response is empty
+        if (!text.trim()) {
+            console.error(`Empty response from ${url}`);
+            return null;
+        }
+        // Try to parse as JSON first, in case the XML is wrapped in a JSON object
+        try {
+            const jsonResponse = JSON.parse(text);
+            if (jsonResponse.data && typeof jsonResponse.data === 'string') {
+                text = jsonResponse.data;
+            }
+        } catch  {
+        // If it's not JSON, continue with the original text
+        }
+        // Check if the response starts with XML declaration or a tag
+        if (!text.trim().startsWith('<?xml') && !text.trim().startsWith('<')) {
+            console.error(`Response from ${url} is not XML. First 100 chars: ${text.substring(0, 100)}`);
+            return null;
+        }
+        // Add media namespace if it's missing
+        if (text.includes('media:content') && !text.includes('xmlns:media')) {
+            text = text.replace(/<rss[^>]*>/, (match)=>`${match.replace('>', ' xmlns:media="http://search.yahoo.com/mrss/">')}`);
+        }
+        // Fix unclosed CDATA sections
+        text = text.replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content)=>{
+            // If the CDATA section is not properly closed, close it
+            if (!content.includes(']]>')) {
+                return `<!\[CDATA\[${content}]]>`;
+            }
+            return match;
+        });
+        // Escape unescaped ampersands in content
+        text = text.replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(text, "text/xml");
-        // Check if it's a valid RSS feed
+        // Check for XML parsing errors
+        const parseError = xmlDoc.querySelector("parsererror");
+        if (parseError) {
+            console.error("XML parsing error:", parseError.textContent);
+            // Try to extract any useful information from the error
+            const errorText = parseError.textContent || '';
+            if (errorText.includes("Start tag expected")) {
+                console.error("Response might not be XML. First 100 chars:", text.substring(0, 100));
+            }
+            return null;
+        }
+        // Check if it's a valid RSS/Atom feed
         const rssElement = xmlDoc.querySelector("rss, feed");
         if (!rssElement) {
+            console.warn(`Invalid RSS/Atom structure for ${url}. Missing <rss> or <feed> tag.`);
             return null;
         }
         const channel = xmlDoc.querySelector("channel, feed");
         if (!channel) {
+            console.warn(`Invalid RSS/Atom structure for ${url}. Missing <channel> or <feed> tag.`);
             return null;
         }
-        const title = channel.querySelector("title")?.textContent || "";
-        const items = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
-            const itemTitle = item.querySelector("title")?.textContent || "";
-            const itemLink = item.querySelector("link")?.textContent || item.querySelector("link")?.getAttribute("href") || "";
-            const itemPubDate = item.querySelector("pubDate, published")?.textContent || "";
-            const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
-            // Try to get enclosure image first
-            let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
-            // If no enclosure image, try media:content
-            if (!thumbnail) {
-                const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-                thumbnail = mediaContent?.getAttribute("url");
-            }
-            // If still no thumbnail, try to extract from the article
-            if (!thumbnail && itemLink) {
-                thumbnail = await extractThumbnail(itemLink, content);
-            }
-            // Extract source domain from the link
-            let sourceDomain = "";
+        const title = channel.querySelector("title")?.textContent || "Untitled Feed"; // Provide a default title
+        // Use Promise.allSettled to handle potential errors in individual item processing
+        const itemPromises = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item)=>{
             try {
-                if (itemLink) {
-                    sourceDomain = new URL(itemLink).hostname.replace("www.", "");
+                const itemTitle = item.querySelector("title")?.textContent || "";
+                // Prioritize link[@href] for Atom feeds
+                const itemLink = item.querySelector("link[href]")?.getAttribute("href") || item.querySelector("link")?.textContent || "";
+                // Handle different date formats more robustly if needed
+                const itemPubDateStr = item.querySelector("pubDate, published")?.textContent || "";
+                const itemPubDate = itemPubDateStr ? new Date(itemPubDateStr).toISOString() : new Date().toISOString(); // Standardize date or use current if missing
+                const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
+                // Try to get enclosure image first
+                let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+                // If no enclosure image, try media:content or media:thumbnail
+                if (!thumbnail) {
+                    const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+                    thumbnail = mediaContent?.getAttribute("url");
                 }
-            } catch (error) {
-                console.error("Error extracting source domain:", error);
+                // If still no thumbnail, try to extract from the article (consider rate limiting/delaying this)
+                // This can be slow and resource-intensive if done for every item.
+                // Maybe only do it if content is empty or lacks images.
+                // if (!thumbnail && itemLink) {
+                //   thumbnail = await extractThumbnail(itemLink, content);
+                // }
+                // Extract source domain from the link
+                let sourceDomain = "";
+                try {
+                    if (itemLink) {
+                        sourceDomain = new URL(itemLink).hostname.replace(/^www\./, ""); // More robust www removal
+                    } else if (url) {
+                        // Fallback to feed's domain if item link is missing
+                        sourceDomain = new URL(url).hostname.replace(/^www\./, "");
+                    }
+                } catch (error) {
+                    console.warn("Error extracting source domain:", error); // Use warn for non-critical errors
+                }
+                // Basic validation: Ensure there's at least a title or link
+                if (!itemTitle && !itemLink) {
+                    console.warn("Skipping item with no title or link");
+                    return null;
+                }
+                return {
+                    title: itemTitle,
+                    link: itemLink,
+                    pubDate: itemPubDate,
+                    thumbnail: thumbnail || undefined,
+                    content: content,
+                    sourceDomain: sourceDomain
+                };
+            } catch (itemError) {
+                console.error("Error processing feed item:", itemError, item.innerHTML); // Log item content on error
+                return null; // Skip this item on error
             }
-            return {
-                title: itemTitle,
-                link: itemLink,
-                pubDate: itemPubDate,
-                thumbnail: thumbnail,
-                content: content,
-                sourceDomain: sourceDomain
-            };
         });
+        // Wait for all item promises to settle and filter out nulls (errors or skipped items)
+        const settledItems = await Promise.allSettled(itemPromises);
+        const validItems = settledItems.filter((result)=>result.status === 'fulfilled' && result.value !== null).map((result)=>result.value);
         return {
             title,
-            items: await Promise.all(items)
+            items: validItems
         };
     } catch (error) {
-        console.error("Error fetching RSS:", error);
-        return null;
+        // Differentiate between fetch errors and parsing errors if needed
+        if (error instanceof Error && error.message.includes('Abort')) {
+            console.warn("RSS fetch timed out:", url);
+        } else {
+            console.error(`Error fetching or parsing RSS feed ${url}:`, error);
+        }
+        return null; // Return null on any error
     }
 }
 const fetchWithCors = async (url)=>{
-    return fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
+    // Make sure your proxy endpoint is correct
+    const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+    console.log(`Fetching via proxy: ${proxyUrl}`); // Add logging
+    try {
+        const response = await fetch(proxyUrl);
+        if (!response.ok) {
+            // Log proxy errors specifically
+            console.error(`Proxy request to ${proxyUrl} failed with status ${response.status}`);
+        }
+        return response;
+    } catch (proxyError) {
+        console.error(`Error fetching from proxy URL ${proxyUrl}:`, proxyError);
+        throw proxyError; // Re-throw the error to be caught by fetchAndParseRSS
+    }
 };
-function saveFeedToStorage(feed) {
-    const stored = localStorage.getItem("feeds");
-    const current = stored ? JSON.parse(stored) : [];
-    if (!current.find((f)=>f.url === feed.url)) {
-        const updated = [
-            ...current,
-            feed
-        ];
-        localStorage.setItem("feeds", JSON.stringify(updated));
+function loadFeedsFromStorage() {
+    if ("TURBOPACK compile-time falsy", 0) {
+        "TURBOPACK unreachable";
+    }
+    try {
+        const feedsJson = localStorage.getItem('feeds');
+        if (!feedsJson) return [];
+        const feeds = JSON.parse(feedsJson);
+        return Array.isArray(feeds) ? feeds : [];
+    } catch (error) {
+        console.error('Error loading feeds from storage:', error);
+        return [];
     }
 }
-function loadFeedsFromStorage() {
-    const stored = localStorage.getItem("feeds");
-    return stored ? JSON.parse(stored) : [];
+function saveFeedToStorage(feed) {
+    if ("TURBOPACK compile-time falsy", 0) {
+        "TURBOPACK unreachable";
+    }
+    try {
+        const feeds = loadFeedsFromStorage();
+        if (!feeds.some((f)=>f.url === feed.url)) {
+            feeds.push(feed);
+            localStorage.setItem('feeds', JSON.stringify(feeds));
+        }
+    } catch (error) {
+        console.error('Error saving feed to storage:', error);
+    }
 }
-function removeFeedFromStorage(url) {
-    const stored = localStorage.getItem("feeds");
-    const current = stored ? JSON.parse(stored) : [];
-    const updated = current.filter((f)=>f.url !== url);
-    localStorage.setItem("feeds", JSON.stringify(updated));
+async function getFeedUrlFromHtml(url) {
+    try {
+        const response = await fetchWithCors(url);
+        if (!response.ok) {
+            console.error(`Failed to fetch HTML from ${url}: ${response.status}`);
+            return null;
+        }
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        // Look for RSS feed links in various formats
+        const feedLinks = [
+            // Standard RSS/Atom links
+            ...Array.from(doc.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"], link[type="application/xml"], link[type="text/xml"]')).map((link)=>link.getAttribute('href')),
+            // Alternate links
+            ...Array.from(doc.querySelectorAll('link[rel="alternate"][type="application/rss+xml"], link[rel="alternate"][type="application/atom+xml"]')).map((link)=>link.getAttribute('href')),
+            // Feed links
+            ...Array.from(doc.querySelectorAll('a[href*="feed"], a[href*="rss"], a[href*="atom"]')).map((link)=>link.getAttribute('href'))
+        ].filter(Boolean);
+        // If we found any feed links, return the first one
+        if (feedLinks.length > 0) {
+            const feedUrl = feedLinks[0];
+            // If the URL is relative, make it absolute
+            try {
+                return new URL(feedUrl, url).toString();
+            } catch (e) {
+                console.error('Error making feed URL absolute:', e);
+                return feedUrl;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error extracting feed URL from HTML:', error);
+        return null;
+    }
 }
 async function parseOPMLFile(file) {
     return new Promise((resolve, reject)=>{
         const reader = new FileReader();
-        reader.onload = async (e)=>{
+        reader.onload = (event)=>{
             try {
-                const text = e.target?.result;
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(text, "text/xml");
-                // Check if it's a valid OPML file
-                const opmlElement = xmlDoc.querySelector("opml");
-                if (!opmlElement) {
-                    throw new Error("Invalid OPML file");
+                const text = event.target?.result;
+                if (!text) {
+                    reject(new Error('Failed to read file content'));
+                    return;
                 }
-                // Get all outline elements that have an xmlUrl attribute (these are the feed entries)
-                const outlines = Array.from(xmlDoc.querySelectorAll("outline[xmlUrl]"));
-                const feeds = outlines.map((outline)=>({
-                        title: outline.getAttribute("title") || outline.getAttribute("text") || "",
-                        url: outline.getAttribute("xmlUrl") || ""
-                    })).filter((feed)=>feed.url !== ""); // Filter out any entries without URLs
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/xml');
+                // Check for OPML structure
+                const opmlElement = doc.querySelector('opml');
+                if (!opmlElement) {
+                    reject(new Error('Invalid OPML file: missing <opml> tag'));
+                    return;
+                }
+                // Find all outline elements that have a type="rss" attribute or a url attribute
+                const outlines = doc.querySelectorAll('outline[type="rss"], outline[url]');
+                if (outlines.length === 0) {
+                    reject(new Error('No feed outlines found in OPML file'));
+                    return;
+                }
+                const feeds = [];
+                outlines.forEach((outline)=>{
+                    const title = outline.getAttribute('title') || outline.getAttribute('text') || '';
+                    const url = outline.getAttribute('url') || outline.getAttribute('xmlUrl') || '';
+                    // Only add if we have both a title and URL
+                    if (title && url) {
+                        feeds.push({
+                            title,
+                            url
+                        });
+                    }
+                });
                 resolve(feeds);
             } catch (error) {
+                console.error('Error parsing OPML file:', error);
                 reject(error);
             }
         };
-        reader.onerror = ()=>reject(new Error("Failed to read file"));
+        reader.onerror = ()=>{
+            reject(new Error('Error reading file'));
+        };
         reader.readAsText(file);
     });
 }

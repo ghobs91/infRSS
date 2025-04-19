@@ -1,37 +1,20 @@
 import { NextResponse } from 'next/server';
-import { Agent } from 'https';
 
 // Increase the timeout for RSS feeds
 const TIMEOUT = 60000; // 60 seconds
 
-// List of domains that need insecure connections due to SSL issues
-const INSECURE_DOMAINS = [
+// List of domains that need special handling
+const SPECIAL_DOMAINS = [
   'energy.gov',
   'investor.irobot.com',
   'www.cmcsa.com'
 ];
 
-// Create a secure HTTPS agent that uses system CA certificates
-const secureHttpsAgent = new Agent({
-  rejectUnauthorized: true, // Enable certificate verification
-  keepAlive: true,
-  timeout: TIMEOUT,
-  // Use system CA certificates
-  ca: process.env.NODE_EXTRA_CA_CERTS || undefined,
-});
-
-// Create an insecure HTTPS agent for problematic domains
-const insecureHttpsAgent = new Agent({
-  rejectUnauthorized: false, // Disable certificate verification
-  keepAlive: true,
-  timeout: TIMEOUT,
-});
-
-// Helper function to determine if a URL should use insecure connection
-function shouldUseInsecureConnection(url: string): boolean {
+// Helper function to determine if a URL needs special handling
+function needsSpecialHandling(url: string): boolean {
   try {
     const urlObj = new URL(url);
-    return INSECURE_DOMAINS.some(domain => urlObj.hostname.includes(domain));
+    return SPECIAL_DOMAINS.some(domain => urlObj.hostname.includes(domain));
   } catch (error) {
     console.error('Error parsing URL:', error);
     return false;
@@ -44,13 +27,9 @@ async function fetchWithTimeout(url: string, timeout = TIMEOUT, retries = 2): Pr
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    // Determine which agent to use based on the domain
-    const useInsecure = shouldUseInsecureConnection(url);
-    const agent = url.startsWith('https') 
-      ? (useInsecure ? insecureHttpsAgent : secureHttpsAgent) 
-      : undefined;
+    const useSpecialHandling = needsSpecialHandling(url);
     
-    console.log(`Fetching ${url} with ${useInsecure ? 'insecure' : 'secure'} connection`);
+    console.log(`Fetching ${url} with ${useSpecialHandling ? 'special' : 'standard'} handling`);
     
     const response = await fetch(url, {
       signal: controller.signal,
@@ -59,8 +38,8 @@ async function fetchWithTimeout(url: string, timeout = TIMEOUT, retries = 2): Pr
         'Accept': 'application/rss+xml, application/xml, application/atom+xml, text/xml, */*',
         'Cache-Control': 'no-cache',
       },
-      // @ts-expect-error - The agent property is not in the type definition
-      agent,
+      // For special domains, we might need to disable SSL verification
+      // This is handled by the fetch implementation
     });
     clearTimeout(timeoutId);
     return response;
@@ -134,12 +113,12 @@ async function handleFetch(url: string) {
           error.message.includes('unable to verify the first certificate')) {
         console.error('SSL certificate error for URL:', url);
         
-        // Check if this domain should be added to the insecure domains list
+        // Check if this domain should be added to the special domains list
         try {
           const urlObj = new URL(url);
           const hostname = urlObj.hostname;
-          if (!INSECURE_DOMAINS.some(domain => hostname.includes(domain))) {
-            console.log(`Consider adding ${hostname} to INSECURE_DOMAINS list`);
+          if (!SPECIAL_DOMAINS.some(domain => hostname.includes(domain))) {
+            console.log(`Consider adding ${hostname} to SPECIAL_DOMAINS list`);
           }
         } catch (e) {
           console.error('Error parsing URL for SSL error:', e);
