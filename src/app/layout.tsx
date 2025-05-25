@@ -1,6 +1,8 @@
 "use client";
 import "./globals.css";
+import "../styles/scroll-fix.css";
 import { Navigation } from "@/components/Navigation";
+import { UnreadProvider } from "@/lib/unreadContext";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,10 +15,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body className="bg-[var(--background)] text-[var(--foreground)]">
         <div className="min-h-screen">
-          <Navigation />
-          <div className="pt-16">
-            {children}
-          </div>
+          <UnreadProvider>
+            <Navigation />
+            <div className="pt-16">
+              {children}
+            </div>
+          </UnreadProvider>
         </div>
       </body>
     </html>

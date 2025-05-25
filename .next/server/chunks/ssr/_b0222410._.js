@@ -127,6 +127,7 @@ var { g: global, __dirname } = __turbopack_context__;
 // ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
 // Import fetchWithCors if it's not already implicitly available in the scope
 // (Assuming it's exported from the same file or imported correctly)
+// Helper function to clean XML content before parsing
 __turbopack_context__.s({
     "fetchAndParseRSS": (()=>fetchAndParseRSS),
     "fetchWithCors": (()=>fetchWithCors),
@@ -135,6 +136,22 @@ __turbopack_context__.s({
     "parseOPMLFile": (()=>parseOPMLFile),
     "saveFeedToStorage": (()=>saveFeedToStorage)
 });
+function cleanXMLContent(xmlString) {
+    // First, normalize line endings
+    xmlString = xmlString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Handle CDATA sections that might contain problematic sequences
+    // Use [\s\S]*? to match any character including newlines non-greedily
+    xmlString = xmlString.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content)=>{
+        // Escape any ]] sequences within CDATA content by splitting the CDATA section
+        const escapedContent = content.replace(/\]\]>/g, ']]]]><![CDATA[>');
+        return `<![CDATA[${escapedContent}]]>`;
+    });
+    // Remove any invalid XML characters (Control characters except Tab, LF, CR)
+    // XML 1.0: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+    // We remove characters in the ranges #x0-#x8, #xB-#xC, #xE-#x1F, #x7F-#x84, #x86-#x9F
+    xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
+    return xmlString;
+}
 async function fetchAndParseRSS(url) {
     try {
         const controller = new AbortController();
@@ -188,12 +205,13 @@ async function fetchAndParseRSS(url) {
         });
         // Escape unescaped ampersands in content
         text = text.replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+        // Clean the XML content before parsing
+        const cleanedXML = cleanXMLContent(text);
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(text, "text/xml");
+        const xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
         // Check for XML parsing errors
         const parseError = xmlDoc.querySelector("parsererror");
         if (parseError) {
-            console.error("XML parsing error:", parseError.textContent);
             // Try to extract any useful information from the error
             const errorText = parseError.textContent || '';
             if (errorText.includes("Start tag expected")) {

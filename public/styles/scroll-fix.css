@@ -1,0 +1,18 @@
+/* Prevent pull-to-refresh and improve scrolling */
+body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent scroll bounce on iOS */
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Enable smooth scrolling for content */
+#root {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}

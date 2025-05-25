@@ -2,18 +2,15 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArticleSkeleton } from "@/components/ArticleSkeleton";
 import { Spinner } from "@/components/ui/spinner";
 import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
 } from "@/lib/rssUtils";
-
-const PullToRefresh = dynamic(() => import("react-pull-to-refresh"), { ssr: false });
+import { useUnread } from "@/lib/unreadContext";
 
 // Format date to "Month Day, Year" (e.g., "April 13th, 2025")
 function formatDate(dateString: string): string {
@@ -54,63 +51,81 @@ function formatDate(dateString: string): string {
 }
 
 // Article component to reduce re-renders
-const Article = ({ article }: { article: { title: string; link: string; pubDate: string; thumbnail?: string } }) => {
+const Article = ({ article, onVisible }: { article: { title: string; link: string; pubDate: string; thumbnail?: string }, onVisible?: () => void }) => {
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!ref.current || !onVisible) return;
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onVisible();
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [onVisible]);
+
   return (
-    <Card className="shadow-sm overflow-hidden">
-      <CardContent className="p-0">
-        <div className="flex flex-col sm:flex-row">
-          {article.thumbnail && !imgError && (
-            <div className="w-full sm:w-40 h-40 sm:h-auto relative">
-              {/* Use unoptimized prop for external images */}
-              <Image 
-                src={article.thumbnail} 
-                alt={article.title}
-                fill
-                unoptimized
-                className="object-cover"
-                onError={() => setImgError(true)}
-              />
-            </div>
-          )}
-          <div className="flex-1 p-3 sm:p-4">
-            <a
-              href={article.link}
-              className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {article.title}
-            </a>
-            <div className="flex items-center gap-2 my-1">
-              {mounted && (
-                <div className="w-4 h-4 relative">
-                  <Image
-                    src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                    alt="favicon"
-                    fill
-                    unoptimized
-                    className="object-contain"
-                  />
-                </div>
-              )}
+    <div ref={ref}>
+      <Card className="shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <div className="flex flex-col sm:flex-row">
+            {article.thumbnail && !imgError && (
+              <div className="w-full sm:w-40 h-40 sm:h-auto relative">
+                {/* Use unoptimized prop for external images */}
+                <Image 
+                  src={article.thumbnail} 
+                  alt={article.title}
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  onError={() => setImgError(true)}
+                />
+              </div>
+            )}
+            <div className="flex-1 p-3 sm:p-4">
+              <a
+                href={article.link}
+                className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {article.title}
+              </a>
+              <div className="flex items-center gap-2 my-1">
+                {mounted && (
+                  <div className="w-4 h-4 relative">
+                    <Image
+                      src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
+                      alt="favicon"
+                      fill
+                      unoptimized
+                      className="object-contain"
+                    />
+                  </div>
+                )}
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+                  {new URL(article.link).hostname.replace("www.", "")}
+                </p>
+              </div>
               <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                {new URL(article.link).hostname.replace("www.", "")}
+                {formatDate(article.pubDate)}
               </p>
             </div>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-              {formatDate(article.pubDate)}
-            </p>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
@@ -119,33 +134,8 @@ export default function HomePage() {
   const [visibleCount, setVisibleCount] = useState(20);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const lastRefreshTime = useRef<number>(0);
-  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Add a style tag to hide the refresh indicator when not refreshing
-  useEffect(() => {
-    if (isClient) {
-      const style = document.createElement('style');
-      style.innerHTML = `
-        .ptr-element {
-          display: none;
-        }
-        .ptr-refresh .ptr-element {
-          display: block;
-        }
-        .ptr-pull .ptr-element {
-          display: block;
-        }
-      `;
-      document.head.appendChild(style);
-      return () => {
-        document.head.removeChild(style);
-      };
-    }
-  }, [isClient]);
+  const { markAsRead, setTotalArticles, readLinks } = useUnread();
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
@@ -154,19 +144,9 @@ export default function HomePage() {
 
   // Handle refreshing feeds
   const handleRefresh = useCallback(async () => {
-    // Prevent multiple refreshes in quick succession
-    const now = Date.now();
-    if (now - lastRefreshTime.current < 5000) { // 5 second cooldown
-      return;
-    }
-    
-    lastRefreshTime.current = now;
-    setIsRefreshing(true);
-    
     try {
       const feeds = loadFeedsFromStorage();
       if (feeds.length === 0) {
-        setIsRefreshing(false);
         return;
       }
 
@@ -191,8 +171,6 @@ export default function HomePage() {
       setVisibleCount(20); // Reset visible count
     } catch (error) {
       console.error("Error refreshing feeds:", error);
-    } finally {
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -212,12 +190,17 @@ export default function HomePage() {
       observer.observe(currentRef);
     }
 
+    const interval = setInterval(() => {
+      handleRefresh();
+    }, 10 * 60 * 1000); // Check every 10 minutes
+
     return () => {
+      clearInterval(interval);
       if (currentRef) {
         observer.unobserve(currentRef);
       }
     };
-  }, [isLoading, articles.length]);
+  }, [isLoading, articles.length, handleRefresh]);
 
   // Load saved feeds on initial render
   useEffect(() => {
@@ -227,7 +210,6 @@ export default function HomePage() {
         const feeds = loadFeedsFromStorage();
         if (feeds.length === 0) {
           setIsLoading(false);
-          setIsInitialLoad(false);
           return;
         }
 
@@ -253,151 +235,80 @@ export default function HomePage() {
         console.error("Error loading feeds:", error);
       } finally {
         setIsLoading(false);
-        setIsInitialLoad(false);
       }
     };
 
     setIsClient(true);
     loadSavedFeeds();
 
-    // Set up periodic refresh with a reasonable interval
-    const interval = setInterval(() => {
-      const now = Date.now();
-      // Only refresh if it's been at least 10 minutes since the last refresh
-      if (now - lastRefreshTime.current > 10 * 60 * 1000) {
-        handleRefresh();
-      }
-    }, 10 * 60 * 1000); // Check every 10 minutes
-
-    return () => {
-      clearInterval(interval);
-      const currentTimeoutRef = refreshTimeoutRef.current;
-      if (currentTimeoutRef) {
-        clearTimeout(currentTimeoutRef);
-      }
-    };
   }, [handleRefresh]);
+
+  useEffect(() => {
+    setTotalArticles(articles.length);
+  }, [articles.length, setTotalArticles]);
 
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
       <section className="space-y-4">
         {isClient && (
-          <>
-            {/* Manual refresh button */}
-            <div className="flex justify-end mb-4">
-              <Button
-                variant="default"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="flex items-center gap-2"
-              >
-                {isRefreshing ? (
-                  <>
-                    <Spinner size="sm" />
-                    <span>Refreshing...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                    <span>Refresh</span>
-                  </>
-                )}
-              </Button>
-            </div>
-            <PullToRefresh
-              onRefresh={handleRefresh}
-              distanceToRefresh={100}
-              resistance={2.5}
-              icon={
-                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                  <svg
-                    className="w-4 h-4 mr-2 transform rotate-180"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                  <span>Pull to refresh</span>
-                </div>
-              }
-              loading={
-                <div className="flex justify-center items-center py-2 text-[var(--text-secondary)]">
-                  <Spinner size="sm" className="mr-2" />
-                  <span>Refreshing...</span>
-                </div>
-              }
-            >
-              <div className="grid gap-4">
-                {isInitialLoad ? (
-                  // Show spinner during initial load
-                  <div className="flex justify-center items-center py-12">
-                    <Spinner size="lg" />
-                  </div>
-                ) : isRefreshing ? (
-                  // Show spinner during pull-to-refresh
-                  <div className="flex justify-center items-center py-4">
-                    <Spinner size="md" />
-                  </div>
-                ) : isLoading ? (
-                  // Show skeleton loaders while loading
-                  Array.from({ length: 10 }).map((_, idx) => (
-                    <div 
-                      key={`skeleton-${idx}`} 
-                      style={{ 
-                        animationDelay: `${idx * 100}ms`,
-                        animation: `fadeIn 0.5s ease-in-out ${idx * 100}ms forwards`
-                      }}
-                    >
-                      <ArticleSkeleton />
-                    </div>
-                  ))
-                ) : articles.length === 0 ? (
-                  <Card className="shadow-sm">
-                    <CardContent className="p-4 text-center">
-                      <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  // Show actual articles
-                  visibleArticles.map((article, idx) => (
-                    <Article key={`${article.link}-${idx}`} article={article} />
-                  ))
-                )}
-                {articles.length > visibleCount && (
-                  <div ref={loadMoreRef} className="h-10 flex justify-center">
-                    <Button 
-                      variant="default" 
-                      onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
-                      className="w-full"
-                    >
-                      Load More
-                    </Button>
-                  </div>
-                )}
+          <div className="grid gap-4">
+            {isLoading ? (
+              // Show spinner during initial load
+              <div className="flex justify-center items-center py-12">
+                <Spinner size="lg" />
               </div>
-            </PullToRefresh>
-          </>
+            ) : articles.length === 0 ? (
+              <Card className="shadow-sm">
+                <CardContent className="p-4 text-center">
+                  <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              // Show actual articles
+              visibleArticles.map((article, idx) => (
+                <Article
+                  key={`${article.link}-${idx}`}
+                  article={article}
+                  onVisible={() => {
+                    if (!readLinks.has(article.link)) markAsRead(article.link);
+                  }}
+                />
+              ))
+            )}
+            {articles.length > visibleCount && (
+              <div ref={loadMoreRef} className="h-10 flex justify-center">
+                <Button 
+                  variant="default" 
+                  onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
+                  className="w-full"
+                >
+                  Load More
+                </Button>
+              </div>
+            )}
+          </div>
         )}
+        <Button
+          variant="default"
+          onClick={handleRefresh}
+          className="flex items-center gap-2"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          <span>Refresh</span>
+        </Button>
       </section>
     </main>
   );

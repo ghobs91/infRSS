@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { Drawer } from '@/components/ui/drawer';
 import { IconButton } from '@/components/ui/icon-button';
 import { MenuIcon, CloseIcon, HomeIcon, PlusIcon, RssIcon } from '@/components/ui/icons';
+import { useUnread } from '@/lib/unreadContext';
 
 export const Navigation = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -49,14 +50,18 @@ export const Navigation = () => {
       <header className={`fixed top-0 left-0 right-0 h-16 z-30 bg-[var(--card-bg)] bg-opacity-95 backdrop-blur-sm transition-all duration-200 ${
         isScrolled ? 'shadow-sm' : ''
       }`}>
-        <div className="h-full flex items-center px-4">
-          <IconButton
-            icon={<MenuIcon />}
-            label="Menu"
-            variant="ghost"
-            onClick={toggleDrawer}
-          />
-          <h1 className="ml-2 text-xl font-semibold text-[var(--text-primary)]">{getPageTitle()}</h1>
+        <div className="h-full flex items-center px-4 justify-between">
+          <div className="flex items-center">
+            <IconButton
+              icon={<MenuIcon />}
+              label="Menu"
+              variant="ghost"
+              onClick={toggleDrawer}
+            />
+            <h1 className="ml-2 text-xl font-semibold text-[var(--text-primary)]">{getPageTitle()}</h1>
+          </div>
+          {/* Unread Counter */}
+          <UnreadCounter />
         </div>
       </header>
 
@@ -115,5 +120,18 @@ export const Navigation = () => {
         </div>
       </Drawer>
     </>
+  );
+};
+
+// Add UnreadCounter component at the bottom of the file
+const UnreadCounter = () => {
+  const { unreadCount } = useUnread();
+  if (unreadCount === 0) return null;
+  return (
+    <div className="relative">
+      <span className="inline-block bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">
+        {unreadCount} unread
+      </span>
+    </div>
   );
 }; 
