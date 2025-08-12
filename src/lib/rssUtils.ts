@@ -1,5 +1,7 @@
 // lib/rssUtils.ts
 
+import type { FeedData, Article, Category } from './types';
+
 // ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
 
 // Import fetchWithCors if it's not already implicitly available in the scope
@@ -18,12 +20,102 @@ function cleanXMLContent(xmlString: string): string {
     return `<![CDATA[${escapedContent}]]>`;
   });
 
+  // Fix malformed CDATA sections that might cause parsing errors
+  xmlString = xmlString.replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content) => {
+    // If the CDATA section is not properly closed, close it
+    if (!content.includes(']]>')) {
+      return `<!\[CDATA\[${content}]]>`;
+    }
+    return match;
+  });
+
+  // Handle cases where ]] sequences appear outside of CDATA sections
+  // This is a common issue in RSS feeds where content contains these sequences
+  // We'll use a more aggressive approach to catch all problematic sequences
+  
+  // First, let's handle the most common case: ]] sequences in content
+  // Replace any ]] that's not part of a CDATA section with a safe alternative
+  xmlString = xmlString.replace(/\]\]/g, (match, offset) => {
+    // Check if this ]] is part of a CDATA section
+    const before = xmlString.substring(0, offset);
+    const lastCDataStart = before.lastIndexOf('<![CDATA[');
+    const lastCDataEnd = before.lastIndexOf(']]>');
+    
+    // If we're inside a CDATA section, don't replace
+    if (lastCDataStart > lastCDataEnd) {
+      return match;
+    }
+    
+    // Otherwise, escape it
+    return ']]]]><![CDATA[>';
+  });
+  
+  // Now let's also handle any remaining problematic sequences
+  // Some feeds might have HTML content with these sequences
+  xmlString = xmlString.replace(/\]\]>/g, (match, offset) => {
+    const before = xmlString.substring(0, offset);
+    const lastCDataStart = before.lastIndexOf('<![CDATA[');
+    const lastCDataEnd = before.lastIndexOf(']]>');
+    
+    // If we're inside a CDATA section, don't replace
+    if (lastCDataStart > lastCDataEnd) {
+      return match;
+    }
+    
+    // Otherwise, escape it
+    return ']]]]><![CDATA[>';
+  });
+  
+  // Additional safety: wrap any content that might contain problematic sequences
+  // This is a more aggressive approach for very problematic feeds
+  xmlString = xmlString.replace(/(<description>|<content>|<summary>)(.*?)(<\/description>|<\/content>|<\/summary>)/g, (match, openTag, content, closeTag) => {
+    // If content contains problematic sequences, wrap it in CDATA
+    if (content.includes(']]') || content.includes(']]>')) {
+      return `${openTag}<![CDATA[${content}]]>${closeTag}`;
+    }
+    return match;
+  });
+
   // Remove any invalid XML characters (Control characters except Tab, LF, CR)
   // XML 1.0: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
   // We remove characters in the ranges #x0-#x8, #xB-#xC, #xE-#x1F, #x7F-#x84, #x86-#x9F
   xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
 
   return xmlString;
+}
+
+// Helper function to extract thumbnail from RSS item
+function extractThumbnailFromItem(item: Element): string | undefined {
+  // Try to get enclosure image first
+  let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
+  
+  // If no enclosure image, try media:content or media:thumbnail
+  if (!thumbnail) {
+    try {
+      // Try different approaches for media elements
+      // First, try with proper namespace handling
+      const mediaContent = item.querySelector("media\\:content[type^='image']") ||
+                          item.querySelector("media\\:thumbnail");
+      
+      if (mediaContent) {
+        thumbnail = mediaContent.getAttribute("url");
+      } else {
+        // Fallback: search for any element with 'media' in the tag name
+        const allElements = item.querySelectorAll("*");
+        for (const element of allElements) {
+          if (element.tagName.toLowerCase().includes('media') && 
+              element.getAttribute('type')?.startsWith('image')) {
+            thumbnail = element.getAttribute('url');
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error extracting thumbnail from media elements:', error);
+    }
+  }
+  
+  return thumbnail || undefined;
 }
 
 export async function fetchAndParseRSS(url: string): Promise<{ title: string; items: Article[] } | null> { // Changed items type to Article[]
@@ -45,6 +137,21 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       // Consider logging the response body for more details on proxy errors
       const errorText = await response.text().catch(() => 'Could not read error response');
       console.error(`Proxy fetch failed for ${url}. Status: ${response.status}, Body: ${errorText}`);
+      
+      // If it's a 404, the feed might not exist - try to discover the correct URL
+      if (response.status === 404) {
+        console.log(`Feed not found at ${url}, attempting to discover correct RSS URL...`);
+        try {
+          const discoveredUrl = await discoverFeedUrlWithFallbacks(url);
+          if (discoveredUrl && discoveredUrl !== url) {
+            console.log(`Discovered RSS feed at: ${discoveredUrl}`);
+            return await fetchAndParseRSS(discoveredUrl);
+          }
+        } catch (discoverError) {
+          console.warn(`Failed to discover RSS feed for ${url}:`, discoverError);
+        }
+      }
+      
       // Don't throw an error, just return null to allow the app to continue
       return null;
     }
@@ -97,114 +204,109 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
     const cleanedXML = cleanXMLContent(text);
 
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+    let xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
 
-    // Check for XML parsing errors
+    // If parsing failed, try a more aggressive cleaning approach
+    const initialParseError = xmlDoc.querySelector("parsererror");
+    if (initialParseError && initialParseError.textContent?.includes("Sequence ']]>' not allowed")) {
+      console.log(`Attempting aggressive XML cleaning for ${url}...`);
+      
+      // Try to remove or escape all problematic sequences
+      const aggressiveCleaned = cleanedXML
+        .replace(/\]\]>/g, ']]]]><![CDATA[>')  // Escape all ]] sequences
+        .replace(/\]\]/g, ']]]]><![CDATA[>');  // Escape all ]] sequences
+      
+      // Try parsing again
+      xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
+      
+      // Check if the aggressive cleaning worked
+      const secondParseError = xmlDoc.querySelector("parsererror");
+      if (secondParseError) {
+        console.warn(`Aggressive cleaning failed for ${url}, continuing with original...`);
+        // Revert to original cleaned XML
+        xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+      } else {
+        console.log(`Aggressive cleaning successful for ${url}`);
+      }
+    }
+
+    // Check for parsing errors
     const parseError = xmlDoc.querySelector("parsererror");
     if (parseError) {
-      // Try to extract any useful information from the error
-      const errorText = parseError.textContent || '';
-      if (errorText.includes("Start tag expected")) {
-        console.error("Response might not be XML. First 100 chars:", text.substring(0, 100));
+      console.error(`XML parsing error for ${url}:`, parseError.textContent);
+      
+      // Try to extract any useful information despite the error
+      // Sometimes the parser can still extract some content even with errors
+      const hasItems = xmlDoc.querySelector("item, entry");
+      if (!hasItems) {
+        return null; // Only fail completely if we can't get any items
       }
+      
+      console.warn(`Continuing with potentially malformed XML for ${url}`);
+    }
+
+    // Try to find the channel title
+    const channelTitle = xmlDoc.querySelector("channel > title")?.textContent || 
+                        xmlDoc.querySelector("feed > title")?.textContent ||
+                        new URL(url).hostname.replace("www.", "");
+
+    // Handle both RSS and Atom feeds
+    let items: Element[];
+    if (xmlDoc.querySelector("item")) {
+      // RSS format
+      items = Array.from(xmlDoc.querySelectorAll("item"));
+    } else if (xmlDoc.querySelector("entry")) {
+      // Atom format
+      items = Array.from(xmlDoc.querySelectorAll("entry"));
+    } else {
+      console.error(`No items found in feed at ${url}`);
       return null;
     }
 
-    // Check if it's a valid RSS/Atom feed
-    const rssElement = xmlDoc.querySelector("rss, feed");
-    if (!rssElement) {
-      console.warn(`Invalid RSS/Atom structure for ${url}. Missing <rss> or <feed> tag.`);
-      return null;
-    }
+    const parsedItems: Article[] = items.map((item, index) => {
+      const title = item.querySelector("title")?.textContent?.trim() || 
+                   item.querySelector("title")?.textContent?.trim() || 
+                   `Untitled Article ${index + 1}`;
+      
+      const link = item.querySelector("link")?.textContent?.trim() || 
+                  item.querySelector("link")?.getAttribute("href") ||
+                  item.querySelector("id")?.textContent?.trim() || 
+                  "";
+      
+      const pubDate = item.querySelector("pubDate")?.textContent?.trim() || 
+                     item.querySelector("published")?.textContent?.trim() || 
+                     item.querySelector("updated")?.textContent?.trim() || 
+                     new Date().toISOString();
+      
+      const content = item.querySelector("description")?.textContent?.trim() || 
+                     item.querySelector("content")?.textContent?.trim() || 
+                     item.querySelector("summary")?.textContent?.trim() || 
+                     "";
+      
+             const thumbnail = extractThumbnailFromItem(item);
+      
+      const sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "Unknown Source";
 
-    const channel = xmlDoc.querySelector("channel, feed");
-    if (!channel) {
-      console.warn(`Invalid RSS/Atom structure for ${url}. Missing <channel> or <feed> tag.`);
-      return null;
-    }
-
-    const title = channel.querySelector("title")?.textContent || "Untitled Feed"; // Provide a default title
-
-    // Use Promise.allSettled to handle potential errors in individual item processing
-    const itemPromises = Array.from(xmlDoc.querySelectorAll("item, entry")).map(async (item): Promise<Article | null> => {
-      try {
-        const itemTitle = item.querySelector("title")?.textContent || "";
-        // Prioritize link[@href] for Atom feeds
-        const itemLink = item.querySelector("link[href]")?.getAttribute("href") || item.querySelector("link")?.textContent || "";
-        // Handle different date formats more robustly if needed
-        const itemPubDateStr = item.querySelector("pubDate, published")?.textContent || "";
-        const itemPubDate = itemPubDateStr ? new Date(itemPubDateStr).toISOString() : new Date().toISOString(); // Standardize date or use current if missing
-
-        const content = item.querySelector("content\\:encoded, content, description")?.textContent || "";
-
-        // Try to get enclosure image first
-        let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
-
-        // If no enclosure image, try media:content or media:thumbnail
-        if (!thumbnail) {
-          const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:thumbnail");
-          thumbnail = mediaContent?.getAttribute("url");
-        }
-
-        // If still no thumbnail, try to extract from the article (consider rate limiting/delaying this)
-        // This can be slow and resource-intensive if done for every item.
-        // Maybe only do it if content is empty or lacks images.
-        // if (!thumbnail && itemLink) {
-        //   thumbnail = await extractThumbnail(itemLink, content);
-        // }
-
-        // Extract source domain from the link
-        let sourceDomain = "";
-        try {
-          if (itemLink) {
-            sourceDomain = new URL(itemLink).hostname.replace(/^www\./, ""); // More robust www removal
-          } else if (url) {
-             // Fallback to feed's domain if item link is missing
-             sourceDomain = new URL(url).hostname.replace(/^www\./, "");
-          }
-        } catch (error) {
-          console.warn("Error extracting source domain:", error); // Use warn for non-critical errors
-        }
-
-        // Basic validation: Ensure there's at least a title or link
-        if (!itemTitle && !itemLink) {
-            console.warn("Skipping item with no title or link");
-            return null;
-        }
-
-        return {
-          title: itemTitle,
-          link: itemLink,
-          pubDate: itemPubDate, // Use standardized date
-          thumbnail: thumbnail || undefined, // Ensure undefined if null/empty
-          content: content,
-          sourceDomain: sourceDomain
-        };
-      } catch (itemError) {
-          console.error("Error processing feed item:", itemError, item.innerHTML); // Log item content on error
-          return null; // Skip this item on error
-      }
+      return {
+        id: `${url}-${index}`,
+        title,
+        link,
+        pubDate,
+        thumbnail,
+        content,
+        sourceDomain,
+        readStatus: 'unread' as const,
+        tags: []
+      };
     });
 
-    // Wait for all item promises to settle and filter out nulls (errors or skipped items)
-    const settledItems = await Promise.allSettled(itemPromises);
-    const validItems = settledItems
-        .filter(result => result.status === 'fulfilled' && result.value !== null)
-        .map(result => (result as PromiseFulfilledResult<Article>).value);
-
-
     return {
-      title,
-      items: validItems, // Return only successfully processed items
+      title: channelTitle,
+      items: parsedItems
     };
   } catch (error) {
-    // Differentiate between fetch errors and parsing errors if needed
-    if (error instanceof Error && error.message.includes('Abort')) {
-        console.warn("RSS fetch timed out:", url);
-    } else {
-        console.error(`Error fetching or parsing RSS feed ${url}:`, error);
-    }
-    return null; // Return null on any error
+    console.error(`Error fetching and parsing RSS from ${url}:`, error);
+    return null;
   }
 }
 
@@ -229,47 +331,156 @@ export const fetchWithCors = async (url: string): Promise<Response> => {
 
 // ... (Keep existing storage functions and parseOPMLFile)
 
-export type FeedData = {
-  title: string;
-  url: string;
-};
-
-export type Article = {
-  title: string;
-  link: string;
-  pubDate: string;
-  thumbnail?: string;
-  content: string;
-  sourceDomain: string;
-};
+// Remove duplicate type definitions since they're imported from types.ts
 
 export function loadFeedsFromStorage(): FeedData[] {
-  if (typeof window === 'undefined') return [];
-  
   try {
-    const feedsJson = localStorage.getItem('feeds');
-    if (!feedsJson) return [];
-    
-    const feeds = JSON.parse(feedsJson);
-    return Array.isArray(feeds) ? feeds : [];
+    const feeds = localStorage.getItem("feeds");
+    if (feeds) {
+      const parsedFeeds = JSON.parse(feeds);
+      // Ensure all feeds have IDs for backward compatibility
+      return parsedFeeds.map((feed: any, index: number) => ({
+        ...feed,
+        id: feed.id || `feed-${index}`,
+        category: feed.category || 'Uncategorized',
+        tags: feed.tags || [],
+        lastFetched: feed.lastFetched || 0,
+        isActive: feed.isActive !== false
+      }));
+    }
+    return [];
   } catch (error) {
-    console.error('Error loading feeds from storage:', error);
+    console.error("Error loading feeds from storage:", error);
     return [];
   }
 }
 
 export function saveFeedToStorage(feed: FeedData): void {
-  if (typeof window === 'undefined') return;
-  
   try {
     const feeds = loadFeedsFromStorage();
-    if (!feeds.some(f => f.url === feed.url)) {
+    const existingIndex = feeds.findIndex(f => f.url === feed.url);
+    
+    if (existingIndex >= 0) {
+      feeds[existingIndex] = { ...feeds[existingIndex], ...feed };
+    } else {
       feeds.push(feed);
-      localStorage.setItem('feeds', JSON.stringify(feeds));
     }
+    
+    localStorage.setItem("feeds", JSON.stringify(feeds));
   } catch (error) {
-    console.error('Error saving feed to storage:', error);
+    console.error("Error saving feed to storage:", error);
   }
+}
+
+export function loadCategoriesFromStorage(): Category[] {
+  try {
+    const categories = localStorage.getItem("categories");
+    if (categories) {
+      return JSON.parse(categories);
+    }
+    // Return default categories
+    return [
+      { id: 'uncategorized', name: 'Uncategorized', color: '#6B7280', createdAt: Date.now() },
+      { id: 'tech', name: 'Technology', color: '#3B82F6', createdAt: Date.now() },
+      { id: 'news', name: 'News', color: '#EF4444', createdAt: Date.now() },
+      { id: 'science', name: 'Science', color: '#10B981', createdAt: Date.now() },
+      { id: 'programming', name: 'Programming', color: '#8B5CF6', createdAt: Date.now() }
+    ];
+  } catch (error) {
+    console.error("Error loading categories from storage:", error);
+    return [];
+  }
+}
+
+export function saveCategoriesToStorage(categories: Category[]): void {
+  try {
+    localStorage.setItem("categories", JSON.stringify(categories));
+  } catch (error) {
+    console.error("Error saving categories to storage:", error);
+  }
+}
+
+export function loadUserPreferences() {
+  try {
+    const preferences = localStorage.getItem("userPreferences");
+    if (preferences) {
+      return JSON.parse(preferences);
+    }
+    // Return default preferences
+    return {
+      id: 'default',
+      sentimentFilter: {
+        enabled: false,
+        minSentiment: -0.5,
+        maxToxicity: 0.7,
+        hideClickbait: false,
+        hideRagebait: false
+      },
+      categories: loadCategoriesFromStorage(),
+      syncEnabled: false,
+      syncDeviceId: generateDeviceId(),
+      lastSync: 0
+    };
+  } catch (error) {
+    console.error("Error loading user preferences:", error);
+    return null;
+  }
+}
+
+export function saveUserPreferences(preferences: any): void {
+  try {
+    localStorage.setItem("userPreferences", JSON.stringify(preferences));
+  } catch (error) {
+    console.error("Error saving user preferences:", error);
+  }
+}
+
+function generateDeviceId(): string {
+  return 'device-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
+}
+
+export function filterArticlesBySentiment(articles: Article[], preferences: any): Article[] {
+  if (!preferences?.sentimentFilter?.enabled) {
+    return articles;
+  }
+
+  const { minSentiment, maxToxicity, hideClickbait, hideRagebait } = preferences.sentimentFilter;
+
+  return articles.filter(article => {
+    if (!article.sentiment) return true;
+
+    const { score, toxicity, isClickbait, isRagebait } = article.sentiment;
+
+    // Filter by sentiment score
+    if (score < minSentiment) return false;
+
+    // Filter by toxicity
+    if (toxicity > maxToxicity) return false;
+
+    // Filter clickbait
+    if (hideClickbait && isClickbait) return false;
+
+    // Filter ragebait
+    if (hideRagebait && isRagebait) return false;
+
+    return true;
+  });
+}
+
+export function groupArticlesByCategory(articles: Article[], feeds: FeedData[]): Record<string, Article[]> {
+  const grouped: Record<string, Article[]> = {};
+  
+  articles.forEach(article => {
+    const feed = feeds.find(f => f.url === article.link || article.sourceDomain.includes(new URL(f.url).hostname));
+    const category = feed?.category || 'Uncategorized';
+    
+    if (!grouped[category]) {
+      grouped[category] = [];
+    }
+    grouped[category].push(article);
+  });
+  
+  return grouped;
 }
 
 export async function getFeedUrlFromHtml(url: string): Promise<string | null> {
@@ -354,7 +565,14 @@ export async function parseOPMLFile(file: File): Promise<FeedData[]> {
           
           // Only add if we have both a title and URL
           if (title && url) {
-            feeds.push({ title, url });
+            feeds.push({ 
+              id: `opml-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              title, 
+              url,
+              category: 'Uncategorized',
+              tags: [],
+              isActive: true
+            });
           }
         });
         
@@ -371,4 +589,119 @@ export async function parseOPMLFile(file: File): Promise<FeedData[]> {
     
     reader.readAsText(file);
   });
+}
+
+/**
+ * Attempts to discover the most likely RSS feed URL for a given website by searching:
+ * - meta tags
+ * - meta tags in parent pages
+ * - website links
+ * - sitemap.xml
+ * - common suffixes
+ * - blog meta tags
+ * Returns the best guess for the feed URL or null if none found.
+ */
+export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<string | null> {
+  // Helper to fetch and parse HTML
+  async function fetchHtml(url: string): Promise<Document | null> {
+    try {
+      const response = await fetchWithCors(url);
+      if (!response.ok) return null;
+      const html = await response.text();
+      return new DOMParser().parseFromString(html, 'text/html');
+    } catch {
+      return null;
+    }
+  }
+
+  // 1. Try meta tags and link tags on the main page
+  const doc = await fetchHtml(siteUrl);
+  if (doc) {
+    const feedLinks = [
+      ...Array.from(doc.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"], link[type="application/xml"], link[type="text/xml"]')).map(link => link.getAttribute('href')),
+      ...Array.from(doc.querySelectorAll('link[rel="alternate"][type="application/rss+xml"], link[rel="alternate"][type="application/atom+xml"]')).map(link => link.getAttribute('href')),
+      ...Array.from(doc.querySelectorAll('a[href*="feed"], a[href*="rss"], a[href*="atom"]')).map(link => link.getAttribute('href')),
+      ...Array.from(doc.querySelectorAll('meta[property="og:see_also"], meta[name="twitter:app:url:ipad"], meta[name="twitter:app:url:iphone"]')).map(meta => meta.getAttribute('content'))
+    ].filter(Boolean) as string[];
+    for (const href of feedLinks) {
+      try {
+        const absUrl = new URL(href!, siteUrl).toString();
+        if (absUrl.match(/\.(xml|rss|atom)$/i) || absUrl.includes('feed')) {
+          return absUrl;
+        }
+      } catch {}
+    }
+  }
+
+  // 2. Try parent pages (e.g., remove path segments)
+  try {
+    const urlObj = new URL(siteUrl);
+    const segments = urlObj.pathname.split('/').filter(Boolean);
+    for (let i = segments.length - 1; i >= 0; i--) {
+      const parentUrl = `${urlObj.origin}/${segments.slice(0, i).join('/')}`;
+      const parentDoc = await fetchHtml(parentUrl);
+      if (parentDoc) {
+        const parentLinks = [
+          ...Array.from(parentDoc.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"], link[type="application/xml"], link[type="text/xml"]')).map(link => link.getAttribute('href')),
+          ...Array.from(parentDoc.querySelectorAll('link[rel="alternate"][type="application/rss+xml"], link[rel="alternate"][type="application/atom+xml"]')).map(link => link.getAttribute('href')),
+          ...Array.from(parentDoc.querySelectorAll('a[href*="feed"], a[href*="rss"], a[href*="atom"]')).map(link => link.getAttribute('href'))
+        ].filter(Boolean) as string[];
+        for (const href of parentLinks) {
+          try {
+            const absUrl = new URL(href!, parentUrl).toString();
+            if (absUrl.match(/\.(xml|rss|atom)$/i) || absUrl.includes('feed')) {
+              return absUrl;
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  // 3. Try common feed URL suffixes
+  const commonSuffixes = [
+    '/feed', '/rss', '/rss.xml', '/atom.xml', '/feed.xml', '/feeds/posts/default', '/blog/rss.xml', '/blog/feed', '/blog/atom.xml'
+  ];
+  for (const suffix of commonSuffixes) {
+    try {
+      const testUrl = siteUrl.replace(/\/$/, '') + suffix;
+      const resp = await fetchWithCors(testUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text.match(/<rss|<feed|<channel/i)) {
+          return testUrl;
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Try /sitemap.xml and look for feed links
+  try {
+    const sitemapUrl = new URL('/sitemap.xml', siteUrl).toString();
+    const resp = await fetchWithCors(sitemapUrl);
+    if (resp.ok) {
+      const xml = await resp.text();
+      const feedUrls = Array.from(xml.matchAll(/<loc>([^<]+\.(xml|rss|atom))<\/loc>/gi)).map(m => m[1]);
+      for (const url of feedUrls) {
+        if (url.match(/(rss|feed|atom)/i)) {
+          return url;
+        }
+      }
+    }
+  } catch {}
+
+  // 5. Try blog meta tags
+  if (doc) {
+    const blogMeta = doc.querySelector('meta[name="blog-channel-url"], meta[name="blog-feed-url"]');
+    if (blogMeta) {
+      const blogUrl = blogMeta.getAttribute('content');
+      if (blogUrl) {
+        try {
+          return new URL(blogUrl, siteUrl).toString();
+        } catch {}
+      }
+    }
+  }
+
+  return null;
 }

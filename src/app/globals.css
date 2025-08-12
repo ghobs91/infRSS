@@ -84,3 +84,10 @@ body {
     opacity: 0.6;
   }
 }
+
+/* Grayed out style for read articles */
+.read-article {
+  opacity: 0.5;
+  filter: grayscale(0.7);
+  pointer-events: none;
+}

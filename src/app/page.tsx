@@ -11,6 +11,7 @@ import {
   loadFeedsFromStorage,
 } from "@/lib/rssUtils";
 import { useUnread } from "@/lib/unreadContext";
+import { cn } from "@/lib/utils";
 
 // Format date to "Month Day, Year" (e.g., "April 13th, 2025")
 function formatDate(dateString: string): string {
@@ -51,7 +52,7 @@ function formatDate(dateString: string): string {
 }
 
 // Article component to reduce re-renders
-const Article = ({ article, onVisible }: { article: { title: string; link: string; pubDate: string; thumbnail?: string }, onVisible?: () => void }) => {
+const Article = ({ article, isRead, onVisible }: { article: { title: string; link: string; pubDate: string; thumbnail?: string }, isRead: boolean, onVisible?: () => void }) => {
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -77,7 +78,7 @@ const Article = ({ article, onVisible }: { article: { title: string; link: strin
 
   return (
     <div ref={ref}>
-      <Card className="shadow-sm overflow-hidden">
+      <Card className={cn("shadow-sm overflow-hidden", isRead && "read-article")}>
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row">
             {article.thumbnail && !imgError && (
@@ -115,7 +116,13 @@ const Article = ({ article, onVisible }: { article: { title: string; link: strin
                   </div>
                 )}
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                  {new URL(article.link).hostname.replace("www.", "")}
+                  {(() => {
+                    try {
+                      return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
+                    } catch {
+                      return "Unknown Source";
+                    }
+                  })()}
                 </p>
               </div>
               <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
@@ -134,17 +141,27 @@ export default function HomePage() {
   const [visibleCount, setVisibleCount] = useState(20);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hideRead, setHideRead] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { markAsRead, setTotalArticles, readLinks } = useUnread();
 
+  // Only show unread articles if hideRead is true
+  const filteredArticles = useMemo(() => {
+    if (hideRead) {
+      return articles.filter(article => !readLinks.has(article.link));
+    }
+    return articles;
+  }, [articles, readLinks, hideRead]);
+
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
-    return articles.slice(0, visibleCount);
-  }, [articles, visibleCount]);
+    return filteredArticles.slice(0, visibleCount);
+  }, [filteredArticles, visibleCount]);
 
   // Handle refreshing feeds
   const handleRefresh = useCallback(async () => {
     try {
+      setHideRead(true);
       const feeds = loadFeedsFromStorage();
       if (feeds.length === 0) {
         return;
@@ -207,6 +224,7 @@ export default function HomePage() {
     const loadSavedFeeds = async () => {
       setIsLoading(true);
       try {
+        setHideRead(true);
         const feeds = loadFeedsFromStorage();
         if (feeds.length === 0) {
           setIsLoading(false);
@@ -240,8 +258,14 @@ export default function HomePage() {
 
     setIsClient(true);
     loadSavedFeeds();
-
   }, [handleRefresh]);
+
+  // After first render, allow read articles to be shown (but grayed out)
+  useEffect(() => {
+    if (!isLoading) {
+      setTimeout(() => setHideRead(false), 0);
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     setTotalArticles(articles.length);
@@ -269,17 +293,18 @@ export default function HomePage() {
                 <Article
                   key={`${article.link}-${idx}`}
                   article={article}
+                  isRead={readLinks.has(article.link)}
                   onVisible={() => {
                     if (!readLinks.has(article.link)) markAsRead(article.link);
                   }}
                 />
               ))
             )}
-            {articles.length > visibleCount && (
+            {filteredArticles.length > visibleCount && (
               <div ref={loadMoreRef} className="h-10 flex justify-center">
                 <Button 
                   variant="default" 
-                  onClick={() => setVisibleCount(prev => Math.min(prev + 20, articles.length))}
+                  onClick={() => setVisibleCount(prev => Math.min(prev + 20, filteredArticles.length))}
                   className="w-full"
                 >
                   Load More

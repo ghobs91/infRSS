@@ -1,1 +1,461 @@
-if(!self.define){let e,s={};const a=(a,n)=>(a=new URL(a+".js",n).href,s[a]||new Promise((s=>{if("document"in self){const e=document.createElement("script");e.src=a,e.onload=s,document.head.appendChild(e)}else e=a,importScripts(a),s()})).then((()=>{let e=s[a];if(!e)throw new Error(`Module ${a} didn’t register its module`);return e})));self.define=(n,i)=>{const c=e||("document"in self?document.currentScript.src:"")||location.href;if(s[c])return;let t={};const o=e=>a(e,c),r={module:{uri:c},exports:t,require:o};s[c]=Promise.all(n.map((e=>r[e]||o(e)))).then((e=>(i(...e),t)))}}define(["./workbox-4754cb34"],(function(e){"use strict";importScripts(),self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"/_next/app-build-manifest.json",revision:"2302e15c95a01286086f36e1a6643b88"},{url:"/_next/dynamic-css-manifest.json",revision:"d751713988987e9331980363e24189ce"},{url:"/_next/static/chunks/298.d0c597df58febad4.js",revision:"d0c597df58febad4"},{url:"/_next/static/chunks/4bd1b696-444577a1976ffc29.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/684-10799b2c1e16e1ca.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/766-bb1e716e2d8b7395.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/_not-found/page-5ab677a79cf568a8.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/api/fetch-rss/route-c64b05e9037230d5.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/api/proxy/route-dd1204dd7e329b83.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/layout-b6ecc040ad042ef9.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/manage/page-7738ac476ead518f.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/app/page-a38e63ac16499543.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/framework-859199dea06580b0.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/main-4262f8e169aa5469.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/main-app-974f5cdfa4554bc3.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/pages/_app-da15c11dea942c36.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/pages/_error-cc3f077a18ea1793.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/chunks/polyfills-42372ed130431b0a.js",revision:"846118c33b2c0e922d7b3a7676f81f6f"},{url:"/_next/static/chunks/webpack-1b7b7a5f9710f692.js",revision:"oqs8Jjighc5aQqhQKIO48"},{url:"/_next/static/css/f20e6a5def6d8e5c.css",revision:"f20e6a5def6d8e5c"},{url:"/_next/static/oqs8Jjighc5aQqhQKIO48/_buildManifest.js",revision:"ccb4759caeca977af34626598d565bb9"},{url:"/_next/static/oqs8Jjighc5aQqhQKIO48/_ssgManifest.js",revision:"b6652df95db52feb4daf4eca35380933"},{url:"/file.svg",revision:"d09f95206c3fa0bb9bd9fefabfd0ea71"},{url:"/globe.svg",revision:"2aaafa6a49b6563925fe440891e32717"},{url:"/icons/favicon.ico",revision:"23a17fe599dab7f69004a53d2cf85e85"},{url:"/icons/icon-192.png",revision:"5e390e48e994d902f3a00ca03c2e2c70"},{url:"/icons/icon-512.png",revision:"477cb301ea154112dcb23bdae8e9d475"},{url:"/manifest.webmanifest",revision:"4f7e395164bdf21911a9c467ed4bec13"},{url:"/next.svg",revision:"8e061864f388b47f33a1c3780831193e"},{url:"/vercel.svg",revision:"c0af2f507b369b085b35ef4bbe3bcf1e"},{url:"/window.svg",revision:"a2760511c65806022ad20adf74370ff3"},{url:"/workers/transformer-worker.js",revision:"a040196c99160ae011fd1aad1f902116"}],{ignoreURLParametersMatching:[]}),e.cleanupOutdatedCaches(),e.registerRoute("/",new e.NetworkFirst({cacheName:"start-url",plugins:[{cacheWillUpdate:async({request:e,response:s,event:a,state:n})=>s&&"opaqueredirect"===s.type?new Response(s.body,{status:200,statusText:"OK",headers:s.headers}):s}]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,new e.CacheFirst({cacheName:"google-fonts-webfonts",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:31536e3})]}),"GET"),e.registerRoute(/^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,new e.StaleWhileRevalidate({cacheName:"google-fonts-stylesheets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,new e.StaleWhileRevalidate({cacheName:"static-font-assets",plugins:[new e.ExpirationPlugin({maxEntries:4,maxAgeSeconds:604800})]}),"GET"),e.registerRoute(/\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,new e.StaleWhileRevalidate({cacheName:"static-image-assets",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/image\?url=.+$/i,new e.StaleWhileRevalidate({cacheName:"next-image",plugins:[new e.ExpirationPlugin({maxEntries:64,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp3|wav|ogg)$/i,new e.CacheFirst({cacheName:"static-audio-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:mp4)$/i,new e.CacheFirst({cacheName:"static-video-assets",plugins:[new e.RangeRequestsPlugin,new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:js)$/i,new e.StaleWhileRevalidate({cacheName:"static-js-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:css|less)$/i,new e.StaleWhileRevalidate({cacheName:"static-style-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\/_next\/data\/.+\/.+\.json$/i,new e.StaleWhileRevalidate({cacheName:"next-data",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute(/\.(?:json|xml|csv)$/i,new e.NetworkFirst({cacheName:"static-data-assets",plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>{if(!(self.origin===e.origin))return!1;const s=e.pathname;return!s.startsWith("/api/auth/")&&!!s.startsWith("/api/")}),new e.NetworkFirst({cacheName:"apis",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:16,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>{if(!(self.origin===e.origin))return!1;return!e.pathname.startsWith("/api/")}),new e.NetworkFirst({cacheName:"others",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:86400})]}),"GET"),e.registerRoute((({url:e})=>!(self.origin===e.origin)),new e.NetworkFirst({cacheName:"cross-origin",networkTimeoutSeconds:10,plugins:[new e.ExpirationPlugin({maxEntries:32,maxAgeSeconds:3600})]}),"GET")}));
+// Service Worker for InfRSS with Background Sync
+
+const CACHE_NAME = 'infrss-v1';
+const STATIC_CACHE = 'infrss-static-v1';
+const DYNAMIC_CACHE = 'infrss-dynamic-v1';
+
+// Files to cache for offline use
+const STATIC_FILES = [
+  '/',
+  '/manage',
+  '/manifest.webmanifest',
+  '/styles/scroll-fix.css',
+  '/workers/transformer-worker.js'
+];
+
+// Install event - cache static files
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('Caching static files');
+        return cache.addAll(STATIC_FILES);
+      })
+      .then(() => {
+        console.log('Static files cached successfully');
+        return self.skipWaiting();
+      })
+  );
+});
+
+// Activate event - clean up old caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+              console.log('Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .then(() => {
+        console.log('Service Worker activated');
+        return self.clients.claim();
+      })
+  );
+});
+
+// Background sync for RSS feeds
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'background-feed-sync') {
+    event.waitUntil(backgroundSyncFeeds());
+  }
+});
+
+// Background sync for article analysis
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'background-article-analysis') {
+    event.waitUntil(backgroundAnalyzeArticles());
+  }
+});
+
+// Background sync RSS feeds
+async function backgroundSyncFeeds() {
+  try {
+    console.log('Background sync: Fetching RSS feeds');
+    
+    // Get feeds from IndexedDB or localStorage
+    const feeds = await getFeedsFromStorage();
+    
+    if (feeds.length === 0) {
+      console.log('No feeds to sync');
+      return;
+    }
+
+    // Fetch feeds in background
+    const syncPromises = feeds.map(async (feed) => {
+      try {
+        const response = await fetch(`/api/proxy?url=${encodeURIComponent(feed.url)}`);
+        if (response.ok) {
+          const data = await response.text();
+          // Store the feed data for offline use
+          await storeFeedData(feed.url, data);
+          console.log(`Background sync: Successfully synced ${feed.title}`);
+        }
+      } catch (error) {
+        console.error(`Background sync: Failed to sync ${feed.title}:`, error);
+      }
+    });
+
+    await Promise.allSettled(syncPromises);
+    console.log('Background sync: RSS feeds sync completed');
+  } catch (error) {
+    console.error('Background sync: RSS feeds sync failed:', error);
+  }
+}
+
+// Background analyze articles
+async function backgroundAnalyzeArticles() {
+  try {
+    console.log('Background sync: Analyzing articles');
+    
+    // Get unanalyzed articles from storage
+    const articles = await getUnanalyzedArticles();
+    
+    if (articles.length === 0) {
+      console.log('No articles to analyze');
+      return;
+    }
+
+    // Analyze articles in background using transformer worker
+    for (const article of articles.slice(0, 10)) { // Limit to 10 articles per sync
+      try {
+        await analyzeArticleInBackground(article);
+        console.log(`Background sync: Analyzed article: ${article.title}`);
+      } catch (error) {
+        console.error(`Background sync: Failed to analyze article: ${article.title}:`, error);
+      }
+    }
+
+    console.log('Background sync: Article analysis completed');
+  } catch (error) {
+    console.error('Background sync: Article analysis failed:', error);
+  }
+}
+
+// Store feed data for offline use
+async function storeFeedData(feedUrl: string, data: string) {
+  try {
+    if ('indexedDB' in self) {
+      const db = await openIndexedDB();
+      const transaction = db.transaction(['feedData'], 'readwrite');
+      const store = transaction.objectStore('feedData');
+      
+      await store.put({
+        url: feedUrl,
+        data: data,
+        timestamp: Date.now()
+      });
+    } else {
+      // Fallback to localStorage
+      const key = `feed_${btoa(feedUrl)}`;
+      localStorage.setItem(key, data);
+      localStorage.setItem(`${key}_timestamp`, Date.now().toString());
+    }
+  } catch (error) {
+    console.error('Failed to store feed data:', error);
+  }
+}
+
+// Get feeds from storage
+async function getFeedsFromStorage() {
+  try {
+    if ('indexedDB' in self) {
+      const db = await openIndexedDB();
+      const transaction = db.transaction(['feeds'], 'readonly');
+      const store = transaction.objectStore('feeds');
+      const feeds = await store.getAll();
+      return feeds;
+    } else {
+      // Fallback to localStorage
+      const feedsJson = localStorage.getItem('feeds');
+      return feedsJson ? JSON.parse(feedsJson) : [];
+    }
+  } catch (error) {
+    console.error('Failed to get feeds from storage:', error);
+    return [];
+  }
+}
+
+// Get unanalyzed articles
+async function getUnanalyzedArticles() {
+  try {
+    if ('indexedDB' in self) {
+      const db = await openIndexedDB();
+      const transaction = db.transaction(['articles'], 'readonly');
+      const store = transaction.objectStore('articles');
+      const articles = await store.getAll();
+      return articles.filter(article => !article.sentiment);
+    } else {
+      // Fallback to localStorage
+      const articlesJson = localStorage.getItem('articles');
+      const articles = articlesJson ? JSON.parse(articlesJson) : [];
+      return articles.filter(article => !article.sentiment);
+    }
+  } catch (error) {
+    console.error('Failed to get articles from storage:', error);
+    return [];
+  }
+}
+
+// Analyze article in background
+async function analyzeArticleInBackground(article: any) {
+  try {
+    // Use transformer worker to analyze article
+    const worker = new Worker('/workers/transformer-worker.js');
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Analysis timeout'));
+      }, 30000);
+
+      worker.onmessage = (event) => {
+        clearTimeout(timeout);
+        if (event.data.type === 'article_analysis') {
+          // Store analysis results
+          storeArticleAnalysis(article.id, event.data.data);
+          resolve(event.data.data);
+        } else if (event.data.type === 'error') {
+          reject(new Error(event.data.error));
+        }
+      };
+
+      worker.onerror = (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      };
+
+      worker.postMessage({
+        type: 'analyze_article',
+        data: { title: article.title, content: article.content }
+      });
+    });
+  } catch (error) {
+    console.error('Failed to analyze article in background:', error);
+    throw error;
+  }
+}
+
+// Store article analysis results
+async function storeArticleAnalysis(articleId: string, analysis: any) {
+  try {
+    if ('indexedDB' in self) {
+      const db = await openIndexedDB();
+      const transaction = db.transaction(['articles'], 'readwrite');
+      const store = transaction.objectStore('articles');
+      
+      const article = await store.get(articleId);
+      if (article) {
+        article.sentiment = analysis.sentiment;
+        article.summary = analysis.summary;
+        await store.put(article);
+      }
+    } else {
+      // Fallback to localStorage
+      const articlesJson = localStorage.getItem('articles');
+      const articles = articlesJson ? JSON.parse(articlesJson) : [];
+      const articleIndex = articles.findIndex((a: any) => a.id === articleId);
+      
+      if (articleIndex >= 0) {
+        articles[articleIndex].sentiment = analysis.sentiment;
+        articles[articleIndex].summary = analysis.summary;
+        localStorage.setItem('articles', JSON.stringify(articles));
+      }
+    }
+  } catch (error) {
+    console.error('Failed to store article analysis:', error);
+  }
+}
+
+// Open IndexedDB
+async function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('InfRSS', 1);
+    
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      
+      // Create object stores
+      if (!db.objectStoreNames.contains('feeds')) {
+        db.createObjectStore('feeds', { keyPath: 'url' });
+      }
+      
+      if (!db.objectStoreNames.contains('articles')) {
+        db.createObjectStore('articles', { keyPath: 'id' });
+      }
+      
+      if (!db.objectStoreNames.contains('feedData')) {
+        db.createObjectStore('feedData', { keyPath: 'url' });
+      }
+    };
+  });
+}
+
+// Fetch event - network first with cache fallback
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests
+  if (request.method !== 'GET') {
+    return;
+  }
+
+  // Handle API requests
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(handleAPIRequest(request));
+    return;
+  }
+
+  // Handle static files
+  if (STATIC_FILES.includes(url.pathname)) {
+    event.respondWith(handleStaticRequest(request));
+    return;
+  }
+
+  // Handle RSS feed requests
+  if (url.pathname.startsWith('/api/proxy') && url.searchParams.get('url')) {
+    event.respondWith(handleRSSRequest(request));
+    return;
+  }
+
+  // Default: network first with cache fallback
+  event.respondWith(handleDefaultRequest(request));
+});
+
+// Handle API requests
+async function handleAPIRequest(request: Request) {
+  try {
+    const response = await fetch(request);
+    return response;
+  } catch (error) {
+    console.error('API request failed:', error);
+    return new Response('Network error', { status: 503 });
+  }
+}
+
+// Handle static file requests
+async function handleStaticRequest(request: Request) {
+  try {
+    // Try cache first
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    // Fallback to network
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch (error) {
+    console.error('Static request failed:', error);
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// Handle RSS feed requests
+async function handleRSSRequest(request: Request) {
+  try {
+    // Try network first
+    const response = await fetch(request);
+    if (response.ok) {
+      // Cache the response
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, response.clone());
+      return response;
+    }
+  } catch (error) {
+    console.log('RSS request failed, trying cache:', error);
+  }
+
+  // Fallback to cache
+  try {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  } catch (error) {
+    console.error('Cache fallback failed:', error);
+  }
+
+  return new Response('Offline', { status: 503 });
+}
+
+// Handle default requests
+async function handleDefaultRequest(request: Request) {
+  try {
+    // Try network first
+    const response = await fetch(request);
+    if (response.ok) {
+      // Cache the response
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, response.clone());
+      return response;
+    }
+  } catch (error) {
+    console.log('Request failed, trying cache:', error);
+  }
+
+  // Fallback to cache
+  try {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+  } catch (error) {
+    console.error('Cache fallback failed:', error);
+  }
+
+  return new Response('Offline', { status: 503 });
+}
+
+// Message event - handle communication with main thread
+self.addEventListener('message', (event) => {
+  const { type, data } = event.data;
+
+  switch (type) {
+    case 'REGISTER_BACKGROUND_SYNC':
+      registerBackgroundSync(data);
+      break;
+    case 'GET_SYNC_STATUS':
+      getSyncStatus(event);
+      break;
+    default:
+      console.log('Unknown message type:', type);
+  }
+});
+
+// Register background sync
+async function registerBackgroundSync(syncData: any) {
+  try {
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Register background sync for RSS feeds
+      await registration.sync.register('background-feed-sync');
+      
+      // Register background sync for article analysis
+      await registration.sync.register('background-article-analysis');
+      
+      console.log('Background sync registered successfully');
+    } else {
+      console.log('Background sync not supported');
+    }
+  } catch (error) {
+    console.error('Failed to register background sync:', error);
+  }
+}
+
+// Get sync status
+function getSyncStatus(event: ExtendableMessageEvent) {
+  const syncStatus = {
+    backgroundSyncSupported: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+    serviceWorkerActive: true,
+    cacheAvailable: 'caches' in self,
+    indexedDBSupported: 'indexedDB' in self
+  };
+
+  event.ports[0].postMessage(syncStatus);
+}
+
+console.log('InfRSS Service Worker loaded with background sync support');

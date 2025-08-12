@@ -1,5 +1,6 @@
-// app/manage/page.tsx
 "use client";
+
+// app/manage/page.tsx
 
 import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,222 @@ import {
   loadFeedsFromStorage,
   saveFeedToStorage,
   parseOPMLFile,
-  type FeedData,
+  loadCategoriesFromStorage,
+  saveCategoriesToStorage,
+  loadUserPreferences,
+  saveUserPreferences,
+  discoverFeedUrlWithFallbacks,
 } from "@/lib/rssUtils";
-import { suggestFeedsWithWorker } from "@/lib/useTransformerWorker";
+import type { FeedData } from "@/lib/types";
+import { useTransformerWorker } from "@/lib/useTransformerWorker";
+import type { Category, UserPreferences } from "@/lib/types";
+
+// Category management component
+const CategoryManager = ({ 
+  categories, 
+  onAddCategory, 
+  onEditCategory, 
+  onDeleteCategory 
+}: {
+  categories: Category[];
+  onAddCategory: (category: Omit<Category, 'id' | 'createdAt'>) => void;
+  onEditCategory: (id: string, updates: Partial<Category>) => void;
+  onDeleteCategory: (id: string) => void;
+}) => {
+  const [newCategory, setNewCategory] = useState({ name: '', color: '#3B82F6', description: '' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newCategory.name.trim()) {
+      onAddCategory(newCategory);
+      setNewCategory({ name: '', color: '#3B82F6', description: '' });
+    }
+  };
+
+  const handleEdit = (category: Category) => {
+    setEditingId(category.id);
+    setNewCategory({ name: category.name, color: category.color, description: category.description || '' });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingId && newCategory.name.trim()) {
+      onEditCategory(editingId, newCategory);
+      setEditingId(null);
+      setNewCategory({ name: '', color: '#3B82F6', description: '' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setNewCategory({ name: '', color: '#3B82F6', description: '' });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-[var(--text-primary)]">Manage Categories</h3>
+      
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <Input
+          type="text"
+          placeholder="Category name"
+          value={newCategory.name}
+          onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
+          className="flex-1"
+        />
+        <Input
+          type="color"
+          value={newCategory.color}
+          onChange={(e) => setNewCategory(prev => ({ ...prev, color: e.target.value }))}
+          className="w-16"
+        />
+        <Input
+          type="text"
+          placeholder="Description (optional)"
+          value={newCategory.description}
+          onChange={(e) => setNewCategory(prev => ({ ...prev, description: e.target.value }))}
+          className="flex-1"
+        />
+        {editingId ? (
+          <div className="flex gap-2">
+            <Button type="button" onClick={handleSaveEdit} size="sm">Save</Button>
+            <Button type="button" variant="destructive" onClick={handleCancelEdit} size="sm">Cancel</Button>
+          </div>
+        ) : (
+          <Button type="submit" size="sm">Add</Button>
+        )}
+      </form>
+
+      <div className="grid gap-2">
+        {categories.map((category) => (
+          <div key={category.id} className="flex items-center justify-between p-3 bg-[var(--muted)] rounded-lg">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-4 h-4 rounded-full" 
+                style={{ backgroundColor: category.color }}
+              />
+              <div>
+                <p className="font-medium">{category.name}</p>
+                {category.description && (
+                  <p className="text-sm text-[var(--text-secondary)]">{category.description}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => handleEdit(category)}
+              >
+                Edit
+              </Button>
+              {category.id !== 'uncategorized' && (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => onDeleteCategory(category.id)}
+                >
+                  Delete
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Sentiment filter settings component
+const SentimentFilterSettings = ({ 
+  preferences, 
+  onUpdatePreferences 
+}: {
+  preferences: UserPreferences;
+  onUpdatePreferences: (prefs: UserPreferences) => void;
+}) => {
+  const updateSentimentFilter = (updates: Partial<UserPreferences['sentimentFilter']>) => {
+    onUpdatePreferences({
+      ...preferences,
+      sentimentFilter: {
+        ...preferences.sentimentFilter,
+        ...updates
+      }
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-[var(--text-primary)]">Sentiment Filtering</h3>
+      
+      <div className="space-y-3">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={preferences.sentimentFilter.enabled}
+            onChange={(e) => updateSentimentFilter({ enabled: e.target.checked })}
+            className="rounded"
+          />
+          <span>Enable sentiment filtering</span>
+        </label>
+
+        {preferences.sentimentFilter.enabled && (
+          <>
+            <div className="space-y-2">
+              <label className="block text-sm">
+                Minimum sentiment score: {preferences.sentimentFilter.minSentiment}
+                <input
+                  type="range"
+                  min="-1"
+                  max="1"
+                  step="0.1"
+                  value={preferences.sentimentFilter.minSentiment}
+                  onChange={(e) => updateSentimentFilter({ minSentiment: parseFloat(e.target.value) })}
+                  className="w-full mt-1"
+                />
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm">
+                Maximum toxicity: {Math.round(preferences.sentimentFilter.maxToxicity * 100)}%
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={preferences.sentimentFilter.maxToxicity}
+                  onChange={(e) => updateSentimentFilter({ maxToxicity: parseFloat(e.target.value) })}
+                  className="w-full mt-1"
+                />
+              </label>
+            </div>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={preferences.sentimentFilter.hideClickbait}
+                onChange={(e) => updateSentimentFilter({ hideClickbait: e.target.checked })}
+                className="rounded"
+              />
+              <span>Hide clickbait articles</span>
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={preferences.sentimentFilter.hideRagebait}
+                onChange={(e) => updateSentimentFilter({ hideRagebait: e.target.checked })}
+                className="rounded"
+              />
+              <span>Hide ragebait articles</span>
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // SuggestedFeed component to reduce re-renders
 const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (feed: FeedData) => void }) => {
@@ -60,12 +274,34 @@ const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (fe
 };
 
 // SavedFeed component
-const SavedFeed = ({ feed, onRemove }: { feed: { title: string; url: string }, onRemove: (url: string) => void }) => {
+const SavedFeed = ({ 
+  feed, 
+  categories, 
+  onRemove, 
+  onUpdate 
+}: { 
+  feed: FeedData; 
+  categories: Category[];
+  onRemove: (url: string) => void;
+  onUpdate: (url: string, updates: Partial<FeedData>) => void;
+}) => {
   const [mounted, setMounted] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ title: feed.title, category: feed.category || 'Uncategorized' });
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleSave = () => {
+    onUpdate(feed.url, editData);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditData({ title: feed.title, category: feed.category || 'Uncategorized' });
+    setIsEditing(false);
+  };
 
   return (
     <Card key={feed.url} className="shadow-sm">
@@ -83,18 +319,54 @@ const SavedFeed = ({ feed, onRemove }: { feed: { title: string; url: string }, o
                 />
               </div>
             )}
-            <div>
-              <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
-              <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
+            <div className="flex-1">
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Input
+                    value={editData.title}
+                    onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                    className="text-sm"
+                  />
+                  <select
+                    value={editData.category}
+                    onChange={(e) => setEditData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full text-sm p-2 border rounded"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <p className="font-medium text-[var(--text-primary)]">{feed.title}</p>
+                  <p className="text-xs text-[var(--text-secondary)] break-all">{feed.url}</p>
+                  <p className="text-xs text-[var(--text-secondary)] mt-1">
+                    Category: {categories.find(c => c.id === feed.category)?.name || 'Uncategorized'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          <Button 
-            variant="destructive" 
-            onClick={() => onRemove(feed.url)}
-            className="whitespace-nowrap"
-          >
-            Remove
-          </Button>
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button variant="default" size="sm" onClick={handleSave}>Save</Button>
+                <Button variant="destructive" size="sm" onClick={handleCancel}>Cancel</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => onRemove(feed.url)}
+                >
+                  Remove
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -106,15 +378,25 @@ export default function ManagePage() {
   const [topic, setTopic] = useState("");
   const [suggestedFeeds, setSuggestedFeeds] = useState<FeedData[]>([]);
   const [savedFeeds, setSavedFeeds] = useState<FeedData[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'sentiment'>('feeds');
 
-  // Load saved feeds on initial render
+  const { suggestFeedsWithWorker, isLoading: workerLoading } = useTransformerWorker();
+
+  // Load saved data on initial render
   useEffect(() => {
     const feeds = loadFeedsFromStorage();
+    const cats = loadCategoriesFromStorage();
+    const prefs = loadUserPreferences();
+    
     setSavedFeeds(feeds);
+    setCategories(cats);
+    setPreferences(prefs);
   }, []);
 
   // Handle adding a feed
@@ -139,10 +421,18 @@ export default function ManagePage() {
       let feedData = await fetchAndParseRSS(feedUrlInput.trim());
       
       // If that fails, try to extract the feed URL from the HTML
+      let discoveredFeedUrl: string | null = null;
       if (!feedData) {
-        const feedUrl = await getFeedUrlFromHtml(feedUrlInput.trim());
-        if (feedUrl) {
-          feedData = await fetchAndParseRSS(feedUrl);
+        discoveredFeedUrl = await getFeedUrlFromHtml(feedUrlInput.trim());
+        if (discoveredFeedUrl) {
+          feedData = await fetchAndParseRSS(discoveredFeedUrl);
+        }
+      }
+      // If still no feed, try advanced discovery
+      if (!feedData) {
+        discoveredFeedUrl = await discoverFeedUrlWithFallbacks(feedUrlInput.trim());
+        if (discoveredFeedUrl) {
+          feedData = await fetchAndParseRSS(discoveredFeedUrl);
         }
       }
 
@@ -151,8 +441,12 @@ export default function ManagePage() {
         const feedTitle = feedData.title || new URL(feedUrlInput.trim()).hostname;
         
         const newFeed: FeedData = {
+          id: `feed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: feedTitle,
-          url: feedUrlInput.trim(),
+          url: discoveredFeedUrl || feedUrlInput.trim(),
+          category: 'Uncategorized',
+          tags: [],
+          isActive: true
         };
         
         saveFeedToStorage(newFeed);
@@ -188,7 +482,7 @@ export default function ManagePage() {
     } finally {
       setIsSuggesting(false);
     }
-  }, [topic]);
+  }, [topic, suggestFeedsWithWorker]);
 
   // Handle subscribing to a suggested feed
   const handleSubscribeToFeed = useCallback((feed: FeedData) => {
@@ -198,8 +492,16 @@ export default function ManagePage() {
       return;
     }
 
-    saveFeedToStorage(feed);
-    setSavedFeeds(prev => [...prev, feed]);
+    const newFeed: FeedData = {
+      ...feed,
+      id: feed.id || `feed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      category: 'Uncategorized',
+      tags: [],
+      isActive: true
+    };
+
+    saveFeedToStorage(newFeed);
+    setSavedFeeds(prev => [...prev, newFeed]);
   }, [savedFeeds]);
 
   // Handle removing a feed
@@ -208,6 +510,57 @@ export default function ManagePage() {
     localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
     setSavedFeeds(updatedFeeds);
   }, [savedFeeds]);
+
+  // Handle updating a feed
+  const handleUpdateFeed = useCallback((url: string, updates: Partial<FeedData>) => {
+    const updatedFeeds = savedFeeds.map(feed => 
+      feed.url === url ? { ...feed, ...updates } : feed
+    );
+    localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
+    setSavedFeeds(updatedFeeds);
+  }, [savedFeeds]);
+
+  // Handle adding a category
+  const handleAddCategory = useCallback((categoryData: Omit<Category, 'id' | 'createdAt'>) => {
+    const newCategory: Category = {
+      id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...categoryData,
+      createdAt: Date.now()
+    };
+    
+    const updatedCategories = [...categories, newCategory];
+    saveCategoriesToStorage(updatedCategories);
+    setCategories(updatedCategories);
+  }, [categories]);
+
+  // Handle editing a category
+  const handleEditCategory = useCallback((id: string, updates: Partial<Category>) => {
+    const updatedCategories = categories.map(cat => 
+      cat.id === id ? { ...cat, ...updates } : cat
+    );
+    saveCategoriesToStorage(updatedCategories);
+    setCategories(updatedCategories);
+  }, [categories]);
+
+  // Handle deleting a category
+  const handleDeleteCategory = useCallback((id: string) => {
+    const updatedCategories = categories.filter(cat => cat.id !== id);
+    saveCategoriesToStorage(updatedCategories);
+    setCategories(updatedCategories);
+    
+    // Update feeds that were using this category
+    const updatedFeeds = savedFeeds.map(feed => 
+      feed.category === id ? { ...feed, category: 'Uncategorized' } : feed
+    );
+    localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
+    setSavedFeeds(updatedFeeds);
+  }, [categories, savedFeeds]);
+
+  // Handle updating preferences
+  const handleUpdatePreferences = useCallback((newPreferences: UserPreferences) => {
+    saveUserPreferences(newPreferences);
+    setPreferences(newPreferences);
+  }, []);
 
   // Handle importing OPML file
   const handleImportOPML = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,74 +599,128 @@ export default function ManagePage() {
 
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto">
-      <section className="space-y-4">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Add Feed</h2>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                type="url"
-                placeholder="Enter RSS feed URL"
-                value={feedUrlInput}
-                onChange={(e) => setFeedUrlInput(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                variant="default" 
-                onClick={handleAddFeed}
-                disabled={isLoading}
-                className="w-full sm:w-auto"
-              >
-                {isLoading ? <Spinner size="sm" /> : "Add Feed"}
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="file"
-                accept=".opml,.xml"
-                onChange={handleImportOPML}
-                className="flex-1"
-                disabled={isImporting}
-              />
-              {isImporting && <Spinner size="sm" />}
-            </div>
-            {error && <p className={`text-sm ${error.includes("Successfully") ? "text-green-500" : "text-red-500"}`}>{error}</p>}
-          </div>
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b">
+        <button
+          onClick={() => setActiveTab('feeds')}
+          className={`px-4 py-2 ${activeTab === 'feeds' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+        >
+          Feeds
+        </button>
+        <button
+          onClick={() => setActiveTab('categories')}
+          className={`px-4 py-2 ${activeTab === 'categories' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+        >
+          Categories
+        </button>
+        <button
+          onClick={() => setActiveTab('sentiment')}
+          className={`px-4 py-2 ${activeTab === 'sentiment' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+        >
+          Sentiment
+        </button>
+      </div>
 
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Input
-                type="text"
-                placeholder="Enter a topic (e.g., 'tech news', 'programming')"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="flex-1"
-              />
-              <Button 
-                variant="default" 
-                onClick={handleSuggestFeeds}
-                disabled={isSuggesting}
-                className="w-full sm:w-auto"
-              >
-                {isSuggesting ? <Spinner size="sm" /> : "Suggest"}
-              </Button>
-            </div>
-          </div>
-
-          {suggestedFeeds.length > 0 && (
+      {/* Feeds Tab */}
+      {activeTab === 'feeds' && (
+        <section className="space-y-4">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
-              <div className="grid gap-3">
-                {suggestedFeeds.map((feed) => (
-                  <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
-                ))}
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Add Feed</h2>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  type="url"
+                  placeholder="Enter RSS feed URL"
+                  value={feedUrlInput}
+                  onChange={(e) => setFeedUrlInput(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  variant="default" 
+                  onClick={handleAddFeed}
+                  disabled={isLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {isLoading ? <Spinner size="sm" /> : "Add Feed"}
+                </Button>
+              </div>
+              {isLoading && !error && (
+                <div className="flex items-center gap-2 mt-2 text-sm text-[var(--text-secondary)]">
+                  <Spinner size="sm" />
+                  <span>Searching for feeds...</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  accept=".opml,.xml"
+                  onChange={handleImportOPML}
+                  className="flex-1"
+                  disabled={isImporting}
+                />
+                {isImporting && <Spinner size="sm" />}
+              </div>
+              {error && <p className={`text-sm ${error.includes("Successfully") ? "text-green-500" : "text-red-500"}`}>{error}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  type="text"
+                  placeholder="Enter a topic (e.g., 'tech news', 'programming')"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  variant="default" 
+                  onClick={handleSuggestFeeds}
+                  disabled={isSuggesting || workerLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {isSuggesting || workerLoading ? <Spinner size="sm" /> : "Suggest"}
+                </Button>
               </div>
             </div>
-          )}
-        </div>
-      </section>
 
+            {suggestedFeeds.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
+                <div className="grid gap-3">
+                  {suggestedFeeds.map((feed) => (
+                    <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Categories Tab */}
+      {activeTab === 'categories' && (
+        <section className="space-y-4">
+          <CategoryManager
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onEditCategory={handleEditCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        </section>
+      )}
+
+      {/* Sentiment Tab */}
+      {activeTab === 'sentiment' && preferences && (
+        <section className="space-y-4">
+          <SentimentFilterSettings
+            preferences={preferences}
+            onUpdatePreferences={handleUpdatePreferences}
+          />
+        </section>
+      )}
+
+      {/* Your Feeds Section */}
       <section className="space-y-4">
         <h2 className="text-xl font-semibold text-[var(--text-primary)]">Your Feeds</h2>
         <div className="grid gap-3">
@@ -325,7 +732,13 @@ export default function ManagePage() {
             </Card>
           ) : (
             savedFeeds.map((feed) => (
-              <SavedFeed key={feed.url} feed={feed} onRemove={handleRemoveFeed} />
+              <SavedFeed 
+                key={feed.url} 
+                feed={feed} 
+                categories={categories}
+                onRemove={handleRemoveFeed}
+                onUpdate={handleUpdateFeed}
+              />
             ))
           )}
         </div>
