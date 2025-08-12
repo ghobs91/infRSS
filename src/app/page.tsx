@@ -52,7 +52,17 @@ function formatDate(dateString: string): string {
 }
 
 // Article component to reduce re-renders
-const Article = ({ article, isRead, onVisible }: { article: { title: string; link: string; pubDate: string; thumbnail?: string }, isRead: boolean, onVisible?: () => void }) => {
+const Article = ({ 
+  article, 
+  isRead, 
+  onVisible, 
+  onMarkAsRead 
+}: { 
+  article: { title: string; link: string; pubDate: string; thumbnail?: string }, 
+  isRead: boolean, 
+  onVisible?: () => void,
+  onMarkAsRead?: (link: string) => void
+}) => {
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -78,7 +88,12 @@ const Article = ({ article, isRead, onVisible }: { article: { title: string; lin
 
   return (
     <div ref={ref}>
-      <Card className={cn("shadow-sm overflow-hidden", isRead && "read-article")}>
+      <Card className={cn(
+        "shadow-sm overflow-hidden transition-all duration-200",
+        isRead 
+          ? "read-article opacity-75" 
+          : "border-l-4 border-l-blue-500 bg-blue-50/30"
+      )}>
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row">
             {article.thumbnail && !imgError && (
@@ -95,14 +110,32 @@ const Article = ({ article, isRead, onVisible }: { article: { title: string; lin
               </div>
             )}
             <div className="flex-1 p-3 sm:p-4">
-              <a
-                href={article.link}
-                className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {article.title}
-              </a>
+                              <div className="flex items-start gap-2 flex-1">
+                  <div className="flex-1">
+                    <a
+                      href={article.link}
+                      className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 block"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {article.title}
+                    </a>
+                    {!isRead && (
+                      <span className="inline-block text-xs bg-blue-500 text-white px-2 py-1 rounded-full mt-1">
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  {onMarkAsRead && (
+                    <button
+                      onClick={() => onMarkAsRead(article.link)}
+                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0"
+                      title={isRead ? "Mark as unread" : "Mark as read"}
+                    >
+                      {isRead ? "👁️" : "👁️‍🗨️"}
+                    </button>
+                  )}
+                </div>
               <div className="flex items-center gap-2 my-1">
                 {mounted && (
                   <div className="w-4 h-4 relative">
@@ -143,7 +176,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hideRead, setHideRead] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { markAsRead, setTotalArticles, readLinks } = useUnread();
+  const { toggleReadStatus, setTotalArticles, readLinks, unreadCount } = useUnread();
 
   // Only show unread articles if hideRead is true
   const filteredArticles = useMemo(() => {
@@ -275,7 +308,21 @@ export default function HomePage() {
     <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
       <section className="space-y-4">
         {isClient && (
-          <div className="grid gap-4">
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-[var(--text-secondary)]">
+                {unreadCount} unread articles
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHideRead(!hideRead)}
+                className="text-xs"
+              >
+                {hideRead ? "Show all" : "Hide read"}
+              </Button>
+            </div>
+            <div className="grid gap-4">
             {isLoading ? (
               // Show spinner during initial load
               <div className="flex justify-center items-center py-12">
@@ -295,8 +342,10 @@ export default function HomePage() {
                   article={article}
                   isRead={readLinks.has(article.link)}
                   onVisible={() => {
-                    if (!readLinks.has(article.link)) markAsRead(article.link);
+                    // Don't automatically mark as read - let user interact first
+                    // This prevents marking articles as read before they're actually read
                   }}
+                  onMarkAsRead={(link) => toggleReadStatus(link)}
                 />
               ))
             )}
@@ -311,7 +360,8 @@ export default function HomePage() {
                 </Button>
               </div>
             )}
-          </div>
+            </div>
+          </>
         )}
         <Button
           variant="default"

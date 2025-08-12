@@ -4,6 +4,7 @@ interface UnreadContextType {
   unreadCount: number;
   readLinks: Set<string>;
   markAsRead: (link: string) => void;
+  toggleReadStatus: (link: string) => void;
   setTotalArticles: (count: number) => void;
 }
 
@@ -45,8 +46,20 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
+  const toggleReadStatus = useCallback((link: string) => {
+    setReadLinks(prev => {
+      const next = new Set(prev);
+      if (next.has(link)) {
+        next.delete(link);
+      } else {
+        next.add(link);
+      }
+      return next;
+    });
+  }, []);
+
   return (
-    <UnreadContext.Provider value={{ unreadCount, readLinks, markAsRead, setTotalArticles }}>
+    <UnreadContext.Provider value={{ unreadCount, readLinks, markAsRead, toggleReadStatus, setTotalArticles }}>
       {children}
     </UnreadContext.Provider>
   );

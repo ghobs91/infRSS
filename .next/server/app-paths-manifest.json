@@ -1,1 +1,6 @@
-{}
+{
+  "/api/fetch-rss/route": "app/api/fetch-rss/route.js",
+  "/api/proxy/route": "app/api/proxy/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
+}

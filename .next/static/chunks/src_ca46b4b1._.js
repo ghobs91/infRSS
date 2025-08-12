@@ -147,10 +147,30 @@ __turbopack_context__.s({
 // ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
 // Import fetchWithCors if it's not already implicitly available in the scope
 // (Assuming it's exported from the same file or imported correctly)
-// Helper function to clean XML content before parsing
+/**
+ * Helper function to clean XML content before parsing.
+ * 
+ * Specifically handles the malformed CDATA patterns commonly found in RSS feeds:
+ * - "><![CDATA[>>" - completely malformed pattern
+ * - "><![CDATA[>" - incomplete CDATA start
+ * - "><![CDATA[><![CDATA[>>" - nested malformed CDATA
+ * - "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA
+ * 
+ * These patterns are commonly seen in feeds from major publishers like Apple,
+ * Samsung, Microsoft, and others that have incomplete XML generation.
+ */ // Helper function to clean XML content before parsing
 function cleanXMLContent(xmlString) {
     // First, normalize line endings
     xmlString = xmlString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Handle the specific malformed CDATA patterns we're seeing in error logs
+    // Pattern: "><![CDATA[>>" - this is completely malformed
+    xmlString = xmlString.replace(/><!\[CDATA\[>>/g, '>');
+    // Pattern: "><![CDATA[>" - another malformed pattern
+    xmlString = xmlString.replace(/><!\[CDATA\[>/g, '>');
+    // Pattern: "><![CDATA[><![CDATA[>>" - nested malformed CDATA
+    xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+    // Pattern: "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA
+    xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
     // Handle CDATA sections that might contain problematic sequences
     // Use [\s\S]*? to match any character including newlines non-greedily
     xmlString = xmlString.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content)=>{
@@ -209,6 +229,11 @@ function cleanXMLContent(xmlString) {
     // XML 1.0: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
     // We remove characters in the ranges #x0-#x8, #xB-#xC, #xE-#x1F, #x7F-#x84, #x86-#x9F
     xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
+    // Final cleanup: handle any remaining problematic sequences that might cause parsing errors
+    // This is a more aggressive approach for very problematic feeds
+    xmlString = xmlString.replace(/\]\]/g, ']]]]><![CDATA[>');
+    // Also handle any remaining ]] sequences that might be in HTML content
+    xmlString = xmlString.replace(/\]\]>/g, ']]]]><![CDATA[>');
     return xmlString;
 }
 // Helper function to extract thumbnail from RSS item
@@ -257,11 +282,11 @@ async function fetchAndParseRSS(url) {
             console.error(`Proxy fetch failed for ${url}. Status: ${response.status}, Body: ${errorText}`);
             // If it's a 404, the feed might not exist - try to discover the correct URL
             if (response.status === 404) {
-                console.log(`Feed not found at ${url}, attempting to discover correct RSS URL...`);
+                console.debug(`Feed not found at ${url}, attempting to discover correct RSS URL...`);
                 try {
                     const discoveredUrl = await discoverFeedUrlWithFallbacks(url);
                     if (discoveredUrl && discoveredUrl !== url) {
-                        console.log(`Discovered RSS feed at: ${discoveredUrl}`);
+                        console.log(`✅ Discovered RSS feed at: ${discoveredUrl}`);
                         return await fetchAndParseRSS(discoveredUrl);
                     }
                 } catch (discoverError) {
@@ -291,6 +316,11 @@ async function fetchAndParseRSS(url) {
             console.error(`Response from ${url} is not XML. First 100 chars: ${text.substring(0, 100)}`);
             return null;
         }
+        // Check if the response is HTML instead of XML (common with 404 pages)
+        if (text.trim().startsWith('<!DOCTYPE html') || text.includes('<html')) {
+            console.error(`Response from ${url} is HTML instead of XML. This usually means the RSS feed doesn't exist.`);
+            return null;
+        }
         // Add media namespace if it's missing
         if (text.includes('media:content') && !text.includes('xmlns:media')) {
             text = text.replace(/<rss[^>]*>/, (match)=>`${match.replace('>', ' xmlns:media="http://search.yahoo.com/mrss/">')}`);
@@ -307,19 +337,86 @@ async function fetchAndParseRSS(url) {
         text = text.replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
         // Clean the XML content before parsing
         const cleanedXML = cleanXMLContent(text);
-        // Additional safety: try to fix any remaining problematic sequences
-        let finalXML = cleanedXML;
-        // If the cleaning didn't work, try a more aggressive approach
-        if (cleanedXML.includes(']]>') && !cleanedXML.includes('<![CDATA[')) {
-            // Wrap the entire content in CDATA if it contains problematic sequences
-            finalXML = `<![CDATA[${cleanedXML}]]>`;
+        // Declare xmlDoc at function level
+        let xmlDoc;
+        // Pre-check for the specific malformed CDATA patterns we're seeing in error logs
+        if (cleanedXML.includes('><![CDATA[>>') || cleanedXML.includes('><![CDATA[>') || cleanedXML.includes('><![CDATA[><![CDATA[>>') || cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) {
+            console.debug(`Detected malformed CDATA patterns in ${url}, applying pre-parse cleanup...`);
+            // Log the specific patterns found for debugging
+            const patterns = [];
+            if (cleanedXML.includes('><![CDATA[>>')) patterns.push('><![CDATA[>>');
+            if (cleanedXML.includes('><![CDATA[>')) patterns.push('><![CDATA[>');
+            if (cleanedXML.includes('><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[>>');
+            if (cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[><![CDATA[>>');
+            console.debug(`Found malformed patterns in ${url}:`, patterns);
+            // Apply the same cleanup patterns we use in aggressive cleaning
+            let preCleaned = cleanedXML;
+            preCleaned = preCleaned.replace(/><!\[CDATA\[>>/g, '>');
+            preCleaned = preCleaned.replace(/><!\[CDATA\[>/g, '>');
+            preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+            preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+            // Try parsing the pre-cleaned version first
+            const parser = new DOMParser();
+            xmlDoc = parser.parseFromString(preCleaned, "text/xml");
+            // If pre-cleaning worked, use it; otherwise fall back to original cleaned version
+            const preParseError = xmlDoc.querySelector("parsererror");
+            if (!preParseError) {
+                console.log(`Pre-parse cleanup successful for ${url}`);
+            } else {
+                console.debug(`Pre-parse cleanup failed for ${url}, falling back to standard cleaning...`);
+                xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+            }
+        } else {
+            const parser = new DOMParser();
+            xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
         }
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(finalXML, "text/xml");
         // Check for parsing errors
         const parseError = xmlDoc.querySelector("parsererror");
         if (parseError) {
             console.error(`XML parsing error for ${url}:`, parseError.textContent);
+            // Try aggressive cleaning as a fallback
+            if (parseError.textContent?.includes("Sequence ']]>' not allowed")) {
+                console.debug(`Attempting aggressive XML cleaning for ${url}...`);
+                // Try multiple cleaning strategies for malformed XML
+                let aggressiveCleaned = cleanedXML;
+                // Strategy 1: Handle the specific malformed CDATA patterns we're seeing
+                // Pattern: "><![CDATA[>>" - completely malformed
+                aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>>/g, '>');
+                aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>/g, '>');
+                aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+                aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+                // Strategy 2: Escape all ]] sequences that aren't in CDATA
+                aggressiveCleaned = aggressiveCleaned.replace(/\]\]/g, ']]]]><![CDATA[>');
+                // Strategy 3: If that doesn't work, try removing problematic sequences
+                if (aggressiveCleaned.includes(']]]]><![CDATA[>')) {
+                    aggressiveCleaned = aggressiveCleaned.replace(/\]\]\]\]><!\[CDATA\[>/g, ']]');
+                }
+                // Strategy 4: Remove any remaining problematic CDATA sections
+                aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]]*\]\]>/g, '');
+                // Strategy 5: Clean up any remaining malformed patterns
+                aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]>]*$/g, ''); // Remove incomplete CDATA at end
+                aggressiveCleaned = aggressiveCleaned.replace(/^[^<]*\]\]>/g, ''); // Remove incomplete CDATA at start
+                // Try parsing again
+                const parser = new DOMParser();
+                xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
+                // Check if the aggressive cleaning worked
+                const secondParseError = xmlDoc.querySelector("parsererror");
+                if (secondParseError) {
+                    console.warn(`Aggressive cleaning failed for ${url}, trying final fallback...`);
+                    // Final fallback: strip all CDATA and try to parse as basic XML
+                    const strippedXML = cleanedXML.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '').replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+                    xmlDoc = parser.parseFromString(strippedXML, "text/xml");
+                    const finalParseError = xmlDoc.querySelector("parsererror");
+                    if (finalParseError) {
+                        console.warn(`All XML cleaning strategies failed for ${url}, continuing with original...`);
+                        xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+                    } else {
+                        console.log(`Final fallback cleaning successful for ${url}`);
+                    }
+                } else {
+                    console.log(`Aggressive cleaning successful for ${url}`);
+                }
+            }
             // Try to extract any useful information despite the error
             // Sometimes the parser can still extract some content even with errors
             const hasItems = xmlDoc.querySelector("item, entry");
@@ -348,7 +445,19 @@ async function fetchAndParseRSS(url) {
             const pubDate = item.querySelector("pubDate")?.textContent?.trim() || item.querySelector("published")?.textContent?.trim() || item.querySelector("updated")?.textContent?.trim() || new Date().toISOString();
             const content = item.querySelector("description")?.textContent?.trim() || item.querySelector("content")?.textContent?.trim() || item.querySelector("summary")?.textContent?.trim() || "";
             const thumbnail = extractThumbnailFromItem(item);
-            const sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "Unknown Source";
+            let sourceDomain = "Unknown Source";
+            if (link) {
+                try {
+                    sourceDomain = new URL(link).hostname.replace("www.", "");
+                } catch  {
+                    console.warn(`Invalid link URL for article: ${link}`);
+                    // Try to extract domain from the link string if possible
+                    const domainMatch = link.match(/https?:\/\/([^\/]+)/);
+                    if (domainMatch) {
+                        sourceDomain = domainMatch[1].replace("www.", "");
+                    }
+                }
+            }
             return {
                 id: `${url}-${index}`,
                 title,
@@ -373,12 +482,18 @@ async function fetchAndParseRSS(url) {
 const fetchWithCors = async (url)=>{
     // Make sure your proxy endpoint is correct
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-    console.log(`Fetching via proxy: ${proxyUrl}`); // Add logging
     try {
         const response = await fetch(proxyUrl);
         if (!response.ok) {
-            // Log proxy errors specifically
-            console.error(`Proxy request to ${proxyUrl} failed with status ${response.status}`);
+            // Only log 404 errors as warnings since they're expected during feed discovery
+            if (response.status === 404) {
+                console.debug(`Feed not found at ${url} - trying next URL pattern...`);
+            } else {
+                // Log other errors as they might indicate real problems
+                console.error(`Proxy request to ${proxyUrl} failed with status ${response.status}`);
+            }
+        // Don't throw here, let the calling function handle the response
+        // This allows for better error handling upstream
         }
         return response;
     } catch (proxyError) {
@@ -679,11 +794,15 @@ async function discoverFeedUrlWithFallbacks(siteUrl) {
                         if (absUrl.match(/\.(xml|rss|atom)$/i) || absUrl.includes('feed')) {
                             return absUrl;
                         }
-                    } catch  {}
+                    } catch (urlError) {
+                        console.warn(`Invalid URL in parent page discovery: ${href}`, urlError);
+                    }
                 }
             }
         }
-    } catch  {}
+    } catch (urlError) {
+        console.warn(`Error during parent page discovery for ${siteUrl}:`, urlError);
+    }
     // 3. Try common feed URL suffixes
     const commonSuffixes = [
         '/feed',
@@ -706,7 +825,9 @@ async function discoverFeedUrlWithFallbacks(siteUrl) {
                     return testUrl;
                 }
             }
-        } catch  {}
+        } catch (error) {
+            console.warn(`Error testing suffix ${suffix} for ${siteUrl}:`, error);
+        }
     }
     // 4. Try /sitemap.xml and look for feed links
     try {
@@ -721,7 +842,9 @@ async function discoverFeedUrlWithFallbacks(siteUrl) {
                 }
             }
         }
-    } catch  {}
+    } catch (error) {
+        console.warn(`Error checking sitemap for ${siteUrl}:`, error);
+    }
     // 5. Try blog meta tags
     if (doc) {
         const blogMeta = doc.querySelector('meta[name="blog-channel-url"], meta[name="blog-feed-url"]');
@@ -730,7 +853,9 @@ async function discoverFeedUrlWithFallbacks(siteUrl) {
             if (blogUrl) {
                 try {
                     return new URL(blogUrl, siteUrl).toString();
-                } catch  {}
+                } catch (urlError) {
+                    console.warn(`Invalid blog URL in meta tag: ${blogUrl}`, urlError);
+                }
             }
         }
     }
@@ -856,7 +981,7 @@ function formatDate(dateString) {
     }
 }
 // Article component to reduce re-renders
-const Article = ({ article, isRead, onVisible })=>{
+const Article = ({ article, isRead, onVisible, onMarkAsRead })=>{
     _s();
     const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [imgError, setImgError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
@@ -890,7 +1015,7 @@ const Article = ({ article, isRead, onVisible })=>{
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         ref: ref,
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
-            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("shadow-sm overflow-hidden", isRead && "read-article"),
+            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cn"])("shadow-sm overflow-hidden transition-all duration-200", isRead ? "read-article opacity-75" : "border-l-4 border-l-blue-500 bg-blue-50/30"),
             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
                 className: "p-0",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -907,27 +1032,63 @@ const Article = ({ article, isRead, onVisible })=>{
                                 onError: ()=>setImgError(true)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 87,
+                                lineNumber: 102,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 85,
+                            lineNumber: 100,
                             columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "flex-1 p-3 sm:p-4",
                             children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
-                                    href: article.link,
-                                    className: "text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2",
-                                    target: "_blank",
-                                    rel: "noopener noreferrer",
-                                    children: article.title
-                                }, void 0, false, {
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "flex items-start gap-2 flex-1",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "flex-1",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
+                                                    href: article.link,
+                                                    className: "text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 block",
+                                                    target: "_blank",
+                                                    rel: "noopener noreferrer",
+                                                    children: article.title
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/page.tsx",
+                                                    lineNumber: 115,
+                                                    columnNumber: 21
+                                                }, this),
+                                                !isRead && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                                                    className: "inline-block text-xs bg-blue-500 text-white px-2 py-1 rounded-full mt-1",
+                                                    children: "NEW"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/src/app/page.tsx",
+                                                    lineNumber: 124,
+                                                    columnNumber: 23
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/src/app/page.tsx",
+                                            lineNumber: 114,
+                                            columnNumber: 19
+                                        }, this),
+                                        onMarkAsRead && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
+                                            onClick: ()=>onMarkAsRead(article.link),
+                                            className: "text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0",
+                                            title: isRead ? "Mark as unread" : "Mark as read",
+                                            children: isRead ? "👁️" : "👁️‍🗨️"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/app/page.tsx",
+                                            lineNumber: 130,
+                                            columnNumber: 21
+                                        }, this)
+                                    ]
+                                }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 98,
-                                    columnNumber: 15
+                                    lineNumber: 113,
+                                    columnNumber: 31
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "flex items-center gap-2 my-1",
@@ -942,12 +1103,12 @@ const Article = ({ article, isRead, onVisible })=>{
                                                 className: "object-contain"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/app/page.tsx",
-                                                lineNumber: 109,
+                                                lineNumber: 142,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 108,
+                                            lineNumber: 141,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -961,13 +1122,13 @@ const Article = ({ article, isRead, onVisible })=>{
                                             })()
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 118,
+                                            lineNumber: 151,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 106,
+                                    lineNumber: 139,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -975,34 +1136,34 @@ const Article = ({ article, isRead, onVisible })=>{
                                     children: formatDate(article.pubDate)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 128,
+                                    lineNumber: 161,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 97,
+                            lineNumber: 112,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 83,
+                    lineNumber: 98,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/page.tsx",
-                lineNumber: 82,
+                lineNumber: 97,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 81,
+            lineNumber: 91,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 80,
+        lineNumber: 90,
         columnNumber: 5
     }, this);
 };
@@ -1016,7 +1177,7 @@ function HomePage() {
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
     const [hideRead, setHideRead] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
     const loadMoreRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
-    const { markAsRead, setTotalArticles, readLinks } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useUnread"])();
+    const { toggleReadStatus, setTotalArticles, readLinks, unreadCount } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useUnread"])();
     // Only show unread articles if hideRead is true
     const filteredArticles = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "HomePage.useMemo[filteredArticles]": ()=>{
@@ -1188,80 +1349,117 @@ function HomePage() {
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
             className: "space-y-4",
             children: [
-                isClient && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    className: "grid gap-4",
+                isClient && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
                     children: [
-                        isLoading ? // Show spinner during initial load
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex justify-center items-center py-12",
-                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Spinner"], {
-                                size: "lg"
-                            }, void 0, false, {
-                                fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 282,
-                                columnNumber: 17
-                            }, this)
-                        }, void 0, false, {
-                            fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 281,
-                            columnNumber: 15
-                        }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
-                            className: "shadow-sm",
-                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
-                                className: "p-4 text-center",
-                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                    className: "text-[var(--text-secondary)]",
-                                    children: "No articles found. Add some feeds to get started."
+                            className: "flex items-center justify-between mb-4",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "text-sm text-[var(--text-secondary)]",
+                                    children: [
+                                        unreadCount,
+                                        " unread articles"
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/app/page.tsx",
+                                    lineNumber: 313,
+                                    columnNumber: 15
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "ghost",
+                                    size: "sm",
+                                    onClick: ()=>setHideRead(!hideRead),
+                                    className: "text-xs",
+                                    children: hideRead ? "Show all" : "Hide read"
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 287,
-                                    columnNumber: 19
+                                    lineNumber: 316,
+                                    columnNumber: 15
                                 }, this)
-                            }, void 0, false, {
-                                fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 286,
-                                columnNumber: 17
-                            }, this)
-                        }, void 0, false, {
+                            ]
+                        }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 285,
-                            columnNumber: 15
-                        }, this) : // Show actual articles
-                        visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Article, {
-                                article: article,
-                                isRead: readLinks.has(article.link),
-                                onVisible: ()=>{
-                                    if (!readLinks.has(article.link)) markAsRead(article.link);
-                                }
-                            }, `${article.link}-${idx}`, false, {
-                                fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 293,
-                                columnNumber: 17
-                            }, this)),
-                        filteredArticles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            ref: loadMoreRef,
-                            className: "h-10 flex justify-center",
-                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
-                                variant: "default",
-                                onClick: ()=>setVisibleCount((prev)=>Math.min(prev + 20, filteredArticles.length)),
-                                className: "w-full",
-                                children: "Load More"
-                            }, void 0, false, {
-                                fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 305,
-                                columnNumber: 17
-                            }, this)
-                        }, void 0, false, {
+                            lineNumber: 312,
+                            columnNumber: 13
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "grid gap-4",
+                            children: [
+                                isLoading ? // Show spinner during initial load
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    className: "flex justify-center items-center py-12",
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Spinner"], {
+                                        size: "lg"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/page.tsx",
+                                        lineNumber: 329,
+                                        columnNumber: 17
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/page.tsx",
+                                    lineNumber: 328,
+                                    columnNumber: 15
+                                }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
+                                    className: "shadow-sm",
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["CardContent"], {
+                                        className: "p-4 text-center",
+                                        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                            className: "text-[var(--text-secondary)]",
+                                            children: "No articles found. Add some feeds to get started."
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/app/page.tsx",
+                                            lineNumber: 334,
+                                            columnNumber: 19
+                                        }, this)
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/page.tsx",
+                                        lineNumber: 333,
+                                        columnNumber: 17
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/page.tsx",
+                                    lineNumber: 332,
+                                    columnNumber: 15
+                                }, this) : // Show actual articles
+                                visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Article, {
+                                        article: article,
+                                        isRead: readLinks.has(article.link),
+                                        onVisible: ()=>{
+                                        // Don't automatically mark as read - let user interact first
+                                        // This prevents marking articles as read before they're actually read
+                                        },
+                                        onMarkAsRead: (link)=>toggleReadStatus(link)
+                                    }, `${article.link}-${idx}`, false, {
+                                        fileName: "[project]/src/app/page.tsx",
+                                        lineNumber: 340,
+                                        columnNumber: 17
+                                    }, this)),
+                                filteredArticles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    ref: loadMoreRef,
+                                    className: "h-10 flex justify-center",
+                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                                        variant: "default",
+                                        onClick: ()=>setVisibleCount((prev)=>Math.min(prev + 20, filteredArticles.length)),
+                                        className: "w-full",
+                                        children: "Load More"
+                                    }, void 0, false, {
+                                        fileName: "[project]/src/app/page.tsx",
+                                        lineNumber: 354,
+                                        columnNumber: 17
+                                    }, this)
+                                }, void 0, false, {
+                                    fileName: "[project]/src/app/page.tsx",
+                                    lineNumber: 353,
+                                    columnNumber: 15
+                                }, this)
+                            ]
+                        }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 304,
-                            columnNumber: 15
+                            lineNumber: 325,
+                            columnNumber: 13
                         }, this)
                     ]
-                }, void 0, true, {
-                    fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 278,
-                    columnNumber: 11
-                }, this),
+                }, void 0, true),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
                     variant: "default",
                     onClick: handleRefresh,
@@ -1280,40 +1478,40 @@ function HomePage() {
                                 d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 328,
+                                lineNumber: 378,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 321,
+                            lineNumber: 371,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 335,
+                            lineNumber: 385,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 316,
+                    lineNumber: 366,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 276,
+            lineNumber: 309,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 275,
+        lineNumber: 308,
         columnNumber: 5
     }, this);
 }
-_s1(HomePage, "MeoFiejfarSwTgiXMHftIk8B2M0=", false, function() {
+_s1(HomePage, "leiPLw6lpfexWNciIX6GLjp6FMk=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useUnread"]
     ];

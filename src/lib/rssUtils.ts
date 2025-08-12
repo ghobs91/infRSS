@@ -7,10 +7,35 @@ import type { FeedData, Article, Category } from './types';
 // Import fetchWithCors if it's not already implicitly available in the scope
 // (Assuming it's exported from the same file or imported correctly)
 
+/**
+ * Helper function to clean XML content before parsing.
+ * 
+ * Specifically handles the malformed CDATA patterns commonly found in RSS feeds:
+ * - "><![CDATA[>>" - completely malformed pattern
+ * - "><![CDATA[>" - incomplete CDATA start
+ * - "><![CDATA[><![CDATA[>>" - nested malformed CDATA
+ * - "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA
+ * 
+ * These patterns are commonly seen in feeds from major publishers like Apple,
+ * Samsung, Microsoft, and others that have incomplete XML generation.
+ */
 // Helper function to clean XML content before parsing
 function cleanXMLContent(xmlString: string): string {
   // First, normalize line endings
   xmlString = xmlString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // Handle the specific malformed CDATA patterns we're seeing in error logs
+  // Pattern: "><![CDATA[>>" - this is completely malformed
+  xmlString = xmlString.replace(/><!\[CDATA\[>>/g, '>');
+  
+  // Pattern: "><![CDATA[>" - another malformed pattern
+  xmlString = xmlString.replace(/><!\[CDATA\[>/g, '>');
+  
+  // Pattern: "><![CDATA[><![CDATA[>>" - nested malformed CDATA
+  xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+  
+  // Pattern: "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA
+  xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
 
   // Handle CDATA sections that might contain problematic sequences
   // Use [\s\S]*? to match any character including newlines non-greedily
@@ -81,6 +106,13 @@ function cleanXMLContent(xmlString: string): string {
   // We remove characters in the ranges #x0-#x8, #xB-#xC, #xE-#x1F, #x7F-#x84, #x86-#x9F
   xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
 
+  // Final cleanup: handle any remaining problematic sequences that might cause parsing errors
+  // This is a more aggressive approach for very problematic feeds
+  xmlString = xmlString.replace(/\]\]/g, ']]]]><![CDATA[>');
+  
+  // Also handle any remaining ]] sequences that might be in HTML content
+  xmlString = xmlString.replace(/\]\]>/g, ']]]]><![CDATA[>');
+
   return xmlString;
 }
 
@@ -118,6 +150,19 @@ function extractThumbnailFromItem(item: Element): string | undefined {
   return thumbnail || undefined;
 }
 
+/**
+ * Fetches and parses an RSS feed with robust error handling for malformed XML.
+ * 
+ * This function implements a multi-layered approach to handle common RSS parsing issues:
+ * 1. Pre-parse detection and cleanup of malformed CDATA patterns (e.g., "><![CDATA[>>")
+ * 2. Standard XML cleaning for common issues
+ * 3. Aggressive cleaning fallback for persistent parsing errors
+ * 4. Final fallback to strip all CDATA sections
+ * 
+ * The function is designed to handle the specific malformed CDATA patterns seen in
+ * feeds from Apple, Samsung, Microsoft, and other major publishers that often
+ * have incomplete or malformed CDATA sections.
+ */
 export async function fetchAndParseRSS(url: string): Promise<{ title: string; items: Article[] } | null> { // Changed items type to Article[]
   try {
     const controller = new AbortController();
@@ -140,11 +185,11 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       
       // If it's a 404, the feed might not exist - try to discover the correct URL
       if (response.status === 404) {
-        console.log(`Feed not found at ${url}, attempting to discover correct RSS URL...`);
+        console.debug(`Feed not found at ${url}, attempting to discover correct RSS URL...`);
         try {
           const discoveredUrl = await discoverFeedUrlWithFallbacks(url);
           if (discoveredUrl && discoveredUrl !== url) {
-            console.log(`Discovered RSS feed at: ${discoveredUrl}`);
+            console.log(`✅ Discovered RSS feed at: ${discoveredUrl}`);
             return await fetchAndParseRSS(discoveredUrl);
           }
         } catch (discoverError) {
@@ -179,6 +224,12 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       console.error(`Response from ${url} is not XML. First 100 chars: ${text.substring(0, 100)}`);
       return null;
     }
+    
+    // Check if the response is HTML instead of XML (common with 404 pages)
+    if (text.trim().startsWith('<!DOCTYPE html') || text.includes('<html')) {
+      console.error(`Response from ${url} is HTML instead of XML. This usually means the RSS feed doesn't exist.`);
+      return null;
+    }
 
     // Add media namespace if it's missing
     if (text.includes('media:content') && !text.includes('xmlns:media')) {
@@ -203,37 +254,111 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
     // Clean the XML content before parsing
     const cleanedXML = cleanXMLContent(text);
 
-    const parser = new DOMParser();
-    let xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+    // Declare xmlDoc at function level
+    let xmlDoc: Document;
 
-    // If parsing failed, try a more aggressive cleaning approach
-    const initialParseError = xmlDoc.querySelector("parsererror");
-    if (initialParseError && initialParseError.textContent?.includes("Sequence ']]>' not allowed")) {
-      console.log(`Attempting aggressive XML cleaning for ${url}...`);
+    // Pre-check for the specific malformed CDATA patterns we're seeing in error logs
+    if (cleanedXML.includes('><![CDATA[>>') || 
+        cleanedXML.includes('><![CDATA[>') || 
+        cleanedXML.includes('><![CDATA[><![CDATA[>>') ||
+        cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) {
+      console.debug(`Detected malformed CDATA patterns in ${url}, applying pre-parse cleanup...`);
       
-      // Try to remove or escape all problematic sequences
-      const aggressiveCleaned = cleanedXML
-        .replace(/\]\]>/g, ']]]]><![CDATA[>')  // Escape all ]] sequences
-        .replace(/\]\]/g, ']]]]><![CDATA[>');  // Escape all ]] sequences
+      // Log the specific patterns found for debugging
+      const patterns: string[] = [];
+      if (cleanedXML.includes('><![CDATA[>>')) patterns.push('><![CDATA[>>');
+      if (cleanedXML.includes('><![CDATA[>')) patterns.push('><![CDATA[>');
+      if (cleanedXML.includes('><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[>>');
+      if (cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[><![CDATA[>>');
       
-      // Try parsing again
-      xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
+      console.debug(`Found malformed patterns in ${url}:`, patterns);
       
-      // Check if the aggressive cleaning worked
-      const secondParseError = xmlDoc.querySelector("parsererror");
-      if (secondParseError) {
-        console.warn(`Aggressive cleaning failed for ${url}, continuing with original...`);
-        // Revert to original cleaned XML
-        xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+      // Apply the same cleanup patterns we use in aggressive cleaning
+      let preCleaned = cleanedXML;
+      preCleaned = preCleaned.replace(/><!\[CDATA\[>>/g, '>');
+      preCleaned = preCleaned.replace(/><!\[CDATA\[>/g, '>');
+      preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+      preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+      
+      // Try parsing the pre-cleaned version first
+      const parser = new DOMParser();
+      xmlDoc = parser.parseFromString(preCleaned, "text/xml");
+      
+      // If pre-cleaning worked, use it; otherwise fall back to original cleaned version
+      const preParseError = xmlDoc.querySelector("parsererror");
+      if (!preParseError) {
+        console.log(`Pre-parse cleanup successful for ${url}`);
       } else {
-        console.log(`Aggressive cleaning successful for ${url}`);
+        console.debug(`Pre-parse cleanup failed for ${url}, falling back to standard cleaning...`);
+        xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
       }
+    } else {
+      const parser = new DOMParser();
+      xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
     }
 
     // Check for parsing errors
     const parseError = xmlDoc.querySelector("parsererror");
     if (parseError) {
       console.error(`XML parsing error for ${url}:`, parseError.textContent);
+      
+      // Try aggressive cleaning as a fallback
+      if (parseError.textContent?.includes("Sequence ']]>' not allowed")) {
+        console.debug(`Attempting aggressive XML cleaning for ${url}...`);
+        
+        // Try multiple cleaning strategies for malformed XML
+        let aggressiveCleaned = cleanedXML;
+        
+        // Strategy 1: Handle the specific malformed CDATA patterns we're seeing
+        // Pattern: "><![CDATA[>>" - completely malformed
+        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>>/g, '>');
+        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>/g, '>');
+        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
+        
+        // Strategy 2: Escape all ]] sequences that aren't in CDATA
+        aggressiveCleaned = aggressiveCleaned.replace(/\]\]/g, ']]]]><![CDATA[>');
+        
+        // Strategy 3: If that doesn't work, try removing problematic sequences
+        if (aggressiveCleaned.includes(']]]]><![CDATA[>')) {
+          aggressiveCleaned = aggressiveCleaned.replace(/\]\]\]\]><!\[CDATA\[>/g, ']]');
+        }
+        
+        // Strategy 4: Remove any remaining problematic CDATA sections
+        aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]]*\]\]>/g, '');
+        
+        // Strategy 5: Clean up any remaining malformed patterns
+        aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]>]*$/g, ''); // Remove incomplete CDATA at end
+        aggressiveCleaned = aggressiveCleaned.replace(/^[^<]*\]\]>/g, ''); // Remove incomplete CDATA at start
+        
+        // Try parsing again
+        const parser = new DOMParser();
+        xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
+        
+        // Check if the aggressive cleaning worked
+        const secondParseError = xmlDoc.querySelector("parsererror");
+        if (secondParseError) {
+          console.warn(`Aggressive cleaning failed for ${url}, trying final fallback...`);
+          
+          // Final fallback: strip all CDATA and try to parse as basic XML
+          const strippedXML = cleanedXML
+            .replace(/<!\[CDATA\[/g, '')
+            .replace(/\]\]>/g, '')
+            .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+          
+          xmlDoc = parser.parseFromString(strippedXML, "text/xml");
+          
+          const finalParseError = xmlDoc.querySelector("parsererror");
+          if (finalParseError) {
+            console.warn(`All XML cleaning strategies failed for ${url}, continuing with original...`);
+            xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+          } else {
+            console.log(`Final fallback cleaning successful for ${url}`);
+          }
+        } else {
+          console.log(`Aggressive cleaning successful for ${url}`);
+        }
+      }
       
       // Try to extract any useful information despite the error
       // Sometimes the parser can still extract some content even with errors
@@ -285,7 +410,19 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       
              const thumbnail = extractThumbnailFromItem(item);
       
-      const sourceDomain = link ? new URL(link).hostname.replace("www.", "") : "Unknown Source";
+      let sourceDomain = "Unknown Source";
+      if (link) {
+        try {
+          sourceDomain = new URL(link).hostname.replace("www.", "");
+        } catch {
+          console.warn(`Invalid link URL for article: ${link}`);
+          // Try to extract domain from the link string if possible
+          const domainMatch = link.match(/https?:\/\/([^\/]+)/);
+          if (domainMatch) {
+            sourceDomain = domainMatch[1].replace("www.", "");
+          }
+        }
+      }
 
       return {
         id: `${url}-${index}`,
@@ -314,12 +451,20 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
 export const fetchWithCors = async (url: string): Promise<Response> => {
   // Make sure your proxy endpoint is correct
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-  console.log(`Fetching via proxy: ${proxyUrl}`); // Add logging
+  
   try {
       const response = await fetch(proxyUrl);
       if (!response.ok) {
-          // Log proxy errors specifically
-          console.error(`Proxy request to ${proxyUrl} failed with status ${response.status}`);
+          // Only log 404 errors as warnings since they're expected during feed discovery
+          if (response.status === 404) {
+              console.debug(`Feed not found at ${url} - trying next URL pattern...`);
+          } else {
+              // Log other errors as they might indicate real problems
+              console.error(`Proxy request to ${proxyUrl} failed with status ${response.status}`);
+          }
+          
+          // Don't throw here, let the calling function handle the response
+          // This allows for better error handling upstream
       }
       return response;
   } catch (proxyError) {
@@ -652,11 +797,15 @@ export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<str
             if (absUrl.match(/\.(xml|rss|atom)$/i) || absUrl.includes('feed')) {
               return absUrl;
             }
-          } catch {}
+          } catch (urlError) {
+            console.warn(`Invalid URL in parent page discovery: ${href}`, urlError);
+          }
         }
       }
     }
-  } catch {}
+  } catch (urlError) {
+    console.warn(`Error during parent page discovery for ${siteUrl}:`, urlError);
+  }
 
   // 3. Try common feed URL suffixes
   const commonSuffixes = [
@@ -672,7 +821,9 @@ export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<str
           return testUrl;
         }
       }
-    } catch {}
+    } catch (error) {
+      console.warn(`Error testing suffix ${suffix} for ${siteUrl}:`, error);
+    }
   }
 
   // 4. Try /sitemap.xml and look for feed links
@@ -688,7 +839,9 @@ export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<str
         }
       }
     }
-  } catch {}
+  } catch (error) {
+    console.warn(`Error checking sitemap for ${siteUrl}:`, error);
+  }
 
   // 5. Try blog meta tags
   if (doc) {
@@ -698,7 +851,9 @@ export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<str
       if (blogUrl) {
         try {
           return new URL(blogUrl, siteUrl).toString();
-        } catch {}
+        } catch (urlError) {
+          console.warn(`Invalid blog URL in meta tag: ${blogUrl}`, urlError);
+        }
       }
     }
   }

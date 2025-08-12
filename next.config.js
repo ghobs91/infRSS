@@ -17,5 +17,18 @@ const withPWA = require("next-pwa")({
         },
       ],
     },
+    // Ensure API routes are properly handled
+    experimental: {
+      appDir: true,
+    },
+    // Add proper rewrites if needed
+    async rewrites() {
+      return [
+        {
+          source: '/api/:path*',
+          destination: '/api/:path*',
+        },
+      ];
+    },
   });
   

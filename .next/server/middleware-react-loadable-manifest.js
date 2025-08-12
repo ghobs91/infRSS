@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST='{"app/page.tsx -> react-pull-to-refresh":{"id":9298,"files":["static/chunks/298.d0c597df58febad4.js"]}}';
+self.__REACT_LOADABLE_MANIFEST="{}";
