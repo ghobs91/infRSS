@@ -28990,11 +28990,32 @@ env.backends.onnx = "wasm";
 env.allowLocalModels = false;
 env.useBrowserCache = true;
 var embedder = null;
+var sentimentClassifier = null;
+var summarizer = null;
+var textClassifier = null;
 async function loadEmbedder() {
   if (!embedder) {
     embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
   }
   return embedder;
+}
+async function loadSentimentClassifier() {
+  if (!sentimentClassifier) {
+    sentimentClassifier = await pipeline("sentiment-analysis", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
+  }
+  return sentimentClassifier;
+}
+async function loadSummarizer() {
+  if (!summarizer) {
+    summarizer = await pipeline("summarization", "Xenova/facebook/bart-large-cnn");
+  }
+  return summarizer;
+}
+async function loadTextClassifier() {
+  if (!textClassifier) {
+    textClassifier = await pipeline("text-classification", "Xenova/facebook/bart-large-mnli");
+  }
+  return textClassifier;
 }
 function cosineSimilarity(a, b) {
   const dot = a.reduce((acc, val, i) => acc + val * b[i], 0);
@@ -29002,18 +29023,159 @@ function cosineSimilarity(a, b) {
   const magB = Math.sqrt(b.reduce((acc, val) => acc + val * val, 0));
   return dot / (magA * magB);
 }
+async function analyzeSentiment(text) {
+  const classifier = await loadSentimentClassifier();
+  const result = await classifier(text);
+  let score = 0;
+  if (result[0].label === "POSITIVE") {
+    score = result[0].score;
+  } else {
+    score = -result[0].score;
+  }
+  return {
+    score: score * 2 - 1,
+    // Convert 0-1 to -1 to 1
+    label: score > 0 ? "positive" : score < 0 ? "negative" : "neutral",
+    confidence: result[0].score
+  };
+}
+async function detectClickbaitAndToxicity(text) {
+  const classifier = await loadTextClassifier();
+  const clickbaitPatterns = [
+    "you won't believe",
+    "shocking",
+    "amazing",
+    "incredible",
+    "mind-blowing",
+    "this will change everything",
+    "the truth about",
+    "what they don't want you to know"
+  ];
+  let isClickbait = false;
+  let isRagebait = false;
+  const lowerText = text.toLowerCase();
+  for (const pattern of clickbaitPatterns) {
+    if (lowerText.includes(pattern)) {
+      isClickbait = true;
+      break;
+    }
+  }
+  const ragebaitPatterns = [
+    "outrageous",
+    "disgusting",
+    "horrifying",
+    "terrifying",
+    "shocking truth",
+    "you'll be furious",
+    "this is unacceptable"
+  ];
+  for (const pattern of ragebaitPatterns) {
+    if (lowerText.includes(pattern)) {
+      isRagebait = true;
+      break;
+    }
+  }
+  const toxicWords = ["hate", "kill", "destroy", "terrible", "awful", "horrible"];
+  let toxicityScore = 0;
+  for (const word of toxicWords) {
+    if (lowerText.includes(word)) {
+      toxicityScore += 0.1;
+    }
+  }
+  return {
+    isClickbait,
+    isRagebait,
+    toxicity: Math.min(toxicityScore, 1)
+  };
+}
+async function generateSummary(text, maxLength = 150) {
+  try {
+    const summarizer2 = await loadSummarizer();
+    const result = await summarizer2(text, {
+      max_length: maxLength,
+      min_length: 50,
+      do_sample: false
+    });
+    return result[0].summary_text;
+  } catch (error) {
+    console.error("Error generating summary:", error);
+    const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 10);
+    return sentences.slice(0, 2).join(". ") + ".";
+  }
+}
 self.onmessage = async (e) => {
-  const { topic, feeds } = e.data;
-  const embedder2 = await loadEmbedder();
-  const topicEmbedding = (await embedder2(topic))[0][0];
-  const results = await Promise.all(
-    feeds.map(async (feed) => {
-      const embedding = (await embedder2(feed.title))[0][0];
-      const score = cosineSimilarity(topicEmbedding, embedding);
-      return { ...feed, score };
-    })
-  );
-  postMessage(results.sort((a, b) => b.score - a.score).slice(0, 5));
+  const { type, data } = e.data;
+  try {
+    switch (type) {
+      case "suggest_feeds":
+        const { topic, feeds } = data;
+        const embedder2 = await loadEmbedder();
+        const topicEmbedding = (await embedder2(topic))[0][0];
+        const results = await Promise.all(
+          feeds.map(async (feed) => {
+            const embedding = (await embedder2(feed.title))[0][0];
+            const score = cosineSimilarity(topicEmbedding, embedding);
+            return { ...feed, score };
+          })
+        );
+        postMessage({
+          type: "feed_suggestions",
+          data: results.sort((a, b) => b.score - a.score).slice(0, 5)
+        });
+        break;
+      case "analyze_article":
+        const { title, content } = data;
+        const fullText = `${title}. ${content}`;
+        const sentiment = await analyzeSentiment(fullText);
+        const clickbaitToxicity = await detectClickbaitAndToxicity(fullText);
+        const summary = await generateSummary(content);
+        const analysis = {
+          sentiment: {
+            ...sentiment,
+            ...clickbaitToxicity
+          },
+          summary
+        };
+        postMessage({
+          type: "article_analysis",
+          data: analysis
+        });
+        break;
+      case "batch_analyze":
+        const { articles } = data;
+        const analyses = await Promise.all(
+          articles.map(async (article) => {
+            const fullText2 = `${article.title}. ${article.content}`;
+            const sentiment2 = await analyzeSentiment(fullText2);
+            const clickbaitToxicity2 = await detectClickbaitAndToxicity(fullText2);
+            const summary2 = await generateSummary(article.content);
+            return {
+              articleId: article.id,
+              analysis: {
+                sentiment: {
+                  ...sentiment2,
+                  ...clickbaitToxicity2
+                },
+                summary: summary2
+              }
+            };
+          })
+        );
+        postMessage({
+          type: "batch_analysis",
+          data: analyses
+        });
+        break;
+      default:
+        console.warn("Unknown message type:", type);
+    }
+  } catch (error) {
+    console.error("Worker error:", error);
+    postMessage({
+      type: "error",
+      error: error.message
+    });
+  }
 };
 /*! Bundled license information:
 

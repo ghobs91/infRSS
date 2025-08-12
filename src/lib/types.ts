@@ -55,6 +55,7 @@ export interface UserPreferences {
   syncEnabled: boolean;
   syncDeviceId: string;
   lastSync: number;
+  language: string;
 }
 
 export interface SyncData {

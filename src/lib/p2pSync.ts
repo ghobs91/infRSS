@@ -1,6 +1,6 @@
 // lib/p2pSync.ts
 
-import type { SyncData, P2PSyncMessage, FeedData, Article, UserPreferences } from './types';
+import type { SyncData, FeedData, Article, UserPreferences } from './types';
 
 export class P2PSyncService {
   private deviceId: string;
@@ -94,13 +94,13 @@ export class P2PSyncService {
   private async syncWithPeer(peerId: string, syncData: SyncData) {
     try {
       // Send sync request
-      const syncRequest: P2PSyncMessage = {
-        type: 'sync_request',
-        data: syncData,
-        deviceId: this.deviceId,
-        timestamp: Date.now(),
-        signature: this.generateSignature(syncData)
-      };
+      // const syncRequest: P2PSyncMessage = {
+      //   type: 'sync_request',
+      //   data: syncData,
+      //   deviceId: this.deviceId,
+      //   timestamp: Date.now(),
+      //   signature: this.generateSignature(syncData)
+      // };
 
       // In a real implementation, this would use WebRTC or similar P2P technology
       // For now, we'll simulate the sync process
@@ -152,11 +152,10 @@ export class P2PSyncService {
     // Add/update peer feeds
     peerFeeds.forEach(feed => {
       const existing = merged.get(feed.url);
-      if (!existing || existing.lastFetched < feed.lastFetched) {
+      if (!existing || (feed.lastFetched && (!existing.lastFetched || existing.lastFetched < feed.lastFetched))) {
         merged.set(feed.url, feed);
       }
     });
-    
     return Array.from(merged.values());
   }
 
@@ -172,11 +171,10 @@ export class P2PSyncService {
     // Add/update peer articles
     peerArticles.forEach(article => {
       const existing = merged.get(article.id);
-      if (!existing || existing.lastRead < article.lastRead) {
+      if (!existing || (article.lastRead && (!existing.lastRead || existing.lastRead < article.lastRead))) {
         merged.set(article.id, article);
       }
     });
-    
     return Array.from(merged.values());
   }
 
@@ -239,9 +237,38 @@ export class P2PSyncService {
   private loadUserPreferences(): UserPreferences {
     try {
       const prefs = localStorage.getItem("userPreferences");
-      return prefs ? JSON.parse(prefs) : {};
+      const defaultPrefs: UserPreferences = {
+        id: crypto.randomUUID(),
+        sentimentFilter: {
+          enabled: false,
+          minSentiment: 0,
+          maxToxicity: 1,
+          hideClickbait: false,
+          hideRagebait: false
+        },
+        categories: [],
+        syncEnabled: false,
+        language: 'en',
+        syncDeviceId: '',
+        lastSync: 0
+      };
+      return prefs ? JSON.parse(prefs) : defaultPrefs;
     } catch {
-      return {};
+      return {
+        id: crypto.randomUUID(),
+        sentimentFilter: {
+          enabled: false,
+          minSentiment: 0,
+          maxToxicity: 1,
+          hideClickbait: false,
+          hideRagebait: false
+        },
+        categories: [],
+        syncEnabled: false,
+        syncDeviceId: this.deviceId,
+        lastSync: 0,
+        language: 'en'
+      };
     }
   }
 
