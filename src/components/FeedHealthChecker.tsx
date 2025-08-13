@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,13 +14,12 @@ import {
   Twitter,
   Github
 } from 'lucide-react';
-import { generateMigrationReport, FeedMigration } from '@/lib/feedMigration';
+import { generateMigrationReport } from '@/lib/feedMigration';
 import { FeedData } from '@/lib/types';
 
 interface FeedHealthCheckerProps {
   feeds: FeedData[];
   onUpdateFeed?: (oldUrl: string, newUrl: string) => void;
-  onRemoveFeed?: (url: string) => void;
 }
 
 interface FeedHealthStatus {
@@ -31,7 +30,7 @@ interface FeedHealthStatus {
   lastChecked: Date;
 }
 
-export function FeedHealthChecker({ feeds, onUpdateFeed, onRemoveFeed }: FeedHealthCheckerProps) {
+export function FeedHealthChecker({ feeds, onUpdateFeed }: FeedHealthCheckerProps) {
   const [healthStatuses, setHealthStatuses] = useState<FeedHealthStatus[]>([]);
   const [isChecking, setIsChecking] = useState(false);
   const [migrationReport, setMigrationReport] = useState<any>(null);
@@ -79,7 +78,7 @@ export function FeedHealthChecker({ feeds, onUpdateFeed, onRemoveFeed }: FeedHea
     }
   };
 
-  const checkAllFeeds = async () => {
+  const checkAllFeeds = useCallback(async () => {
     setIsChecking(true);
     const statuses: FeedHealthStatus[] = [];
     
@@ -102,7 +101,7 @@ export function FeedHealthChecker({ feeds, onUpdateFeed, onRemoveFeed }: FeedHea
       const report = generateMigrationReport(failedUrls);
       setMigrationReport(report);
     }
-  };
+  }, [feeds]);
 
   const getStatusIcon = (status: FeedHealthStatus['status']) => {
     switch (status) {
@@ -141,7 +140,7 @@ export function FeedHealthChecker({ feeds, onUpdateFeed, onRemoveFeed }: FeedHea
     if (feeds.length > 0) {
       checkAllFeeds();
     }
-  }, [feeds]);
+  }, [feeds, checkAllFeeds]);
 
   const healthyFeeds = healthStatuses.filter(s => s.status === 'healthy');
   const problematicFeeds = healthStatuses.filter(s => s.status !== 'healthy');

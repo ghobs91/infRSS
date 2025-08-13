@@ -784,7 +784,6 @@ export default function ManagePage() {
           <FeedHealthChecker
             feeds={savedFeeds}
             onUpdateFeed={handleFeedUrlUpdate}
-            onRemoveFeed={handleRemoveFeed}
           />
         </section>
       )}
