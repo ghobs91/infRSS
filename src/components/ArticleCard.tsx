@@ -10,7 +10,7 @@ import type { Article, SentimentAnalysis } from "@/lib/types";
 interface ArticleCardProps {
   article: Article;
   isRead: boolean;
-  onVisible?: () => void;
+  onVisibleChange?: (isVisible: boolean) => void;
   onToggleRead?: (articleId: string) => void;
   onArchive?: (articleId: string) => void;
   showSentiment?: boolean;
@@ -38,27 +38,27 @@ const SentimentIndicator = ({ sentiment }: { sentiment: SentimentAnalysis }) => 
   };
 
   return (
-    <div className="flex flex-wrap gap-2 text-xs">
-      <div className={cn("flex items-center gap-1", getSentimentColor(sentiment.score))}>
+    <div className="flex flex-wrap gap-2 text-xs w-full overflow-hidden">
+      <div className={cn("flex items-center gap-1 flex-shrink-0", getSentimentColor(sentiment.score))}>
         <span>{getSentimentIcon(sentiment.score)}</span>
         <span>{Math.round(sentiment.score * 100)}%</span>
       </div>
       
       {sentiment.isClickbait && (
-        <div className="text-orange-600 flex items-center gap-1">
+        <div className="text-orange-600 flex items-center gap-1 flex-shrink-0">
           <span>🚨</span>
           <span>Clickbait</span>
         </div>
       )}
       
       {sentiment.isRagebait && (
-        <div className="text-red-600 flex items-center gap-1">
+        <div className="text-red-600 flex items-center gap-1 flex-shrink-0">
           <span>💥</span>
           <span>Ragebait</span>
         </div>
       )}
       
-      <div className={cn("flex items-center gap-1", getToxicityColor(sentiment.toxicity))}>
+      <div className={cn("flex items-center gap-1 flex-shrink-0", getToxicityColor(sentiment.toxicity))}>
         <span>⚠️</span>
         <span>{Math.round(sentiment.toxicity * 100)}%</span>
       </div>
@@ -76,19 +76,19 @@ const ArticleSummary = ({ summary, isExpanded, onToggle }: {
   const shouldTruncate = summary.length > maxLength;
   
   if (!shouldTruncate) {
-    return <p className="text-sm text-[var(--text-secondary)] mt-2">{summary}</p>;
+    return <p className="text-sm text-[var(--text-secondary)] mt-2 break-words">{summary}</p>;
   }
 
   return (
-    <div className="mt-2">
-      <p className="text-sm text-[var(--text-secondary)]">
+    <div className="mt-2 w-full overflow-hidden">
+      <p className="text-sm text-[var(--text-secondary)] break-words">
         {isExpanded ? summary : `${summary.substring(0, maxLength)}...`}
       </p>
       <Button
         variant="ghost"
         size="sm"
         onClick={onToggle}
-        className="text-xs p-1 h-auto mt-1"
+        className="text-xs p-1 h-auto mt-1 flex-shrink-0"
       >
         {isExpanded ? 'Show less' : 'Read more'}
       </Button>
@@ -99,7 +99,7 @@ const ArticleSummary = ({ summary, isExpanded, onToggle }: {
 export const ArticleCard = ({ 
   article, 
   isRead, 
-  onVisible, 
+  onVisibleChange, 
   onToggleRead,
   onArchive,
   showSentiment = true,
@@ -115,21 +115,20 @@ export const ArticleCard = ({
   }, []);
 
   useEffect(() => {
-    if (!ref.current || !onVisible) return;
+    if (!ref.current || !onVisibleChange) return;
     
     const observer = new window.IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
-          onVisible();
-          observer.disconnect();
-        }
+        entries.forEach((entry) => {
+          onVisibleChange(entry.isIntersecting);
+        });
       },
-      { threshold: 0.5 }
+      { threshold: 0.1 } // Lower threshold for better detection
     );
     
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [onVisible]);
+  }, [onVisibleChange]);
 
   const handleToggleRead = () => {
     if (onToggleRead) {
@@ -146,15 +145,15 @@ export const ArticleCard = ({
   return (
     <div ref={ref}>
       <Card className={cn(
-        "shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md",
+        "shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md max-w-full",
         isRead && "read-article opacity-75",
         article.sentiment?.isClickbait && "border-orange-200",
         article.sentiment?.isRagebait && "border-red-200"
       )}>
         <CardContent className="p-0">
-          <div className="flex flex-col sm:flex-row">
+          <div className="flex flex-col sm:flex-row w-full overflow-hidden">
             {article.thumbnail && !imgError && (
-              <div className="w-full sm:w-40 h-40 sm:h-auto relative">
+              <div className="w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0">
                 <Image 
                   src={article.thumbnail} 
                   alt={article.title}
@@ -166,24 +165,24 @@ export const ArticleCard = ({
               </div>
             )}
             
-            <div className="flex-1 p-3 sm:p-4">
-              <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 p-3 sm:p-4 min-w-0">
+              <div className="flex items-start justify-between gap-2 w-full overflow-hidden">
                 <a
                   href={article.link}
-                  className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 flex-1"
+                  className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 flex-1 break-words overflow-hidden"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   {article.title}
                 </a>
                 
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0">
                   {onToggleRead && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={handleToggleRead}
-                      className="text-xs p-2 h-auto"
+                      className="text-xs p-2 h-auto whitespace-nowrap"
                       title={isRead ? "Mark as unread" : "Mark as read"}
                     >
                       {isRead ? "👁️" : "👁️‍🗨️"}
@@ -195,7 +194,7 @@ export const ArticleCard = ({
                       variant="ghost"
                       size="sm"
                       onClick={handleArchive}
-                      className="text-xs p-2 h-auto"
+                      className="text-xs p-2 h-auto whitespace-nowrap"
                       title="Archive article"
                     >
                       📁
@@ -204,9 +203,9 @@ export const ArticleCard = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 my-1">
+              <div className="flex items-center gap-2 my-1 w-full overflow-hidden">
                 {mounted && (
-                  <div className="w-4 h-4 relative">
+                  <div className="w-4 h-4 relative flex-shrink-0">
                     <Image
                       src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
                       alt="favicon"
@@ -216,7 +215,7 @@ export const ArticleCard = ({
                     />
                   </div>
                 )}
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)] truncate flex-1">
                   {(() => {
                     try {
                       return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
@@ -227,11 +226,11 @@ export const ArticleCard = ({
                 </p>
                 
                 {article.tags && article.tags.length > 0 && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-shrink-0">
                     {article.tags.slice(0, 3).map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full"
+                        className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full whitespace-nowrap"
                       >
                         {tag}
                       </span>
@@ -240,7 +239,7 @@ export const ArticleCard = ({
                 )}
               </div>
 
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-2">
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-2 truncate">
                 {new Date(article.pubDate).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -250,25 +249,29 @@ export const ArticleCard = ({
 
               {/* Sentiment Analysis */}
               {showSentiment && article.sentiment && (
-                <div className="mb-2">
+                <div className="mb-2 w-full overflow-hidden">
                   <SentimentIndicator sentiment={article.sentiment} />
                 </div>
               )}
 
               {/* Article Summary */}
               {showSummary && article.summary && (
-                <ArticleSummary
-                  summary={article.summary}
-                  isExpanded={summaryExpanded}
-                  onToggle={() => setSummaryExpanded(!summaryExpanded)}
-                />
+                <div className="w-full overflow-hidden">
+                  <ArticleSummary
+                    summary={article.summary}
+                    isExpanded={summaryExpanded}
+                    onToggle={() => setSummaryExpanded(!summaryExpanded)}
+                  />
+                </div>
               )}
 
-              {/* Article Content Preview */}
-              {!article.summary && article.content && (
-                <p className="text-sm text-[var(--text-secondary)] mt-2 line-clamp-3">
-                  {article.content.replace(/<[^>]*>/g, '').substring(0, 200)}...
-                </p>
+              {/* Article Content Preview - show content if no summary, or as fallback */}
+              {(!article.summary || showSummary === false) && article.content && (
+                <div className="w-full overflow-hidden">
+                  <p className="text-sm text-[var(--text-secondary)] mt-2 line-clamp-3 break-words">
+                    {article.content.substring(0, 200)}...
+                  </p>
+                </div>
               )}
             </div>
           </div>

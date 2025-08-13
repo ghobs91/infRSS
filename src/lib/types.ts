@@ -56,6 +56,7 @@ export interface UserPreferences {
   syncDeviceId: string;
   lastSync: number;
   language: string;
+  autoMarkAsReadOnScroll: boolean; // New preference for auto-marking articles as read when scrolling past
 }
 
 export interface SyncData {

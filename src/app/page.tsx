@@ -2,172 +2,37 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { ArticleCard } from "@/components/ArticleCard";
 import {
   fetchAndParseRSS,
   loadFeedsFromStorage,
 } from "@/lib/rssUtils";
 import { useUnread } from "@/lib/unreadContext";
-import { cn } from "@/lib/utils";
 
-// Format date to "Month Day, Year" (e.g., "April 13th, 2025")
-function formatDate(dateString: string): string {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return dateString; // Return original string if parsing fails
+
+
+// Helper function to convert article format for ArticleCard
+const convertArticleForCard = (article: { title: string; link: string; pubDate: string; thumbnail?: string }) => ({
+  id: article.link,
+  title: article.title,
+  link: article.link,
+  pubDate: article.pubDate,
+  thumbnail: article.thumbnail,
+  content: '',
+  summary: '',
+  sourceDomain: (() => {
+    try {
+      return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
+    } catch {
+      return "Unknown Source";
     }
-    
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    
-    const day = date.getDate();
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
-    
-    // Add ordinal suffix to day (1st, 2nd, 3rd, etc.)
-    let dayWithOrdinal = day.toString();
-    if (day > 3 && day < 21) {
-      dayWithOrdinal += "th";
-    } else {
-      const lastDigit = day % 10;
-      switch (lastDigit) {
-        case 1: dayWithOrdinal += "st"; break;
-        case 2: dayWithOrdinal += "nd"; break;
-        case 3: dayWithOrdinal += "rd"; break;
-        default: dayWithOrdinal += "th";
-      }
-    }
-    
-    return `${month} ${dayWithOrdinal}, ${year}`;
-  } catch (error) {
-    console.error("Error formatting date:", error);
-    return dateString; // Return original string if there's an error
-  }
-}
-
-// Article component to reduce re-renders
-const Article = ({ 
-  article, 
-  isRead, 
-  onVisible, 
-  onMarkAsRead 
-}: { 
-  article: { title: string; link: string; pubDate: string; thumbnail?: string }, 
-  isRead: boolean, 
-  onVisible?: () => void,
-  onMarkAsRead?: (link: string) => void
-}) => {
-  const [mounted, setMounted] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ref.current || !onVisible) return;
-    const observer = new window.IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          onVisible();
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.5 }
-    );
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [onVisible]);
-
-  return (
-    <div ref={ref}>
-      <Card className={cn(
-        "shadow-sm overflow-hidden transition-all duration-200",
-        isRead 
-          ? "read-article opacity-75" 
-          : "border-l-4 border-l-blue-500 bg-blue-50/30"
-      )}>
-        <CardContent className="p-0">
-          <div className="flex flex-col sm:flex-row">
-            {article.thumbnail && !imgError && (
-              <div className="w-full sm:w-40 h-40 sm:h-auto relative">
-                {/* Use unoptimized prop for external images */}
-                <Image 
-                  src={article.thumbnail} 
-                  alt={article.title}
-                  fill
-                  unoptimized
-                  className="object-cover"
-                  onError={() => setImgError(true)}
-                />
-              </div>
-            )}
-            <div className="flex-1 p-3 sm:p-4">
-                              <div className="flex items-start gap-2 flex-1">
-                  <div className="flex-1">
-                    <a
-                      href={article.link}
-                      className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 block"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {article.title}
-                    </a>
-                    {!isRead && (
-                      <span className="inline-block text-xs bg-blue-500 text-white px-2 py-1 rounded-full mt-1">
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                  {onMarkAsRead && (
-                    <button
-                      onClick={() => onMarkAsRead(article.link)}
-                      className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors flex-shrink-0"
-                      title={isRead ? "Mark as unread" : "Mark as read"}
-                    >
-                      {isRead ? "👁️" : "👁️‍🗨️"}
-                    </button>
-                  )}
-                </div>
-              <div className="flex items-center gap-2 my-1">
-                {mounted && (
-                  <div className="w-4 h-4 relative">
-                    <Image
-                      src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                      alt="favicon"
-                      fill
-                      unoptimized
-                      className="object-contain"
-                    />
-                  </div>
-                )}
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                  {(() => {
-                    try {
-                      return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
-                    } catch {
-                      return "Unknown Source";
-                    }
-                  })()}
-                </p>
-              </div>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                {formatDate(article.pubDate)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+  })(),
+  readStatus: 'unread' as const,
+  tags: []
+});
 
 export default function HomePage() {
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
@@ -176,7 +41,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hideRead, setHideRead] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { toggleReadStatus, setTotalArticles, readLinks, unreadCount } = useUnread();
+  const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
 
   // Only show unread articles if hideRead is true
   const filteredArticles = useMemo(() => {
@@ -305,24 +170,35 @@ export default function HomePage() {
   }, [articles.length, setTotalArticles]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6">
-      <section className="space-y-4">
+    <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6 overflow-hidden">
+      <section className="space-y-4 w-full overflow-hidden">
         {isClient && (
           <>
             <div className="flex items-center justify-between mb-4">
               <div className="text-sm text-[var(--text-secondary)]">
                 {unreadCount} unread articles
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setHideRead(!hideRead)}
-                className="text-xs"
-              >
-                {hideRead ? "Show all" : "Hide read"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleAutoMarkAsRead}
+                  className="text-xs"
+                  title={autoMarkAsReadOnScroll ? "Disable auto-mark as read when scrolling past" : "Enable auto-mark as read when scrolling past"}
+                >
+                  {autoMarkAsReadOnScroll ? "📖 Auto-scroll" : "📖 Manual"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setHideRead(!hideRead)}
+                  className="text-xs"
+                >
+                  {hideRead ? "Show all" : "Hide read"}
+                </Button>
+              </div>
             </div>
-            <div className="grid gap-4">
+            <div className="grid gap-4 w-full overflow-hidden">
             {isLoading ? (
               // Show spinner during initial load
               <div className="flex justify-center items-center py-12">
@@ -335,17 +211,19 @@ export default function HomePage() {
                 </CardContent>
               </Card>
             ) : (
-              // Show actual articles
+              // Show actual articles using ArticleCard component
               visibleArticles.map((article, idx) => (
-                <Article
+                <ArticleCard
                   key={`${article.link}-${idx}`}
-                  article={article}
+                  article={convertArticleForCard(article)}
                   isRead={readLinks.has(article.link)}
-                  onVisible={() => {
-                    // Don't automatically mark as read - let user interact first
-                    // This prevents marking articles as read before they're actually read
+                  onVisibleChange={(isVisible) => {
+                    // Auto-mark as read when scrolling past if the preference is enabled
+                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && !isVisible) {
+                      toggleReadStatus(article.link);
+                    }
                   }}
-                  onMarkAsRead={(link) => toggleReadStatus(link)}
+                  onToggleRead={(articleId) => toggleReadStatus(articleId)}
                 />
               ))
             )}

@@ -23,6 +23,7 @@ import {
 import type { FeedData } from "@/lib/types";
 import { useTransformerWorker } from "@/lib/useTransformerWorker";
 import type { Category, UserPreferences } from "@/lib/types";
+import { FeedHealthChecker } from "@/components/FeedHealthChecker";
 
 // Category management component
 const CategoryManager = ({ 
@@ -102,16 +103,16 @@ const CategoryManager = ({
 
       <div className="grid gap-2">
         {categories.map((category) => (
-          <div key={category.id} className="flex items-center justify-between p-3 bg-[var(--muted)] rounded-lg">
+          <div key={category.id} className="flex items-center justify-between p-4 bg-[var(--muted)] border border-[var(--card-border)] rounded-lg hover:bg-[var(--muted-hover)] transition-colors">
             <div className="flex items-center gap-3">
               <div 
-                className="w-4 h-4 rounded-full" 
+                className="w-4 h-4 rounded-full border border-[var(--card-border)]" 
                 style={{ backgroundColor: category.color }}
               />
               <div>
-                <p className="font-medium">{category.name}</p>
+                <p className="font-medium text-[var(--text-primary)]">{category.name}</p>
                 {category.description && (
-                  <p className="text-sm text-[var(--text-secondary)]">{category.description}</p>
+                  <p className="text-sm text-[var(--text-secondary)] mt-1">{category.description}</p>
                 )}
               </div>
             </div>
@@ -120,6 +121,7 @@ const CategoryManager = ({
                 variant="ghost" 
                 size="sm" 
                 onClick={() => handleEdit(category)}
+                className="hover:bg-[var(--accent)] hover:text-[var(--text-primary)]"
               >
                 Edit
               </Button>
@@ -163,12 +165,12 @@ const SentimentFilterSettings = ({
       <h3 className="text-lg font-medium text-[var(--text-primary)]">Sentiment Filtering</h3>
       
       <div className="space-y-3">
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-[var(--text-primary)]">
           <input
             type="checkbox"
             checked={preferences.sentimentFilter.enabled}
             onChange={(e) => updateSentimentFilter({ enabled: e.target.checked })}
-            className="rounded"
+            className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
           />
           <span>Enable sentiment filtering</span>
         </label>
@@ -176,7 +178,7 @@ const SentimentFilterSettings = ({
         {preferences.sentimentFilter.enabled && (
           <>
             <div className="space-y-2">
-              <label className="block text-sm">
+              <label className="block text-sm text-[var(--text-primary)]">
                 Minimum sentiment score: {preferences.sentimentFilter.minSentiment}
                 <input
                   type="range"
@@ -185,13 +187,13 @@ const SentimentFilterSettings = ({
                   step="0.1"
                   value={preferences.sentimentFilter.minSentiment}
                   onChange={(e) => updateSentimentFilter({ minSentiment: parseFloat(e.target.value) })}
-                  className="w-full mt-1"
+                  className="w-full mt-2"
                 />
               </label>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm">
+              <label className="block text-sm text-[var(--text-primary)]">
                 Maximum toxicity: {Math.round(preferences.sentimentFilter.maxToxicity * 100)}%
                 <input
                   type="range"
@@ -200,27 +202,27 @@ const SentimentFilterSettings = ({
                   step="0.1"
                   value={preferences.sentimentFilter.maxToxicity}
                   onChange={(e) => updateSentimentFilter({ maxToxicity: parseFloat(e.target.value) })}
-                  className="w-full mt-1"
+                  className="w-full mt-2"
                 />
               </label>
             </div>
 
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-[var(--text-primary)]">
               <input
                 type="checkbox"
                 checked={preferences.sentimentFilter.hideClickbait}
                 onChange={(e) => updateSentimentFilter({ hideClickbait: e.target.checked })}
-                className="rounded"
+                className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
               />
               <span>Hide clickbait articles</span>
             </label>
 
-            <label className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-[var(--text-primary)]">
               <input
                 type="checkbox"
                 checked={preferences.sentimentFilter.hideRagebait}
                 onChange={(e) => updateSentimentFilter({ hideRagebait: e.target.checked })}
-                className="rounded"
+                className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
               />
               <span>Hide ragebait articles</span>
             </label>
@@ -330,7 +332,7 @@ const SavedFeed = ({
                   <select
                     value={editData.category}
                     onChange={(e) => setEditData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full text-sm p-2 border rounded"
+                    className="w-full text-sm p-2 border border-[var(--input-border)] rounded bg-[var(--input-bg)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--input-focus)] focus:border-[var(--input-focus)]"
                   >
                     {categories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -384,7 +386,7 @@ export default function ManagePage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'sentiment'>('feeds');
+  const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'sentiment' | 'health'>('feeds');
 
   const { suggestFeedsWithWorker, isLoading: workerLoading } = useTransformerWorker();
 
@@ -513,11 +515,28 @@ export default function ManagePage() {
 
   // Handle updating a feed
   const handleUpdateFeed = useCallback((url: string, updates: Partial<FeedData>) => {
+    setSavedFeeds(prev => prev.map(feed => 
+      feed.url === url ? { ...feed, ...updates } : feed
+    ));
+    
+    // Update in storage
     const updatedFeeds = savedFeeds.map(feed => 
       feed.url === url ? { ...feed, ...updates } : feed
     );
     localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
-    setSavedFeeds(updatedFeeds);
+  }, [savedFeeds]);
+
+  // Handle feed URL updates for health checker
+  const handleFeedUrlUpdate = useCallback((oldUrl: string, newUrl: string) => {
+    setSavedFeeds(prev => prev.map(feed => 
+      feed.url === oldUrl ? { ...feed, url: newUrl } : feed
+    ));
+    
+    // Update in storage
+    const updatedFeeds = savedFeeds.map(feed => 
+      feed.url === oldUrl ? { ...feed, url: newUrl } : feed
+    );
+    localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
   }, [savedFeeds]);
 
   // Handle adding a category
@@ -598,109 +617,148 @@ export default function ManagePage() {
   }, [savedFeeds]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto">
+    <main className="space-y-8 px-4 max-w-4xl mx-auto py-6">
+      {/* Page Header */}
+      <div className="border-b border-[var(--border)] pb-4">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
+        <p className="text-[var(--text-secondary)] mt-1">Add, organize, and monitor your RSS feeds</p>
+      </div>
       {/* Tab Navigation */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-1 border-b border-[var(--border)] bg-[var(--muted)] rounded-t-lg p-1">
         <button
           onClick={() => setActiveTab('feeds')}
-          className={`px-4 py-2 ${activeTab === 'feeds' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+            activeTab === 'feeds' 
+              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+          }`}
         >
           Feeds
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-4 py-2 ${activeTab === 'categories' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+            activeTab === 'categories' 
+              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+          }`}
         >
           Categories
         </button>
         <button
           onClick={() => setActiveTab('sentiment')}
-          className={`px-4 py-2 ${activeTab === 'sentiment' ? 'border-b-2 border-[var(--primary)]' : ''}`}
+          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+            activeTab === 'sentiment' 
+              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+          }`}
         >
           Sentiment
+        </button>
+        <button
+          onClick={() => setActiveTab('health')}
+          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+            activeTab === 'health' 
+              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+          }`}
+        >
+          Health
         </button>
       </div>
 
       {/* Feeds Tab */}
       {activeTab === 'feeds' && (
-        <section className="space-y-4">
-          <div className="space-y-4">
-            <div className="space-y-2">
+        <section className="space-y-6">
+          <div className="space-y-3">
+            <div className="border-b border-[var(--border)] pb-2">
               <h2 className="text-xl font-semibold text-[var(--text-primary)]">Add Feed</h2>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Input
-                  type="url"
-                  placeholder="Enter RSS feed URL"
-                  value={feedUrlInput}
-                  onChange={(e) => setFeedUrlInput(e.target.value)}
-                  className="flex-1"
-                />
-                <Button 
-                  variant="default" 
-                  onClick={handleAddFeed}
-                  disabled={isLoading}
-                  className="w-full sm:w-auto"
-                >
-                  {isLoading ? <Spinner size="sm" /> : "Add Feed"}
-                </Button>
-              </div>
-              {isLoading && !error && (
-                <div className="flex items-center gap-2 mt-2 text-sm text-[var(--text-secondary)]">
-                  <Spinner size="sm" />
-                  <span>Searching for feeds...</span>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Input
-                  type="file"
-                  accept=".opml,.xml"
-                  onChange={handleImportOPML}
-                  className="flex-1"
-                  disabled={isImporting}
-                />
-                {isImporting && <Spinner size="sm" />}
-              </div>
-              {error && <p className={`text-sm ${error.includes("Successfully") ? "text-green-500" : "text-red-500"}`}>{error}</p>}
+              <p className="text-sm text-[var(--text-secondary)] mt-1">Enter a feed URL or import from OPML file</p>
             </div>
-
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Input
-                  type="text"
-                  placeholder="Enter a topic (e.g., 'tech news', 'programming')"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  className="flex-1"
-                />
-                <Button 
-                  variant="default" 
-                  onClick={handleSuggestFeeds}
-                  disabled={isSuggesting || workerLoading}
-                  className="w-full sm:w-auto"
-                >
-                  {isSuggesting || workerLoading ? <Spinner size="sm" /> : "Suggest"}
-                </Button>
-              </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                type="url"
+                placeholder="Enter RSS feed URL"
+                value={feedUrlInput}
+                onChange={(e) => setFeedUrlInput(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="default" 
+                onClick={handleAddFeed}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? <Spinner size="sm" /> : "Add Feed"}
+              </Button>
             </div>
-
-            {suggestedFeeds.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
-                <div className="grid gap-3">
-                  {suggestedFeeds.map((feed) => (
-                    <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
-                  ))}
-                </div>
+            {isLoading && !error && (
+              <div className="flex items-center gap-2 mt-2 p-3 bg-[var(--muted)] border border-[var(--card-border)] rounded-lg">
+                <Spinner size="sm" />
+                <span className="text-sm text-[var(--text-secondary)]">Searching for feeds...</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <Input
+                type="file"
+                accept=".opml,.xml"
+                onChange={handleImportOPML}
+                className="flex-1"
+                disabled={isImporting}
+              />
+              {isImporting && <Spinner size="sm" />}
+            </div>
+            {error && (
+              <div className={`p-3 rounded-lg border ${
+                error.includes("Successfully") 
+                  ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200" 
+                  : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200"
+              }`}>
+                {error}
               </div>
             )}
           </div>
+
+          <div className="space-y-3">
+            <div className="border-b border-[var(--border)] pb-2">
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">Discover new feeds based on topics</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                type="text"
+                placeholder="Enter a topic (e.g., 'tech news', 'programming')"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                className="flex-1"
+              />
+              <Button 
+                variant="default" 
+                onClick={handleSuggestFeeds}
+                disabled={isSuggesting || workerLoading}
+                className="w-full sm:w-auto"
+              >
+                {isSuggesting || workerLoading ? <Spinner size="sm" /> : "Suggest"}
+              </Button>
+            </div>
+          </div>
+
+          {suggestedFeeds.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
+              <div className="grid gap-3">
+                {suggestedFeeds.map((feed) => (
+                  <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
       {/* Categories Tab */}
       {activeTab === 'categories' && (
-        <section className="space-y-4">
+        <section className="space-y-6">
           <CategoryManager
             categories={categories}
             onAddCategory={handleAddCategory}
@@ -712,7 +770,7 @@ export default function ManagePage() {
 
       {/* Sentiment Tab */}
       {activeTab === 'sentiment' && preferences && (
-        <section className="space-y-4">
+        <section className="space-y-6">
           <SentimentFilterSettings
             preferences={preferences}
             onUpdatePreferences={handleUpdatePreferences}
@@ -720,14 +778,28 @@ export default function ManagePage() {
         </section>
       )}
 
+      {/* Health Tab */}
+      {activeTab === 'health' && (
+        <section className="space-y-6">
+          <FeedHealthChecker
+            feeds={savedFeeds}
+            onUpdateFeed={handleFeedUrlUpdate}
+            onRemoveFeed={handleRemoveFeed}
+          />
+        </section>
+      )}
+
       {/* Your Feeds Section */}
-      <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Your Feeds</h2>
+      <section className="space-y-4 pt-6 border-t border-[var(--border)]">
+        <div className="border-b border-[var(--border)] pb-2">
+          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Your Feeds</h2>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage and organize your subscribed feeds</p>
+        </div>
         <div className="grid gap-3">
           {savedFeeds.length === 0 ? (
-            <Card className="shadow-sm">
-              <CardContent className="p-4 text-center">
-                <p className="text-[var(--text-secondary)]">No feeds added yet. Add some feeds to get started.</p>
+            <Card className="shadow-sm border-[var(--card-border)]">
+              <CardContent className="p-6 text-center">
+                <p className="text-[var(--text-secondary)] text-lg">No feeds added yet. Add some feeds to get started.</p>
               </CardContent>
             </Card>
           ) : (

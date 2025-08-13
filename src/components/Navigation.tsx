@@ -105,7 +105,7 @@ export const Navigation = () => {
                   onClick={closeDrawer}
                 >
                   <PlusIcon />
-                  <span>Add Feeds</span>
+                  <span>Manage Feeds</span>
                 </Link>
               </li>
             </ul>

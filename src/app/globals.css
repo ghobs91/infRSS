@@ -11,6 +11,13 @@
   --text-secondary: #6b7280;
   --accent: #f3f4f6;
   --accent-hover: #e5e7eb;
+  --muted: #f9fafb;
+  --muted-hover: #f3f4f6;
+  --background-hover: #f8fafc;
+  --border: #e5e7eb;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+  --input-focus: #3b82f6;
 }
 
 @theme inline {
@@ -25,13 +32,20 @@
     --background: #0f172a;
     --foreground: #f8fafc;
     --card-bg: #1e293b;
-    --card-border: #334155;
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
+    --card-border: #475569;
+    --primary: #60a5fa;
+    --primary-hover: #3b82f6;
     --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --accent: #1e293b;
-    --accent-hover: #334155;
+    --text-secondary: #cbd5e1;
+    --accent: #334155;
+    --accent-hover: #475569;
+    --muted: #1e293b;
+    --muted-hover: #334155;
+    --background-hover: #1e293b;
+    --border: #475569;
+    --input-bg: #1e293b;
+    --input-border: #475569;
+    --input-focus: #60a5fa;
   }
 }
 
@@ -90,4 +104,251 @@ body {
   opacity: 0.5;
   filter: grayscale(0.7);
   pointer-events: none;
+}
+
+/* Improved dark mode form elements */
+@media (prefers-color-scheme: dark) {
+  input[type="text"],
+  input[type="url"],
+  input[type="file"],
+  select,
+  textarea {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+  }
+  
+  input[type="text"]:focus,
+  input[type="url"]:focus,
+  input[type="file"]:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  }
+  
+  /* Improve checkbox and radio button visibility */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--primary);
+  }
+  
+  /* Better contrast for range inputs */
+  input[type="range"] {
+    background: var(--accent);
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    background: var(--primary);
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    background: var(--primary);
+  }
+  
+  /* Improve file input styling */
+  input[type="file"] {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text-primary);
+  }
+  
+  input[type="file"]::-webkit-file-upload-button {
+    background: var(--accent);
+    color: var(--text-primary);
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    padding: 4px 12px;
+    margin-right: 12px;
+    cursor: pointer;
+  }
+  
+  input[type="file"]::-webkit-file-upload-button:hover {
+    background: var(--accent-hover);
+  }
+  
+  /* Improve select dropdown styling */
+  select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 40px;
+  }
+  
+  /* Better focus indicators for all interactive elements */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--input-focus);
+    outline-offset: 2px;
+  }
+  
+  /* Improve tab navigation contrast */
+  .tab-active {
+    background-color: var(--background-hover);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+  
+  .tab-inactive {
+    color: var(--text-secondary);
+  }
+  
+  .tab-inactive:hover {
+    background-color: var(--background-hover);
+    color: var(--text-primary);
+  }
+}
+
+/* Light mode form element improvements */
+input[type="text"],
+input[type="url"],
+input[type="file"],
+select,
+textarea {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="url"]:focus,
+input[type="file"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+/* Improve checkbox and radio button visibility */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--primary);
+}
+
+/* Better contrast for range inputs */
+input[type="range"] {
+  background: var(--accent);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  background: var(--primary);
+}
+
+input[type="range"]::-moz-range-thumb {
+  background: var(--primary);
+}
+
+/* Improve file input styling */
+input[type="file"] {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+}
+
+input[type="file"]::-webkit-file-upload-button {
+  background: var(--accent);
+  color: var(--text-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+input[type="file"]::-webkit-file-upload-button:hover {
+  background: var(--accent-hover);
+}
+
+/* Improve select dropdown styling */
+select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 8px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
+/* Better focus indicators for all interactive elements */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+}
+
+/* Improve tab navigation contrast */
+.tab-active {
+  background-color: var(--background-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.tab-inactive {
+  color: var(--text-secondary);
+}
+
+.tab-inactive:hover {
+  background-color: var(--background-hover);
+  color: var(--text-primary);
+}
+
+/* Enhanced dark mode improvements */
+@media (prefers-color-scheme: dark) {
+  /* Better contrast for status indicators */
+  .status-healthy {
+    color: #4ade80;
+    background-color: rgba(74, 222, 128, 0.1);
+    border-color: rgba(74, 222, 128, 0.3);
+  }
+  
+  .status-error {
+    color: #f87171;
+    background-color: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.3);
+  }
+  
+  .status-warning {
+    color: #fbbf24;
+    background-color: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  
+  /* Improve icon visibility */
+  .icon-secondary {
+    color: var(--text-secondary);
+    opacity: 0.8;
+  }
+  
+  .icon-secondary:hover {
+    opacity: 1;
+    color: var(--text-primary);
+  }
+  
+  /* Better card contrast */
+  .card-muted {
+    background-color: var(--muted);
+    border-color: var(--card-border);
+  }
+  
+  .card-muted:hover {
+    background-color: var(--muted-hover);
+    border-color: var(--primary);
+  }
+  
+  /* Enhanced form elements */
+  .form-element {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--text-primary);
+  }
+  
+  .form-element:focus {
+    border-color: var(--input-focus);
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  }
 }

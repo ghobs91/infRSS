@@ -24,9 +24,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Only HTTP and HTTPS protocols are allowed' }, { status: 400 });
   }
 
+  // Check if this is an RSSHub URL and provide helpful error messages
+  const isRSSHub = validatedUrl.hostname === 'rsshub.app';
+  
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds
 
     const response = await fetch(validatedUrl.toString(), {
       signal: controller.signal,
@@ -40,15 +43,48 @@ export async function GET(req: NextRequest) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.log('Target server error:', response.status);
+      console.log('Target server error:', response.status, 'for URL:', validatedUrl.toString());
+      
+      // Handle RSSHub-specific errors
+      if (isRSSHub) {
+        if (response.status === 404) {
+          return NextResponse.json({ 
+            error: 'RSSHub feed not found. This feed may have been removed or the URL format has changed.',
+            status: response.status,
+            suggestion: 'Try checking RSSHub documentation for the correct feed format or use a different RSS source.',
+            url: validatedUrl.toString()
+          }, { status: 404 });
+        }
+        
+        if (response.status === 429) {
+          return NextResponse.json({ 
+            error: 'RSSHub rate limit exceeded. Please try again later.',
+            status: response.status,
+            suggestion: 'Wait a few minutes before retrying, or consider using a different RSS source.',
+            retryAfter: '5 minutes'
+          }, { status: 429 });
+        }
+      }
+      
       return NextResponse.json({ 
         error: `Target server responded with status ${response.status}`,
-        status: response.status 
+        status: response.status,
+        url: validatedUrl.toString()
       }, { status: response.status });
     }
 
     const contentType = response.headers.get('content-type') || 'text/plain';
     const data = await response.text();
+
+    // Validate that we actually got RSS/XML content
+    if (isRSSHub && (!data.includes('<rss') && !data.includes('<feed') && !data.includes('<xml'))) {
+      console.warn('RSSHub returned non-RSS content:', data.substring(0, 200));
+      return NextResponse.json({ 
+        error: 'RSSHub returned invalid RSS content',
+        status: 422,
+        suggestion: 'The feed may be temporarily unavailable or have changed format.'
+      }, { status: 422 });
+    }
 
     return new NextResponse(data, {
       status: 200,
@@ -60,22 +96,35 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Proxy error:', error, 'for URL:', validatedUrl.toString());
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        return NextResponse.json({ error: 'Request timeout' }, { status: 408 });
+        return NextResponse.json({ 
+          error: 'Request timeout - the server took too long to respond',
+          status: 408,
+          suggestion: 'Try again later or check if the RSS source is experiencing issues.',
+          url: validatedUrl.toString()
+        }, { status: 408 });
       }
       
       // Handle network timeouts and connection errors
       if (error.message.includes('fetch') || error.message.includes('timeout') || error.message.includes('connect')) {
         return NextResponse.json({ 
           error: 'Network error - server may be unreachable or too slow',
-          details: error.message
+          details: error.message,
+          status: 504,
+          suggestion: 'Check your internet connection and try again.',
+          url: validatedUrl.toString()
         }, { status: 504 });
       }
     }
     
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      status: 500,
+      details: error instanceof Error ? error.message : 'Unknown error',
+      url: validatedUrl.toString()
+    }, { status: 500 });
   }
 } 

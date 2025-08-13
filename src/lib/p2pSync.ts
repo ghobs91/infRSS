@@ -250,7 +250,8 @@ export class P2PSyncService {
         syncEnabled: false,
         language: 'en',
         syncDeviceId: '',
-        lastSync: 0
+        lastSync: 0,
+        autoMarkAsReadOnScroll: true // Default to enabled
       };
       return prefs ? JSON.parse(prefs) : defaultPrefs;
     } catch {
@@ -267,7 +268,8 @@ export class P2PSyncService {
         syncEnabled: false,
         syncDeviceId: this.deviceId,
         lastSync: 0,
-        language: 'en'
+        language: 'en',
+        autoMarkAsReadOnScroll: true // Default to enabled
       };
     }
   }

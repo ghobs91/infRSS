@@ -6,28 +6,46 @@ interface UnreadContextType {
   markAsRead: (link: string) => void;
   toggleReadStatus: (link: string) => void;
   setTotalArticles: (count: number) => void;
+  autoMarkAsReadOnScroll: boolean;
+  toggleAutoMarkAsRead: () => void;
 }
 
 const UnreadContext = createContext<UnreadContextType | undefined>(undefined);
 
 export const useUnread = () => {
   const ctx = useContext(UnreadContext);
-  if (!ctx) throw new Error('useUnread must be used within UnreadProvider');
+  if (!ctx) {
+    throw new Error('useUnread must be used within UnreadProvider');
+  }
   return ctx;
 };
 
 const READ_KEY = 'infrss_read_links';
+const PREFERENCES_KEY = 'userPreferences';
 
 export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [readLinks, setReadLinks] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalArticles, setTotalArticles] = useState(0);
+  const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = useState(true);
 
-  // Load read links from localStorage
+  // Load read links and preferences from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(READ_KEY);
     if (stored) {
       setReadLinks(new Set(JSON.parse(stored)));
+    }
+
+    const prefs = localStorage.getItem(PREFERENCES_KEY);
+    if (prefs) {
+      try {
+        const parsed = JSON.parse(prefs);
+        if (parsed.autoMarkAsReadOnScroll !== undefined) {
+          setAutoMarkAsReadOnScroll(parsed.autoMarkAsReadOnScroll);
+        }
+      } catch (error) {
+        console.error('Error parsing preferences:', error);
+      }
     }
   }, []);
 
@@ -36,6 +54,26 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks)));
     setUnreadCount(Math.max(totalArticles - readLinks.size, 0));
   }, [readLinks, totalArticles]);
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    const prefs = localStorage.getItem(PREFERENCES_KEY);
+    let currentPrefs = {};
+    if (prefs) {
+      try {
+        currentPrefs = JSON.parse(prefs);
+      } catch (error) {
+        console.error('Error parsing existing preferences:', error);
+      }
+    }
+    
+    const updatedPrefs = {
+      ...currentPrefs,
+      autoMarkAsReadOnScroll
+    };
+    
+    localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updatedPrefs));
+  }, [autoMarkAsReadOnScroll]);
 
   const markAsRead = useCallback((link: string) => {
     setReadLinks(prev => {
@@ -58,8 +96,20 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
+  const toggleAutoMarkAsRead = useCallback(() => {
+    setAutoMarkAsReadOnScroll(prev => !prev);
+  }, []);
+
   return (
-    <UnreadContext.Provider value={{ unreadCount, readLinks, markAsRead, toggleReadStatus, setTotalArticles }}>
+    <UnreadContext.Provider value={{ 
+      unreadCount, 
+      readLinks, 
+      markAsRead, 
+      toggleReadStatus, 
+      setTotalArticles,
+      autoMarkAsReadOnScroll,
+      toggleAutoMarkAsRead
+    }}>
       {children}
     </UnreadContext.Provider>
   );

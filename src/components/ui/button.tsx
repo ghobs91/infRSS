@@ -1,5 +1,5 @@
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "destructive" | "ghost";
+  variant?: "default" | "destructive" | "ghost" | "outline";
   size?: "sm" | "md" | "lg";
 }
 
@@ -11,9 +11,10 @@ export const Button: React.FC<ButtonProps> = ({ className = "", variant = "defau
     lg: "px-6 py-3 text-lg",
   };
   const variants = {
-    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white",
-    destructive: "bg-red-600 hover:bg-red-700 text-white",
-    ghost: "bg-transparent hover:bg-[var(--muted)] text-[var(--foreground)]",
+    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm",
+    destructive: "bg-red-600 hover:bg-red-700 text-white shadow-sm",
+    ghost: "bg-transparent hover:bg-[var(--muted-hover)] text-[var(--text-primary)] border border-transparent hover:border-[var(--card-border)]",
+    outline: "bg-transparent border border-[var(--card-border)] text-[var(--text-primary)] hover:bg-[var(--muted)] hover:border-[var(--card-border)]",
   };
 
   return (

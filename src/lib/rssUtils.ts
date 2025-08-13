@@ -389,9 +389,35 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
     }
 
     const parsedItems: Article[] = items.map((item, index) => {
-      const title = item.querySelector("title")?.textContent?.trim() || 
-                   item.querySelector("title")?.textContent?.trim() || 
-                   `Untitled Article ${index + 1}`;
+      let title = item.querySelector("title")?.textContent?.trim() || 
+                 item.querySelector("title")?.textContent?.trim() || 
+                 `Untitled Article ${index + 1}`;
+      
+      // Clean the title by removing HTML tags and CDATA sections
+      if (title) {
+        // Remove CDATA sections
+        title = title.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '');
+        // Remove HTML tags
+        title = title.replace(/<[^>]*>/g, '');
+        // Decode HTML entities
+        title = title.replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'")
+                    .replace(/&nbsp;/g, ' ');
+        // Clean up extra whitespace and normalize
+        title = title.replace(/\s+/g, ' ')
+                    .replace(/\n+/g, ' ')
+                    .replace(/\r+/g, ' ')
+                    .replace(/\t+/g, ' ')
+                    .trim();
+        
+        // Limit title length to prevent extremely long titles
+        if (title.length > 200) {
+          title = title.substring(0, 200) + '...';
+        }
+      }
       
       const link = item.querySelector("link")?.textContent?.trim() || 
                   item.querySelector("link")?.getAttribute("href") ||
@@ -403,12 +429,68 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
                      item.querySelector("updated")?.textContent?.trim() || 
                      new Date().toISOString();
       
-      const content = item.querySelector("description")?.textContent?.trim() || 
-                     item.querySelector("content")?.textContent?.trim() || 
-                     item.querySelector("summary")?.textContent?.trim() || 
-                     "";
+      let content = item.querySelector("description")?.textContent?.trim() || 
+                   item.querySelector("content")?.textContent?.trim() || 
+                   item.querySelector("summary")?.textContent?.trim() || 
+                   "";
       
-             const thumbnail = extractThumbnailFromItem(item);
+            // Clean the content by removing HTML tags and CDATA sections
+      if (content) {
+        // Remove CDATA sections
+        content = content.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '');
+        // Remove HTML tags
+        content = content.replace(/<[^>]*>/g, '');
+        // Decode HTML entities
+        content = content.replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&nbsp;/g, ' ');
+        // Clean up extra whitespace and normalize
+        content = content.replace(/\s+/g, ' ')
+                        .replace(/\n+/g, ' ')
+                        .replace(/\r+/g, ' ')
+                        .replace(/\t+/g, ' ')
+                        .trim();
+        
+        // Limit content length to prevent extremely long articles
+        if (content.length > 1000) {
+          content = content.substring(0, 1000) + '...';
+        }
+      }
+      
+      // Extract and clean summary if available
+      let summary = item.querySelector("description")?.textContent?.trim() || 
+                   item.querySelector("summary")?.textContent?.trim() || 
+                   "";
+      
+      if (summary && summary !== content) {
+        // Clean the summary the same way as content
+        summary = summary.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '');
+        summary = summary.replace(/<[^>]*>/g, '');
+        summary = summary.replace(/&amp;/g, '&')
+                        .replace(/&lt;/g, '<')
+                        .replace(/&gt;/g, '>')
+                        .replace(/&quot;/g, '"')
+                        .replace(/&#39;/g, "'")
+                        .replace(/&nbsp;/g, ' ');
+        summary = summary.replace(/\s+/g, ' ')
+                        .replace(/\n+/g, ' ')
+                        .replace(/\r+/g, ' ')
+                        .replace(/\t+/g, ' ')
+                        .trim();
+        
+        // Limit summary length for better display
+        if (summary.length > 300) {
+          summary = summary.substring(0, 300) + '...';
+        }
+      } else if (content) {
+        // If no summary available, use a truncated version of content
+        summary = content.length > 300 ? content.substring(0, 300) + '...' : content;
+      }
+      
+      const thumbnail = extractThumbnailFromItem(item);
       
       let sourceDomain = "Unknown Source";
       if (link) {
@@ -431,6 +513,7 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
         pubDate,
         thumbnail,
         content,
+        summary,
         sourceDomain,
         readStatus: 'unread' as const,
         tags: []
@@ -564,7 +647,9 @@ export function loadUserPreferences() {
       categories: loadCategoriesFromStorage(),
       syncEnabled: false,
       syncDeviceId: generateDeviceId(),
-      lastSync: 0
+      lastSync: 0,
+      language: 'en',
+      autoMarkAsReadOnScroll: true // Default to enabled
     };
   } catch (error) {
     console.error("Error loading user preferences:", error);
@@ -858,5 +943,89 @@ export async function discoverFeedUrlWithFallbacks(siteUrl: string): Promise<str
     }
   }
 
+  return null;
+}
+
+/**
+ * Provides alternative RSS sources when RSSHub feeds fail
+ * This helps users find working alternatives to problematic feeds
+ */
+export function getAlternativeRSSSources(failedUrl: string): { title: string; url: string; description: string }[] {
+  const url = new URL(failedUrl);
+  
+  // RSSHub alternatives for common services
+  if (url.hostname === 'rsshub.app') {
+    const path = url.pathname;
+    
+    // Twitter alternatives
+    if (path.includes('/twitter/')) {
+      return [
+        {
+          title: "Nitter RSS (Twitter Alternative)",
+          url: `https://nitter.net/${path.split('/').pop()}/rss`,
+          description: "Nitter provides RSS feeds for Twitter accounts"
+        },
+        {
+          title: "RSS.app Twitter",
+          url: `https://rss.app/rss/feed/${path.split('/').pop()}`,
+          description: "RSS.app can create RSS feeds from Twitter accounts"
+        }
+      ];
+    }
+    
+    // GitHub alternatives
+    if (path.includes('/github/')) {
+      return [
+        {
+          title: "GitHub RSS (Official)",
+          url: `https://github.com/${path.split('/').pop()}.atom`,
+          description: "Official GitHub RSS feeds for repositories and users"
+        }
+      ];
+    }
+    
+    // General alternatives
+    return [
+      {
+        title: "RSS.app",
+        url: "https://rss.app/",
+        description: "Create RSS feeds from any website"
+      },
+      {
+        title: "Feed43",
+        url: "https://feed43.com/",
+        description: "Convert any web page to RSS feed"
+      },
+      {
+        title: "RSSHub (Self-hosted)",
+        url: "https://github.com/DIYgod/RSSHub",
+        description: "Self-host RSSHub instance for better reliability"
+      }
+    ];
+  }
+  
+  return [];
+}
+
+/**
+ * Enhanced RSS fetching with better error handling and alternatives
+ */
+export async function fetchAndParseRSSWithFallbacks(url: string): Promise<{ data: any; alternatives?: any[] } | null> {
+  try {
+    const data = await fetchAndParseRSS(url);
+    if (data) {
+      return { data };
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch RSS from ${url}:`, error);
+  }
+  
+  // If the original URL failed, try to find alternatives
+  const alternatives = getAlternativeRSSSources(url);
+  if (alternatives.length > 0) {
+    console.log(`Found ${alternatives.length} alternative RSS sources for ${url}`);
+    return { data: null, alternatives };
+  }
+  
   return null;
 }
