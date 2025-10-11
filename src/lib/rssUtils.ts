@@ -19,99 +19,76 @@ import type { FeedData, Article, Category } from './types';
  * These patterns are commonly seen in feeds from major publishers like Apple,
  * Samsung, Microsoft, and others that have incomplete XML generation.
  */
-// Helper function to clean XML content before parsing
 function cleanXMLContent(xmlString: string): string {
   // First, normalize line endings
   xmlString = xmlString.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // Handle the specific malformed CDATA patterns we're seeing in error logs
-  // Pattern: "><![CDATA[>>" - this is completely malformed
-  xmlString = xmlString.replace(/><!\[CDATA\[>>/g, '>');
+  // STEP 1: Handle the specific malformed CDATA patterns we're seeing in error logs
+  // These patterns appear when feed generators don't properly escape content
+  // We need to remove these BEFORE doing any other CDATA processing
   
-  // Pattern: "><![CDATA[>" - another malformed pattern
-  xmlString = xmlString.replace(/><!\[CDATA\[>/g, '>');
+  // Pattern: "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA (most specific first)
+  xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
   
-  // Pattern: "><![CDATA[><![CDATA[>>" - nested malformed CDATA
+  // Pattern: "><![CDATA[><![CDATA[>>" - double nested malformed CDATA
   xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
   
-  // Pattern: "><![CDATA[><![CDATA[><![CDATA[>>" - triple nested malformed CDATA
-  xmlString = xmlString.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
-
-  // Handle CDATA sections that might contain problematic sequences
-  // Use [\s\S]*? to match any character including newlines non-greedily
-  xmlString = xmlString.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
-    // Escape any ]] sequences within CDATA content by splitting the CDATA section
-    const escapedContent = content.replace(/\]\]>/g, ']]]]><![CDATA[>');
-    return `<![CDATA[${escapedContent}]]>`;
-  });
-
-  // Fix malformed CDATA sections that might cause parsing errors
-  xmlString = xmlString.replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content) => {
-    // If the CDATA section is not properly closed, close it
-    if (!content.includes(']]>')) {
-      return `<!\[CDATA\[${content}]]>`;
-    }
-    return match;
-  });
-
-  // Handle cases where ]] sequences appear outside of CDATA sections
-  // This is a common issue in RSS feeds where content contains these sequences
-  // We'll use a more aggressive approach to catch all problematic sequences
+  // Pattern: "><![CDATA[>>" - single malformed CDATA with extra >
+  xmlString = xmlString.replace(/><!\[CDATA\[>>/g, '>');
   
-  // First, let's handle the most common case: ]] sequences in content
-  // Replace any ]] that's not part of a CDATA section with a safe alternative
-  xmlString = xmlString.replace(/\]\]/g, (match, offset) => {
-    // Check if this ]] is part of a CDATA section
-    const before = xmlString.substring(0, offset);
-    const lastCDataStart = before.lastIndexOf('<![CDATA[');
-    const lastCDataEnd = before.lastIndexOf(']]>');
-    
-    // If we're inside a CDATA section, don't replace
-    if (lastCDataStart > lastCDataEnd) {
-      return match;
-    }
-    
-    // Otherwise, escape it
-    return ']]]]><![CDATA[>';
-  });
-  
-  // Now let's also handle any remaining problematic sequences
-  // Some feeds might have HTML content with these sequences
-  xmlString = xmlString.replace(/\]\]>/g, (match, offset) => {
-    const before = xmlString.substring(0, offset);
-    const lastCDataStart = before.lastIndexOf('<![CDATA[');
-    const lastCDataEnd = before.lastIndexOf(']]>');
-    
-    // If we're inside a CDATA section, don't replace
-    if (lastCDataStart > lastCDataEnd) {
-      return match;
-    }
-    
-    // Otherwise, escape it
-    return ']]]]><![CDATA[>';
-  });
-  
-  // Additional safety: wrap any content that might contain problematic sequences
-  // This is a more aggressive approach for very problematic feeds
-  xmlString = xmlString.replace(/(<description>|<content>|<summary>)(.*?)(<\/description>|<\/content>|<\/summary>)/g, (match, openTag, content, closeTag) => {
-    // If content contains problematic sequences, wrap it in CDATA
-    if (content.includes(']]') || content.includes(']]>')) {
-      return `${openTag}<![CDATA[${content}]]>${closeTag}`;
-    }
-    return match;
-  });
+  // Pattern: "><![CDATA[>" - incomplete CDATA start
+  xmlString = xmlString.replace(/><!\[CDATA\[>/g, '>');
 
-  // Remove any invalid XML characters (Control characters except Tab, LF, CR)
+  // STEP 2: Remove any invalid XML characters (Control characters except Tab, LF, CR)
   // XML 1.0: #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
   // We remove characters in the ranges #x0-#x8, #xB-#xC, #xE-#x1F, #x7F-#x84, #x86-#x9F
   xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, '');
 
-  // Final cleanup: handle any remaining problematic sequences that might cause parsing errors
-  // This is a more aggressive approach for very problematic feeds
-  xmlString = xmlString.replace(/\]\]/g, ']]]]><![CDATA[>');
+  // STEP 3: Fix unclosed CDATA sections
+  // Find CDATA sections that don't have proper closing tags
+  let cdataStartCount = (xmlString.match(/<!\[CDATA\[/g) || []).length;
+  let cdataEndCount = (xmlString.match(/\]\]>/g) || []).length;
   
-  // Also handle any remaining ]] sequences that might be in HTML content
-  xmlString = xmlString.replace(/\]\]>/g, ']]]]><![CDATA[>');
+  // If we have more CDATA starts than ends, we need to close them
+  if (cdataStartCount > cdataEndCount) {
+    // Find unclosed CDATA sections and close them before the next tag
+    xmlString = xmlString.replace(/<!\[CDATA\[([^<]*?)(?=<(?!!\[CDATA\[))/g, (match, content) => {
+      if (!content.includes(']]>')) {
+        return `<![CDATA[${content}]]>`;
+      }
+      return match;
+    });
+  }
+
+  // STEP 4: Handle CDATA sections that contain problematic ]] sequences
+  // This must be done carefully to avoid infinite loops
+  // We'll process each CDATA section individually
+  const cdataRegex = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
+  const cdataMatches: Array<{ match: string; content: string; start: number; end: number }> = [];
+  
+  let match;
+  while ((match = cdataRegex.exec(xmlString)) !== null) {
+    cdataMatches.push({
+      match: match[0],
+      content: match[1],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
+  
+  // Process CDATA sections in reverse to maintain correct indices
+  for (let i = cdataMatches.length - 1; i >= 0; i--) {
+    const { content, start, end } = cdataMatches[i];
+    
+    // Check if the content contains ]] but not ]]>
+    // This indicates a problematic sequence that needs escaping
+    if (content.includes(']]') && !content.endsWith(']]')) {
+      // Escape by splitting the CDATA section
+      const escapedContent = content.replace(/\]\](?!>)/g, ']]]]><![CDATA[');
+      const replacement = `<![CDATA[${escapedContent}]]>`;
+      xmlString = xmlString.substring(0, start) + replacement + xmlString.substring(end);
+    }
+  }
 
   return xmlString;
 }
@@ -254,48 +231,9 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
     // Clean the XML content before parsing
     const cleanedXML = cleanXMLContent(text);
 
-    // Declare xmlDoc at function level
-    let xmlDoc: Document;
-
-    // Pre-check for the specific malformed CDATA patterns we're seeing in error logs
-    if (cleanedXML.includes('><![CDATA[>>') || 
-        cleanedXML.includes('><![CDATA[>') || 
-        cleanedXML.includes('><![CDATA[><![CDATA[>>') ||
-        cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) {
-      console.debug(`Detected malformed CDATA patterns in ${url}, applying pre-parse cleanup...`);
-      
-      // Log the specific patterns found for debugging
-      const patterns: string[] = [];
-      if (cleanedXML.includes('><![CDATA[>>')) patterns.push('><![CDATA[>>');
-      if (cleanedXML.includes('><![CDATA[>')) patterns.push('><![CDATA[>');
-      if (cleanedXML.includes('><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[>>');
-      if (cleanedXML.includes('><![CDATA[><![CDATA[><![CDATA[>>')) patterns.push('><![CDATA[><![CDATA[><![CDATA[>>');
-      
-      console.debug(`Found malformed patterns in ${url}:`, patterns);
-      
-      // Apply the same cleanup patterns we use in aggressive cleaning
-      let preCleaned = cleanedXML;
-      preCleaned = preCleaned.replace(/><!\[CDATA\[>>/g, '>');
-      preCleaned = preCleaned.replace(/><!\[CDATA\[>/g, '>');
-      preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
-      preCleaned = preCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
-      
-      // Try parsing the pre-cleaned version first
-      const parser = new DOMParser();
-      xmlDoc = parser.parseFromString(preCleaned, "text/xml");
-      
-      // If pre-cleaning worked, use it; otherwise fall back to original cleaned version
-      const preParseError = xmlDoc.querySelector("parsererror");
-      if (!preParseError) {
-        console.log(`Pre-parse cleanup successful for ${url}`);
-      } else {
-        console.debug(`Pre-parse cleanup failed for ${url}, falling back to standard cleaning...`);
-        xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
-      }
-    } else {
-      const parser = new DOMParser();
-      xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
-    }
+    // Parse the cleaned XML
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
 
     // Check for parsing errors
     const parseError = xmlDoc.querySelector("parsererror");
@@ -303,71 +241,85 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       console.error(`XML parsing error for ${url}:`, parseError.textContent);
       
       // Try aggressive cleaning as a fallback
-      if (parseError.textContent?.includes("Sequence ']]>' not allowed")) {
+      if (parseError.textContent?.includes("CData section not finished") || 
+          parseError.textContent?.includes("Sequence ']]>' not allowed") ||
+          parseError.textContent?.includes("CDATA")) {
         console.debug(`Attempting aggressive XML cleaning for ${url}...`);
         
-        // Try multiple cleaning strategies for malformed XML
-        let aggressiveCleaned = cleanedXML;
+        // Strategy 1: Strip all CDATA sections entirely
+        // This is the most aggressive but also most reliable approach
+        let aggressiveCleaned = text
+          .replace(/<!\[CDATA\[/g, '')
+          .replace(/\]\]>/g, '')
+          .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
         
-        // Strategy 1: Handle the specific malformed CDATA patterns we're seeing
-        // Pattern: "><![CDATA[>>" - completely malformed
-        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>>/g, '>');
-        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[>/g, '>');
-        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[>>/g, '>');
-        aggressiveCleaned = aggressiveCleaned.replace(/><!\[CDATA\[><!\[CDATA\[><!\[CDATA\[>>/g, '>');
-        
-        // Strategy 2: Escape all ]] sequences that aren't in CDATA
-        aggressiveCleaned = aggressiveCleaned.replace(/\]\]/g, ']]]]><![CDATA[>');
-        
-        // Strategy 3: If that doesn't work, try removing problematic sequences
-        if (aggressiveCleaned.includes(']]]]><![CDATA[>')) {
-          aggressiveCleaned = aggressiveCleaned.replace(/\]\]\]\]><!\[CDATA\[>/g, ']]');
-        }
-        
-        // Strategy 4: Remove any remaining problematic CDATA sections
-        aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]]*\]\]>/g, '');
-        
-        // Strategy 5: Clean up any remaining malformed patterns
-        aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[[^\]>]*$/g, ''); // Remove incomplete CDATA at end
-        aggressiveCleaned = aggressiveCleaned.replace(/^[^<]*\]\]>/g, ''); // Remove incomplete CDATA at start
-        
-        // Try parsing again
+        // Try parsing the stripped version
         const parser = new DOMParser();
         xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
         
-        // Check if the aggressive cleaning worked
         const secondParseError = xmlDoc.querySelector("parsererror");
         if (secondParseError) {
-          console.warn(`Aggressive cleaning failed for ${url}, trying final fallback...`);
+          console.warn(`CDATA stripping failed for ${url}, trying content extraction...`);
           
-          // Final fallback: strip all CDATA and try to parse as basic XML
-          const strippedXML = cleanedXML
-            .replace(/<!\[CDATA\[/g, '')
-            .replace(/\]\]>/g, '')
-            .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
-          
-          xmlDoc = parser.parseFromString(strippedXML, "text/xml");
-          
-          const finalParseError = xmlDoc.querySelector("parsererror");
-          if (finalParseError) {
-            console.warn(`All XML cleaning strategies failed for ${url}, continuing with original...`);
-            xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
-          } else {
-            console.log(`Final fallback cleaning successful for ${url}`);
+          // Strategy 2: Try to extract just the content between tags
+          // This is useful when the entire feed structure is broken
+          try {
+            // Look for item or entry tags and extract them individually
+            const itemMatches = text.match(/<item[\s\S]*?<\/item>/gi) || [];
+            const entryMatches = text.match(/<entry[\s\S]*?<\/entry>/gi) || [];
+            const allItems = [...itemMatches, ...entryMatches];
+            
+            if (allItems.length > 0) {
+              console.log(`Found ${allItems.length} items/entries, attempting manual extraction...`);
+              
+              // Create a minimal valid XML wrapper
+              const channelTitle = text.match(/<channel[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] || 
+                                 text.match(/<feed[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] ||
+                                 new URL(url).hostname.replace("www.", "");
+              
+              const cleanedItems = allItems.map(item => 
+                item
+                  .replace(/<!\[CDATA\[/g, '')
+                  .replace(/\]\]>/g, '')
+                  .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;')
+              ).join('\n');
+              
+              const reconstructedXML = `<?xml version="1.0" encoding="UTF-8"?>
+                <rss version="2.0">
+                  <channel>
+                    <title>${channelTitle}</title>
+                    ${cleanedItems}
+                  </channel>
+                </rss>`;
+              
+              xmlDoc = parser.parseFromString(reconstructedXML, "text/xml");
+              
+              const thirdParseError = xmlDoc.querySelector("parsererror");
+              if (!thirdParseError) {
+                console.log(`Manual item extraction successful for ${url}`);
+              } else {
+                console.warn(`All XML cleaning strategies failed for ${url}, returning null`);
+                return null;
+              }
+            } else {
+              console.warn(`No items found in ${url}, returning null`);
+              return null;
+            }
+          } catch (extractError) {
+            console.error(`Content extraction failed for ${url}:`, extractError);
+            return null;
           }
         } else {
-          console.log(`Aggressive cleaning successful for ${url}`);
+          console.log(`CDATA stripping successful for ${url}`);
         }
+      } else {
+        // For other parsing errors, try to extract items anyway
+        const hasItems = xmlDoc.querySelector("item, entry");
+        if (!hasItems) {
+          return null;
+        }
+        console.warn(`Continuing with potentially malformed XML for ${url}`);
       }
-      
-      // Try to extract any useful information despite the error
-      // Sometimes the parser can still extract some content even with errors
-      const hasItems = xmlDoc.querySelector("item, entry");
-      if (!hasItems) {
-        return null; // Only fail completely if we can't get any items
-      }
-      
-      console.warn(`Continuing with potentially malformed XML for ${url}`);
     }
 
     // Try to find the channel title

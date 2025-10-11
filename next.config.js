@@ -6,7 +6,6 @@ const withPWA = require("next-pwa")({
   });
   
   module.exports = withPWA({
-    // your existing config
     images: {
       domains: ['www.google.com'],
       remotePatterns: [
@@ -17,9 +16,13 @@ const withPWA = require("next-pwa")({
         },
       ],
     },
-    // Ensure API routes are properly handled
+    // Configure Turbopack
     experimental: {
-      appDir: true,
+      turbo: {
+        rules: {
+          // Add any custom Turbopack rules here if needed
+        }
+      }
     },
     // Add proper rewrites if needed
     async rewrites() {

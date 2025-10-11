@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, fetchWithRetry } from '@/lib/rateLimit';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -28,10 +29,21 @@ export async function GET(req: NextRequest) {
   const isRSSHub = validatedUrl.hostname === 'rsshub.app';
   
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // Increased to 20 seconds
+    // Check rate limit for the target hostname
+    const rateLimitResult = checkRateLimit(validatedUrl.hostname);
+    if (rateLimitResult.isLimited) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded for this RSS source',
+        status: 429,
+        suggestion: 'Please wait before making more requests to this feed',
+        retryAfter: rateLimitResult.retryAfter
+      }, { status: 429 });
+    }
 
-    const response = await fetch(validatedUrl.toString(), {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+
+    const response = await fetchWithRetry(validatedUrl.toString(), {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; RSSReader/1.0)',
@@ -57,11 +69,21 @@ export async function GET(req: NextRequest) {
         }
         
         if (response.status === 429) {
+          // Provide specific alternatives for Twitter feeds
+          const isTwitterFeed = validatedUrl.pathname.includes('/twitter/');
+          const suggestion = isTwitterFeed 
+            ? 'RSSHub Twitter feeds are currently rate limited. Consider using Nitter (nitter.net/{username}/rss) or RSS.app as alternatives. Twitter feeds through RSSHub may be unreliable due to X/Twitter API restrictions.'
+            : 'Wait a few minutes before retrying, or consider using a different RSS source.';
+            
           return NextResponse.json({ 
             error: 'RSSHub rate limit exceeded. Please try again later.',
             status: response.status,
-            suggestion: 'Wait a few minutes before retrying, or consider using a different RSS source.',
-            retryAfter: '5 minutes'
+            suggestion,
+            retryAfter: isTwitterFeed ? 'Consider using alternatives' : '5 minutes',
+            alternatives: isTwitterFeed ? [
+              { name: 'Nitter', example: 'https://nitter.net/{username}/rss' },
+              { name: 'RSS.app', example: 'https://rss.app (requires setup)' }
+            ] : undefined
           }, { status: 429 });
         }
       }

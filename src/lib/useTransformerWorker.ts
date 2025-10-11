@@ -66,22 +66,57 @@ export function useTransformerWorker() {
   const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
-    // Initialize worker
-    if (typeof window !== 'undefined') {
-      workerRef.current = new Worker('/workers/transformer-worker.js');
-      
-      workerRef.current.onerror = (error) => {
-        console.error('Worker error:', error);
-        setError('Worker error occurred');
-        setIsLoading(false);
-      };
+    async function initWorker() {
+      if (typeof window !== 'undefined') {
+        try {
+          // Disable worker initialization in development mode with Turbopack
+          // Workers will be initialized on-demand when needed
+          console.log('Worker initialization deferred - will initialize on first use');
+        } catch (error) {
+          console.error('Failed to initialize worker:', error);
+          setError('Failed to initialize worker');
+        }
+      }
     }
+    
+    initWorker();
 
     return () => {
       if (workerRef.current) {
         workerRef.current.terminate();
       }
     };
+  }, []);
+
+  // Lazy worker initialization helper
+  const ensureWorker = useCallback(() => {
+    if (!workerRef.current && typeof window !== 'undefined') {
+      try {
+        // Disable worker in development mode due to Turbopack compatibility issues
+        // Worker functionality will use fallback methods instead
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Worker disabled in development mode - using fallback methods');
+          return null;
+        }
+        
+        // Use URL constructor to make it statically analyzable for Turbopack
+        const workerPath = new URL('/workers/transformer-worker.js', window.location.origin);
+        workerRef.current = new Worker(workerPath, { 
+          type: 'module',
+          name: 'transformer-worker'
+        });
+        
+        workerRef.current.onerror = (error) => {
+          console.error('Worker error:', error);
+          setError('Worker error occurred');
+          setIsLoading(false);
+        };
+      } catch (error) {
+        console.error('Failed to initialize worker:', error);
+        return null;
+      }
+    }
+    return workerRef.current;
   }, []);
 
   const suggestFeedsWithWorker = useCallback(async (topic: string, feeds: FeedData[]): Promise<FeedDataWithScore[]> => {
@@ -94,15 +129,16 @@ export function useTransformerWorker() {
       }
     }
     
-    if (!workerRef.current) {
-      return FALLBACK_FEEDS.map(feed => ({ ...feed, score: 0.5 }));
-    }
-
-    setIsLoading(true);
-    setError(null);
-
     try {
-      return new Promise((resolve, reject) => {
+      const worker = ensureWorker();
+      if (!worker) {
+        return FALLBACK_FEEDS.map(feed => ({ ...feed, score: 0.5 }));
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      return await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           reject(new Error('Worker timeout'));
         }, 15000);
@@ -130,10 +166,11 @@ export function useTransformerWorker() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [ensureWorker]);
 
   const analyzeArticle = useCallback(async (title: string, content: string): Promise<ArticleAnalysis> => {
-    if (!workerRef.current) {
+    const worker = ensureWorker();
+    if (!worker) {
       throw new Error('Worker not initialized');
     }
 
@@ -169,10 +206,11 @@ export function useTransformerWorker() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [ensureWorker]);
 
   const batchAnalyzeArticles = useCallback(async (articles: Article[]): Promise<BatchAnalysisResult[]> => {
-    if (!workerRef.current) {
+    const worker = ensureWorker();
+    if (!worker) {
       throw new Error('Worker not initialized');
     }
 
@@ -208,7 +246,7 @@ export function useTransformerWorker() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [ensureWorker]);
 
   return {
     suggestFeedsWithWorker,

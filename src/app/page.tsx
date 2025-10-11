@@ -218,8 +218,8 @@ export default function HomePage() {
                   article={convertArticleForCard(article)}
                   isRead={readLinks.has(article.link)}
                   onVisibleChange={(isVisible) => {
-                    // Auto-mark as read when scrolling past if the preference is enabled
-                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && !isVisible) {
+                    // Auto-mark as read when article becomes visible (scrolling into view)
+                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && isVisible) {
                       toggleReadStatus(article.link);
                     }
                   }}
