@@ -158,12 +158,12 @@ export default function HomePage() {
     loadSavedFeeds();
   }, [handleRefresh]);
 
-  // After first render, allow read articles to be shown (but grayed out)
-  useEffect(() => {
-    if (!isLoading) {
-      setTimeout(() => setHideRead(false), 0);
-    }
-  }, [isLoading]);
+  // Don't automatically show read articles - let user control this
+  // useEffect(() => {
+  //   if (!isLoading) {
+  //     setTimeout(() => setHideRead(false), 0);
+  //   }
+  // }, [isLoading]);
 
   useEffect(() => {
     setTotalArticles(articles.length);
@@ -217,9 +217,9 @@ export default function HomePage() {
                   key={`${article.link}-${idx}`}
                   article={convertArticleForCard(article)}
                   isRead={readLinks.has(article.link)}
-                  onVisibleChange={(isVisible) => {
-                    // Auto-mark as read when article becomes visible (scrolling into view)
-                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && isVisible) {
+                  onScrollPast={() => {
+                    // Auto-mark as read when article is scrolled past
+                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link)) {
                       toggleReadStatus(article.link);
                     }
                   }}

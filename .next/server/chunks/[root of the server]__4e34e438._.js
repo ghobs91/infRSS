@@ -58,11 +58,11 @@ module.exports = mod;
 
 var { g: global, __dirname } = __turbopack_context__;
 {
+// Simple in-memory rate limiting
 __turbopack_context__.s({
     "checkRateLimit": (()=>checkRateLimit),
     "fetchWithRetry": (()=>fetchWithRetry)
 });
-// Simple in-memory rate limiting
 const WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 30;
 const RSSHUB_MAX_REQUESTS_PER_WINDOW = 10; // More conservative for RSSHub

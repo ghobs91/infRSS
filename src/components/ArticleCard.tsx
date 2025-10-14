@@ -10,7 +10,7 @@ import type { Article, SentimentAnalysis } from "@/lib/types";
 interface ArticleCardProps {
   article: Article;
   isRead: boolean;
-  onVisibleChange?: (isVisible: boolean) => void;
+  onScrollPast?: () => void;
   onToggleRead?: (articleId: string) => void;
   onArchive?: (articleId: string) => void;
   showSentiment?: boolean;
@@ -99,7 +99,7 @@ const ArticleSummary = ({ summary, isExpanded, onToggle }: {
 export const ArticleCard = ({ 
   article, 
   isRead, 
-  onVisibleChange, 
+  onScrollPast, 
   onToggleRead,
   onArchive,
   showSentiment = true,
@@ -108,6 +108,7 @@ export const ArticleCard = ({
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [wasVisible, setWasVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,20 +116,30 @@ export const ArticleCard = ({
   }, []);
 
   useEffect(() => {
-    if (!ref.current || !onVisibleChange) return;
+    if (!ref.current || !onScrollPast) return;
     
     const observer = new window.IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          onVisibleChange(entry.isIntersecting);
+          // Mark as read when scrolling PAST (was visible, now not visible)
+          if (wasVisible && !entry.isIntersecting) {
+            onScrollPast();
+          }
+          // Track if the article is currently visible
+          if (entry.isIntersecting) {
+            setWasVisible(true);
+          }
         });
       },
-      { threshold: 0.1 } // Lower threshold for better detection
+      { 
+        threshold: 0,
+        rootMargin: '-50px 0px -50px 0px' // Only trigger when article is well within viewport
+      }
     );
     
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [onVisibleChange]);
+  }, [onScrollPast, wasVisible]);
 
   const handleToggleRead = () => {
     if (onToggleRead) {

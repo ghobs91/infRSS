@@ -46,8 +46,8 @@ function cleanXMLContent(xmlString: string): string {
 
   // STEP 3: Fix unclosed CDATA sections
   // Find CDATA sections that don't have proper closing tags
-  let cdataStartCount = (xmlString.match(/<!\[CDATA\[/g) || []).length;
-  let cdataEndCount = (xmlString.match(/\]\]>/g) || []).length;
+  const cdataStartCount = (xmlString.match(/<!\[CDATA\[/g) || []).length;
+  const cdataEndCount = (xmlString.match(/\]\]>/g) || []).length;
   
   // If we have more CDATA starts than ends, we need to close them
   if (cdataStartCount > cdataEndCount) {
@@ -60,19 +60,64 @@ function cleanXMLContent(xmlString: string): string {
     });
   }
 
-  // STEP 4: Handle CDATA sections that contain problematic ]] sequences
+  // STEP 4: Handle problematic ]]> sequences throughout the entire document
+  // This is the most critical step - ]]> appearing outside CDATA sections breaks XML parsing
+  
+  // First, protect legitimate CDATA section endings by temporarily replacing them
+  const cdataEndMarker = '___CDATA_END_MARKER___';
+  xmlString = xmlString.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
+    // Replace the ending ]]> with our marker temporarily
+    return `<![CDATA[${content}${cdataEndMarker}`;
+  });
+  
+  // Now escape ALL remaining ]]> sequences (these are the problematic ones in content)
+  // Replace ]]> with ]] > (adding a space to break the sequence)
+  xmlString = xmlString.replace(/\]\]>/g, ']] >');
+  
+  // Restore the legitimate CDATA endings
+  xmlString = xmlString.replace(new RegExp(cdataEndMarker, 'g'), ']]>');
+  
+  // STEP 5: Remove HTML5 boolean attributes and problematic attributes without values
+  // This must be done BEFORE parsing to prevent "Specification mandates value for attribute" errors
+  // We do this outside CDATA sections to preserve content integrity
+  
+  // First, temporarily protect CDATA sections
+  const cdataProtectionMarker = '___PROTECTED_CDATA_';
+  const protectedCDataSections: string[] = [];
+  xmlString = xmlString.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
+    protectedCDataSections.push(content);
+    return `${cdataProtectionMarker}${protectedCDataSections.length - 1}___`;
+  });
+  
+  // Now clean HTML attributes outside CDATA sections
+  xmlString = xmlString
+    // Fix self-closing tags that aren't properly closed (img, br, hr, input, SVG elements, etc.)
+    .replace(/<(img|br|hr|input|meta|link|area|base|col|embed|param|source|track|wbr|path|circle|rect|svg|use|line|polygon|polyline|ellipse|g|defs|clipPath|mask|pattern|stop|linearGradient|radialGradient)([^>]*?)(?<!\/)>/gi, '<$1$2 />')
+    // Remove comprehensive list of HTML5 boolean attributes and problematic attributes without values
+    // Use negative lookahead to ensure we only match attributes without =
+    .replace(/\s(allowfullscreen|allowpaymentrequest|async|autofocus|autoplay|checked|controls|default|defer|disabled|formnovalidate|hidden|ismap|itemscope|loop|multiple|muted|nomodule|novalidate|open|playsinline|readonly|required|reversed|selected|truespeed|typemustmatch|data-lazy|data-src|data-srcset|data-background|data-background-image|consumption-data|frameborder|scrolling|noresize|declare|compact|noshade|nowrap|inert)(?=\s|>|\/)/gi, ' ')
+    // Remove any remaining data- attributes without values
+    .replace(/\sdata-[\w-]+(?=\s|>|\/)/g, ' ')
+    // Remove aria- attributes without values
+    .replace(/\saria-[\w-]+(?=\s|>|\/)/g, ' ');
+  
+  // Restore protected CDATA sections
+  xmlString = xmlString.replace(/___PROTECTED_CDATA_(\d+)___/g, (match, index) => {
+    return `<![CDATA[${protectedCDataSections[parseInt(index)]}]]>`;
+  });
+
+  // STEP 6: Handle CDATA sections that contain problematic ]] sequences (without the >)
   // This must be done carefully to avoid infinite loops
-  // We'll process each CDATA section individually
   const cdataRegex = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
   const cdataMatches: Array<{ match: string; content: string; start: number; end: number }> = [];
   
-  let match;
-  while ((match = cdataRegex.exec(xmlString)) !== null) {
+  let match2;
+  while ((match2 = cdataRegex.exec(xmlString)) !== null) {
     cdataMatches.push({
-      match: match[0],
-      content: match[1],
-      start: match.index,
-      end: match.index + match[0].length
+      match: match2[0],
+      content: match2[1],
+      start: match2.index,
+      end: match2.index + match2[0].length
     });
   }
   
@@ -80,11 +125,11 @@ function cleanXMLContent(xmlString: string): string {
   for (let i = cdataMatches.length - 1; i >= 0; i--) {
     const { content, start, end } = cdataMatches[i];
     
-    // Check if the content contains ]] but not ]]>
+    // Check if the content contains ]] (without > after it)
     // This indicates a problematic sequence that needs escaping
-    if (content.includes(']]') && !content.endsWith(']]')) {
-      // Escape by splitting the CDATA section
-      const escapedContent = content.replace(/\]\](?!>)/g, ']]]]><![CDATA[');
+    if (content.includes(']]') && !content.includes(']]>')) {
+      // Escape by splitting the CDATA section at ]] boundaries
+      const escapedContent = content.replace(/\]\]/g, ']]]]><![CDATA[');
       const replacement = `<![CDATA[${escapedContent}]]>`;
       xmlString = xmlString.substring(0, start) + replacement + xmlString.substring(end);
     }
@@ -216,6 +261,23 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       );
     }
 
+    // Fix common mismatched tags before parsing
+    text = text
+      // Fix unclosed <br> tags
+      .replace(/<br\s*(?=[^/>]*>)/gi, '<br />')
+      // Fix unclosed <img> tags
+      .replace(/<img([^>]*?)(?<!\/)>/gi, '<img$1 />')
+      // Fix unclosed <hr> tags  
+      .replace(/<hr\s*(?=[^/>]*>)/gi, '<hr />')
+      // Fix common tag mismatches (opening tag doesn't match closing tag)
+      .replace(/<(em|strong|b|i|u|time|span|div|a|td|tr|th|table|p)\b([^>]*)>\s*<\/(em|strong|b|i|u|time|span|div|a|td|tr|th|table|p)>/gi, (match, opening, attrs, closing) => {
+        // If opening and closing tags don't match, use the closing tag
+        if (opening.toLowerCase() !== closing.toLowerCase()) {
+          return `<${closing}${attrs}></${closing}>`;
+        }
+        return match;
+      });
+
     // Fix unclosed CDATA sections
     text = text.replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content) => {
       // If the CDATA section is not properly closed, close it
@@ -225,15 +287,15 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       return match;
     });
 
-    // Escape unescaped ampersands in content
-    text = text.replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+    // Escape unescaped ampersands in content (but preserve HTML entities and numeric character references)
+    text = text.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
 
     // Clean the XML content before parsing
     const cleanedXML = cleanXMLContent(text);
 
     // Parse the cleaned XML
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
+    let xmlDoc = parser.parseFromString(cleanedXML, "text/xml");
 
     // Check for parsing errors
     const parseError = xmlDoc.querySelector("parsererror");
@@ -243,74 +305,146 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       // Try aggressive cleaning as a fallback
       if (parseError.textContent?.includes("CData section not finished") || 
           parseError.textContent?.includes("Sequence ']]>' not allowed") ||
+          parseError.textContent?.includes("Specification mandates value for attribute") ||
           parseError.textContent?.includes("CDATA")) {
         console.debug(`Attempting aggressive XML cleaning for ${url}...`);
         
-        // Strategy 1: Strip all CDATA sections entirely
-        // This is the most aggressive but also most reliable approach
-        let aggressiveCleaned = text
-          .replace(/<!\[CDATA\[/g, '')
-          .replace(/\]\]>/g, '')
-          .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;');
+        // Strategy 1: More aggressive ]]> handling - escape ALL ]]> sequences first
+        let aggressiveCleaned = text;
         
-        // Try parsing the stripped version
+        // Step 1: Temporarily mark legitimate CDATA endings
+        const cdataMarker = '___LEGIT_CDATA_END___';
+        aggressiveCleaned = aggressiveCleaned.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
+          return `<![CDATA[${content}${cdataMarker}`;
+        });
+        
+        // Step 2: Escape ALL remaining ]]> sequences (these are the problematic ones)
+        aggressiveCleaned = aggressiveCleaned.replace(/\]\]>/g, ']] &gt;');
+        
+        // Step 3: Restore legitimate CDATA endings
+        aggressiveCleaned = aggressiveCleaned.replace(new RegExp(cdataMarker, 'g'), ']]>');
+        
+        // Step 4: Clean up other issues - fix ALL HTML attributes without values
+        aggressiveCleaned = aggressiveCleaned
+          // Fix self-closing tags that aren't properly closed (img, br, hr, input, etc.)
+          .replace(/<(img|br|hr|input|meta|link|area|base|col|embed|param|source|track|wbr|path|circle|rect|svg|use)([^>]*?)(?<!\/)>/gi, '<$1$2 />')
+          // Fix VERY comprehensive list of HTML5 boolean attributes and common problematic attributes
+          .replace(/\s(allowfullscreen|allowpaymentrequest|async|autofocus|autoplay|checked|controls|default|defer|disabled|formnovalidate|hidden|ismap|itemscope|loop|multiple|muted|nomodule|novalidate|open|playsinline|readonly|required|reversed|selected|truespeed|typemustmatch|data-lazy|data-src|data-srcset|data-background|data-background-image|consumption-data|frameborder|scrolling|noresize|declare|compact|noshade|nowrap|inert)\s*(?=[>\s\/])/gi, ' ')
+          // Fix any remaining data- attributes without values (more comprehensive)
+          .replace(/\sdata-[\w-]+\s*(?=[>\s\/])/g, ' ')
+          // Fix aria- attributes without values
+          .replace(/\saria-[\w-]+\s*(?=[>\s\/])/g, ' ')
+          // Fix any other custom attributes without = sign (general catch-all)
+          .replace(/\s([a-z][\w-]*)\s+(?=[a-z][\w-]*=|>|\/)/gi, ' ')
+          // Escape unescaped ampersands
+          .replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+        
+        // Try parsing the cleaned version
         const parser = new DOMParser();
         xmlDoc = parser.parseFromString(aggressiveCleaned, "text/xml");
         
         const secondParseError = xmlDoc.querySelector("parsererror");
         if (secondParseError) {
-          console.warn(`CDATA stripping failed for ${url}, trying content extraction...`);
+          console.warn(`First aggressive cleaning failed for ${url}, trying CDATA stripping...`);
           
-          // Strategy 2: Try to extract just the content between tags
-          // This is useful when the entire feed structure is broken
-          try {
-            // Look for item or entry tags and extract them individually
-            const itemMatches = text.match(/<item[\s\S]*?<\/item>/gi) || [];
-            const entryMatches = text.match(/<entry[\s\S]*?<\/entry>/gi) || [];
-            const allItems = [...itemMatches, ...entryMatches];
+          // Strategy 2: Strip all CDATA sections entirely
+          console.warn(`Trying complete CDATA stripping for ${url}...`);
+          const cdataStripped = text
+            // Escape ALL ]] sequences in the entire document
+            .replace(/\]\]/g, '] ]')
+            // Remove CDATA start markers
+            .replace(/<!\[CDATA\[/g, '')
+            // Remove the > that was left from ]]> sequences
+            .replace(/] ]>/g, '] ] ')
+            // Fix self-closing tags that aren't properly closed
+            .replace(/<(img|br|hr|input|meta|link|area|base|col|embed|param|source|track|wbr|path|circle|rect|svg|use)([^>]*?)(?<!\/)>/gi, '<$1$2 />')
+            // Fix ALL common problematic HTML5 attributes without values
+            .replace(/\s(allowfullscreen|allowpaymentrequest|async|autofocus|autoplay|checked|controls|default|defer|disabled|formnovalidate|hidden|ismap|itemscope|loop|multiple|muted|nomodule|novalidate|open|playsinline|readonly|required|reversed|selected|truespeed|typemustmatch|data-lazy|data-src|data-srcset|data-background|data-background-image|consumption-data|frameborder|scrolling|noresize|declare|compact|noshade|nowrap|inert)\s*(?=[>\s\/])/gi, ' ')
+            .replace(/\sdata-[\w-]+\s*(?=[>\s\/])/g, ' ')
+            .replace(/\saria-[\w-]+\s*(?=[>\s\/])/g, ' ')
+            // Escape unescaped ampersands
+            .replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+          
+          xmlDoc = parser.parseFromString(cdataStripped, "text/xml");
+          const thirdParseError = xmlDoc.querySelector("parsererror");
+          
+          if (thirdParseError) {
+            console.warn(`CDATA stripping also failed for ${url}, trying content extraction...`);
+            console.warn(`CDATA stripping also failed for ${url}, trying content extraction...`);
             
-            if (allItems.length > 0) {
-              console.log(`Found ${allItems.length} items/entries, attempting manual extraction...`);
+            // Strategy 3: Try to extract just the content between tags
+            // This is useful when the entire feed structure is broken
+            try {
+              // Look for item or entry tags and extract them individually
+              const itemMatches = text.match(/<item[\s\S]*?<\/item>/gi) || [];
+              const entryMatches = text.match(/<entry[\s\S]*?<\/entry>/gi) || [];
+              const allItems = [...itemMatches, ...entryMatches];
               
-              // Create a minimal valid XML wrapper
-              const channelTitle = text.match(/<channel[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] || 
-                                 text.match(/<feed[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] ||
-                                 new URL(url).hostname.replace("www.", "");
-              
-              const cleanedItems = allItems.map(item => 
-                item
-                  .replace(/<!\[CDATA\[/g, '')
-                  .replace(/\]\]>/g, '')
-                  .replace(/&(?!(amp|lt|gt|quot|apos);)/g, '&amp;')
-              ).join('\n');
-              
-              const reconstructedXML = `<?xml version="1.0" encoding="UTF-8"?>
-                <rss version="2.0">
-                  <channel>
-                    <title>${channelTitle}</title>
-                    ${cleanedItems}
-                  </channel>
-                </rss>`;
-              
-              xmlDoc = parser.parseFromString(reconstructedXML, "text/xml");
-              
-              const thirdParseError = xmlDoc.querySelector("parsererror");
-              if (!thirdParseError) {
-                console.log(`Manual item extraction successful for ${url}`);
+              if (allItems.length > 0) {
+                console.log(`Found ${allItems.length} items/entries, attempting manual extraction...`);
+                
+                // Create a minimal valid XML wrapper
+                const channelTitle = text.match(/<channel[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] || 
+                                   text.match(/<feed[^>]*>[\s\S]*?<title>([^<]+)<\/title>/i)?.[1] ||
+                                   new URL(url).hostname.replace("www.", "");
+                
+                const cleanedItems = allItems.map(item => {
+                  let cleaned = item;
+                  
+                  // Temporarily mark legitimate CDATA endings
+                  const marker = '___CDATA_END___';
+                  cleaned = cleaned.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (match, content) => {
+                    return `<![CDATA[${content}${marker}`;
+                  });
+                  
+                  // Escape ALL remaining ]]> sequences
+                  cleaned = cleaned.replace(/\]\]>/g, ']] &gt;');
+                  
+                  // Restore legitimate CDATA endings
+                  cleaned = cleaned.replace(new RegExp(marker, 'g'), ']]>');
+                  
+                  // Additional cleaning - remove ALL HTML attributes without values
+                  cleaned = cleaned
+                    // Fix self-closing tags
+                    .replace(/<(img|br|hr|input|meta|link|area|base|col|embed|param|source|track|wbr|path|circle|rect|svg|use)([^>]*?)(?<!\/)>/gi, '<$1$2 />')
+                    .replace(/\s(allowfullscreen|allowpaymentrequest|async|autofocus|autoplay|checked|controls|default|defer|disabled|formnovalidate|hidden|ismap|itemscope|loop|multiple|muted|nomodule|novalidate|open|playsinline|readonly|required|reversed|selected|truespeed|typemustmatch|data-lazy|data-src|data-srcset|data-background|data-background-image|consumption-data|frameborder|scrolling|noresize|declare|compact|noshade|nowrap|inert)\s*(?=[>\s\/])/gi, ' ')
+                    .replace(/\sdata-[\w-]+\s*(?=[>\s\/])/g, ' ')
+                    .replace(/\saria-[\w-]+\s*(?=[>\s\/])/g, ' ')
+                    .replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+                  
+                  return cleaned;
+                }).join('\n');
+                
+                const reconstructedXML = `<?xml version="1.0" encoding="UTF-8"?>
+                  <rss version="2.0">
+                    <channel>
+                      <title>${channelTitle}</title>
+                      ${cleanedItems}
+                    </channel>
+                  </rss>`;
+                
+                xmlDoc = parser.parseFromString(reconstructedXML, "text/xml");
+                
+                const fourthParseError = xmlDoc.querySelector("parsererror");
+                if (!fourthParseError) {
+                  console.log(`Manual item extraction successful for ${url}`);
+                } else {
+                  console.warn(`All XML cleaning strategies failed for ${url}, returning null`);
+                  return null;
+                }
               } else {
-                console.warn(`All XML cleaning strategies failed for ${url}, returning null`);
+                console.warn(`No items found in ${url}, returning null`);
                 return null;
               }
-            } else {
-              console.warn(`No items found in ${url}, returning null`);
+            } catch (extractError) {
+              console.error(`Content extraction failed for ${url}:`, extractError);
               return null;
             }
-          } catch (extractError) {
-            console.error(`Content extraction failed for ${url}:`, extractError);
-            return null;
+          } else {
+            console.log(`CDATA stripping successful for ${url}`);
           }
         } else {
-          console.log(`CDATA stripping successful for ${url}`);
+          console.log(`First aggressive cleaning successful for ${url}`);
         }
       } else {
         // For other parsing errors, try to extract items anyway

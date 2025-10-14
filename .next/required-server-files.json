@@ -182,6 +182,7 @@
       "forceSwcTransforms": false,
       "largePageDataBytes": 128000,
       "turbo": {
+        "rules": {},
         "root": "/Users/andrewg/Projects/infrss"
       },
       "typedRoutes": false,
@@ -204,7 +205,6 @@
       "dynamicIO": false,
       "inlineCss": false,
       "useCache": false,
-      "appDir": true,
       "optimizePackageImports": [
         "lucide-react",
         "date-fns",

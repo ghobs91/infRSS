@@ -2,7 +2,7 @@
   "/favicon.ico/route": "/favicon.ico",
   "/_not-found/page": "/_not-found",
   "/api/proxy/route": "/api/proxy",
-  "/manage/page": "/manage",
   "/page": "/",
+  "/manage/page": "/manage",
   "/api/fetch-rss/route": "/api/fetch-rss"
 }

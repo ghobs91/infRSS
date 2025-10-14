@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-
 // Simple in-memory rate limiting
 const WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 30;
