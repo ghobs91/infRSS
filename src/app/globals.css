@@ -215,6 +215,17 @@ body {
   pointer-events: none;
 }
 
+/* Prevent layout shifts during content updates */
+body {
+  overflow-y: scroll; /* Always show scrollbar to prevent layout shifts */
+}
+
+/* Smooth transitions for article cards */
+.article-card-wrapper {
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  will-change: opacity, transform;
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   input[type="text"]:focus,

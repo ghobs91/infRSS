@@ -77,7 +77,7 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const markAsRead = useCallback((link: string) => {
     setReadLinks(prev => {
-      if (prev.has(link)) return prev;
+      if (prev.has(link)) return prev; // No change needed
       const next = new Set(prev);
       next.add(link);
       return next;
@@ -86,17 +86,14 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleReadStatus = useCallback((link: string) => {
     setReadLinks(prev => {
-      // Check if state would actually change to prevent unnecessary re-renders
-      if (prev.has(link)) {
-        const next = new Set(prev);
+      const next = new Set(prev);
+      if (next.has(link)) {
         next.delete(link);
         return next;
-      } else if (!prev.has(link)) {
-        const next = new Set(prev);
+      } else {
         next.add(link);
         return next;
       }
-      return prev; // No change needed
     });
   }, []);
 

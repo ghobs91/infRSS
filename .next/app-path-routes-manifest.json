@@ -1,8 +1,0 @@
-{
-  "/favicon.ico/route": "/favicon.ico",
-  "/_not-found/page": "/_not-found",
-  "/manage/page": "/manage",
-  "/page": "/",
-  "/api/proxy/route": "/api/proxy",
-  "/api/fetch-rss/route": "/api/fetch-rss"
-}

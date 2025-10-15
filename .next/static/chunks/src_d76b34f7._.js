@@ -385,8 +385,9 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
     const [mounted, setMounted] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [imgError, setImgError] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [summaryExpanded, setSummaryExpanded] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
-    const [wasVisible, setWasVisible] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const ref = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    const hasTriggeredRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
+    const wasVisibleRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(false);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ArticleCard.useEffect": ()=>{
             setMounted(true);
@@ -394,29 +395,25 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
     }["ArticleCard.useEffect"], []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "ArticleCard.useEffect": ()=>{
-            if (!ref.current || !onScrollPast) return;
-            let hasTriggered = false;
+            if (!ref.current || !onScrollPast || isRead) return;
             const observer = new window.IntersectionObserver({
                 "ArticleCard.useEffect": (entries)=>{
-                    entries.forEach({
-                        "ArticleCard.useEffect": (entry)=>{
-                            // Track if the article is currently visible (at least 70% visible)
-                            if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
-                                setWasVisible(true);
-                            } else if (wasVisible && !entry.isIntersecting && !hasTriggered) {
-                                hasTriggered = true;
-                                onScrollPast();
-                                setWasVisible(false);
-                            }
-                        }
-                    }["ArticleCard.useEffect"]);
+                    const entry = entries[0];
+                    if (!entry) return;
+                    // Article is now visible - mark it as "seen"
+                    if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+                        wasVisibleRef.current = true;
+                    } else if (!entry.isIntersecting && wasVisibleRef.current && !hasTriggeredRef.current) {
+                        hasTriggeredRef.current = true;
+                        onScrollPast();
+                    }
                 }
             }["ArticleCard.useEffect"], {
                 threshold: [
                     0,
-                    0.7
+                    0.6
                 ],
-                rootMargin: '-50px' // Require article to be well within viewport before marking as "seen"
+                rootMargin: '-80px 0px' // Top margin to ensure article is well in viewport
             });
             observer.observe(ref.current);
             return ({
@@ -425,8 +422,8 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
         }
     }["ArticleCard.useEffect"], [
         onScrollPast,
-        wasVisible
-    ]);
+        isRead
+    ]); // Only depend on onScrollPast and isRead, not on state variables
     const handleToggleRead = ()=>{
         if (onToggleRead) {
             onToggleRead(article.id);
@@ -458,12 +455,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                 onError: ()=>setImgError(true)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                lineNumber: 173,
+                                lineNumber: 171,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/ArticleCard.tsx",
-                            lineNumber: 172,
+                            lineNumber: 170,
                             columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -480,7 +477,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                             children: article.title
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 186,
+                                            lineNumber: 184,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -495,7 +492,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                     children: isRead ? "👁️" : "👁️‍🗨️"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 197,
+                                                    lineNumber: 195,
                                                     columnNumber: 21
                                                 }, this),
                                                 onArchive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -507,19 +504,19 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                     children: "📁"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 209,
+                                                    lineNumber: 207,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 195,
+                                            lineNumber: 193,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 185,
+                                    lineNumber: 183,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -535,12 +532,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                 className: "object-contain"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                                lineNumber: 225,
+                                                lineNumber: 223,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 224,
+                                            lineNumber: 222,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -554,7 +551,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                             })()
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 234,
+                                            lineNumber: 232,
                                             columnNumber: 17
                                         }, this),
                                         article.tags && article.tags.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -564,18 +561,18 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                     children: tag
                                                 }, index, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 247,
+                                                    lineNumber: 245,
                                                     columnNumber: 23
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 245,
+                                            lineNumber: 243,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 222,
+                                    lineNumber: 220,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -587,7 +584,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                     })
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 258,
+                                    lineNumber: 256,
                                     columnNumber: 15
                                 }, this),
                                 showSentiment && article.sentiment && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -596,12 +593,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         sentiment: article.sentiment
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 269,
+                                        lineNumber: 267,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 268,
+                                    lineNumber: 266,
                                     columnNumber: 17
                                 }, this),
                                 showSummary && article.summary && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -612,12 +609,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         onToggle: ()=>setSummaryExpanded(!summaryExpanded)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 276,
+                                        lineNumber: 274,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 275,
+                                    lineNumber: 273,
                                     columnNumber: 17
                                 }, this),
                                 (!article.summary || showSummary === false) && article.content && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -630,43 +627,43 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 287,
+                                        lineNumber: 285,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 286,
+                                    lineNumber: 284,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/ArticleCard.tsx",
-                            lineNumber: 184,
+                            lineNumber: 182,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/ArticleCard.tsx",
-                    lineNumber: 170,
+                    lineNumber: 168,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/ArticleCard.tsx",
-                lineNumber: 169,
+                lineNumber: 167,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/components/ArticleCard.tsx",
-            lineNumber: 163,
+            lineNumber: 161,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/ArticleCard.tsx",
-        lineNumber: 162,
+        lineNumber: 160,
         columnNumber: 5
     }, this);
 };
-_s(ArticleCard, "F5rbaktXPa9f8B0OYFo5BrV7ctc=");
+_s(ArticleCard, "PiNWfzqMZx85ORmqgjY/Oi0dMV8=");
 _c2 = ArticleCard;
 var _c, _c1, _c2;
 __turbopack_context__.k.register(_c, "SentimentIndicator");
@@ -823,6 +820,7 @@ __turbopack_context__.s({
     "fetchAndParseRSSWithFallbacks": (()=>fetchAndParseRSSWithFallbacks),
     "fetchWithCors": (()=>fetchWithCors),
     "filterArticlesBySentiment": (()=>filterArticlesBySentiment),
+    "generateOPMLFromFeeds": (()=>generateOPMLFromFeeds),
     "getAlternativeRSSSources": (()=>getAlternativeRSSSources),
     "getFeedUrlFromHtml": (()=>getFeedUrlFromHtml),
     "groupArticlesByCategory": (()=>groupArticlesByCategory),
@@ -1541,6 +1539,52 @@ async function parseOPMLFile(file) {
         reader.readAsText(file);
     });
 }
+function generateOPMLFromFeeds(feeds, categories) {
+    const now = new Date().toUTCString();
+    // Group feeds by category
+    const feedsByCategory = {};
+    feeds.forEach((feed)=>{
+        const category = feed.category || 'Uncategorized';
+        if (!feedsByCategory[category]) {
+            feedsByCategory[category] = [];
+        }
+        feedsByCategory[category].push(feed);
+    });
+    // Start building OPML
+    let opml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>RSS Feeds Export</title>
+    <dateCreated>${now}</dateCreated>
+    <dateModified>${now}</dateModified>
+  </head>
+  <body>
+`;
+    // Add feeds grouped by category
+    Object.keys(feedsByCategory).forEach((categoryId)=>{
+        const category = categories.find((c)=>c.id === categoryId);
+        const categoryName = category?.name || categoryId;
+        const categoryFeeds = feedsByCategory[categoryId];
+        opml += `    <outline text="${escapeXml(categoryName)}" title="${escapeXml(categoryName)}">\n`;
+        categoryFeeds.forEach((feed)=>{
+            opml += `      <outline type="rss" text="${escapeXml(feed.title)}" title="${escapeXml(feed.title)}" xmlUrl="${escapeXml(feed.url)}" htmlUrl="${escapeXml(feed.url)}"`;
+            // Add tags if available
+            if (feed.tags && feed.tags.length > 0) {
+                opml += ` category="${escapeXml(feed.tags.join(','))}"`;
+            }
+            opml += `/>\n`;
+        });
+        opml += `    </outline>\n`;
+    });
+    opml += `  </body>
+</opml>`;
+    return opml;
+}
+/**
+ * Helper function to escape XML special characters
+ */ function escapeXml(unsafe) {
+    return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
 async function discoverFeedUrlWithFallbacks(siteUrl) {
     // Helper to fetch and parse HTML
     async function fetchHtml(url) {
@@ -1912,11 +1956,53 @@ function HomePage() {
     const [visibleCount, setVisibleCount] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(20);
     const [isClient, setIsClient] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
-    const [hideRead, setHideRead] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    const [hideRead, setHideRead] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false); // Changed default to false - show all articles
     const loadMoreRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
     const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useUnread"])();
     const { parseRSSWithWorker } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useRSSParserWorker$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRSSParserWorker"])();
     const markingAsReadRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(new Set()); // Track articles currently being marked
+    const pendingMarksRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(new Set()); // Track pending marks to batch
+    const batchTimeoutRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRef"])(null);
+    // Batch process pending marks to reduce re-renders
+    const processPendingMarks = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "HomePage.useCallback[processPendingMarks]": ()=>{
+            if (pendingMarksRef.current.size > 0) {
+                const toMark = Array.from(pendingMarksRef.current);
+                pendingMarksRef.current.clear();
+                // Mark all pending articles as read in a single batch
+                toMark.forEach({
+                    "HomePage.useCallback[processPendingMarks]": (link)=>{
+                        if (!readLinks.has(link)) {
+                            toggleReadStatus(link);
+                        }
+                    }
+                }["HomePage.useCallback[processPendingMarks]"]);
+                // Clean up marking refs
+                setTimeout({
+                    "HomePage.useCallback[processPendingMarks]": ()=>{
+                        toMark.forEach({
+                            "HomePage.useCallback[processPendingMarks]": (link)=>markingAsReadRef.current.delete(link)
+                        }["HomePage.useCallback[processPendingMarks]"]);
+                    }
+                }["HomePage.useCallback[processPendingMarks]"], 500);
+            }
+        }
+    }["HomePage.useCallback[processPendingMarks]"], [
+        readLinks,
+        toggleReadStatus
+    ]);
+    // Cleanup timeout on unmount
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "HomePage.useEffect": ()=>{
+            return ({
+                "HomePage.useEffect": ()=>{
+                    if (batchTimeoutRef.current) {
+                        clearTimeout(batchTimeoutRef.current);
+                    }
+                }
+            })["HomePage.useEffect"];
+        }
+    }["HomePage.useEffect"], []);
     // Only show unread articles if hideRead is true
     const filteredArticles = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "HomePage.useMemo[filteredArticles]": ()=>{
@@ -1945,7 +2031,6 @@ function HomePage() {
     const handleRefresh = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "HomePage.useCallback[handleRefresh]": async ()=>{
             try {
-                setHideRead(true);
                 const feeds = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["loadFeedsFromStorage"])();
                 if (feeds.length === 0) {
                     return;
@@ -2025,7 +2110,6 @@ function HomePage() {
                 "HomePage.useEffect.loadSavedFeeds": async ()=>{
                     setIsLoading(true);
                     try {
-                        setHideRead(true);
                         const feeds = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtils$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__["loadFeedsFromStorage"])();
                         if (feeds.length === 0) {
                             setIsLoading(false);
@@ -2100,7 +2184,7 @@ function HomePage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 183,
+                                    lineNumber: 212,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2115,7 +2199,7 @@ function HomePage() {
                                             children: autoMarkAsReadOnScroll ? "📖 Auto-scroll" : "📖 Manual"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 187,
+                                            lineNumber: 216,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -2123,22 +2207,22 @@ function HomePage() {
                                             size: "sm",
                                             onClick: ()=>setHideRead(!hideRead),
                                             className: "text-xs",
-                                            children: hideRead ? "Show all" : "Hide read"
+                                            children: hideRead ? "Show read" : "Hide read"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 196,
+                                            lineNumber: 225,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 186,
+                                    lineNumber: 215,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 182,
+                            lineNumber: 211,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2151,12 +2235,12 @@ function HomePage() {
                                         size: "lg"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 210,
+                                        lineNumber: 239,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 209,
+                                    lineNumber: 238,
                                     columnNumber: 15
                                 }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
                                     className: "animate-[fadeIn_0.5s_ease-out]",
@@ -2167,17 +2251,17 @@ function HomePage() {
                                             children: "No articles found. Add some feeds to get started."
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 215,
+                                            lineNumber: 244,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 214,
+                                        lineNumber: 243,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 213,
+                                    lineNumber: 242,
                                     columnNumber: 15
                                 }, this) : // Show actual articles using ArticleCard component
                                 visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleCard$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["ArticleCard"], {
@@ -2185,24 +2269,28 @@ function HomePage() {
                                         isRead: readLinks.has(article.link),
                                         onScrollPast: ()=>{
                                             // Auto-mark as read when article is scrolled past
-                                            // Use ref to prevent duplicate marks AND check if already read
                                             const articleLink = article.link;
-                                            if (autoMarkAsReadOnScroll && !readLinks.has(articleLink) && !markingAsReadRef.current.has(articleLink)) {
-                                                markingAsReadRef.current.add(articleLink);
-                                                // Use requestAnimationFrame to batch state updates
-                                                requestAnimationFrame(()=>{
-                                                    toggleReadStatus(articleLink);
-                                                    // Clean up after operation completes
-                                                    setTimeout(()=>{
-                                                        markingAsReadRef.current.delete(articleLink);
-                                                    }, 1000);
-                                                });
+                                            // Skip if auto-mark is disabled, already read, or already being marked
+                                            if (!autoMarkAsReadOnScroll || readLinks.has(articleLink) || markingAsReadRef.current.has(articleLink)) {
+                                                return;
                                             }
+                                            // Add to tracking and pending batch
+                                            markingAsReadRef.current.add(articleLink);
+                                            pendingMarksRef.current.add(articleLink);
+                                            // Clear existing timeout and set a new one to batch updates
+                                            if (batchTimeoutRef.current) {
+                                                clearTimeout(batchTimeoutRef.current);
+                                            }
+                                            // Process batch after a short delay (300ms)
+                                            batchTimeoutRef.current = setTimeout(()=>{
+                                                processPendingMarks();
+                                                batchTimeoutRef.current = null;
+                                            }, 300);
                                         },
                                         onToggleRead: (articleId)=>toggleReadStatus(articleId)
                                     }, `${article.link}-${idx}`, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 221,
+                                        lineNumber: 250,
                                         columnNumber: 17
                                     }, this)),
                                 filteredArticles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2215,18 +2303,18 @@ function HomePage() {
                                         children: "Load More"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 249,
+                                        lineNumber: 286,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 248,
+                                    lineNumber: 285,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 206,
+                            lineNumber: 235,
                             columnNumber: 13
                         }, this)
                     ]
@@ -2249,40 +2337,40 @@ function HomePage() {
                                 d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 273,
+                                lineNumber: 310,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 266,
+                            lineNumber: 303,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 280,
+                            lineNumber: 317,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 261,
+                    lineNumber: 298,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 179,
+            lineNumber: 208,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 178,
+        lineNumber: 207,
         columnNumber: 5
     }, this);
 }
-_s(HomePage, "ns/tuN1oYZRJlOqI6AwYYwI5tgs=", false, function() {
+_s(HomePage, "h1cCM5eju0JA1EGddwAdy0/2KUo=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useUnread"],
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useRSSParserWorker$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRSSParserWorker"]

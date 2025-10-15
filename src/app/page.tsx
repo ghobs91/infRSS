@@ -40,11 +40,42 @@ export default function HomePage() {
   const [visibleCount, setVisibleCount] = useState(20);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [hideRead, setHideRead] = useState(true);
+  const [hideRead, setHideRead] = useState(false); // Changed default to false - show all articles
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
   const markingAsReadRef = useRef<Set<string>>(new Set()); // Track articles currently being marked
+  const pendingMarksRef = useRef<Set<string>>(new Set()); // Track pending marks to batch
+  const batchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Batch process pending marks to reduce re-renders
+  const processPendingMarks = useCallback(() => {
+    if (pendingMarksRef.current.size > 0) {
+      const toMark = Array.from(pendingMarksRef.current);
+      pendingMarksRef.current.clear();
+      
+      // Mark all pending articles as read in a single batch
+      toMark.forEach(link => {
+        if (!readLinks.has(link)) {
+          toggleReadStatus(link);
+        }
+      });
+      
+      // Clean up marking refs
+      setTimeout(() => {
+        toMark.forEach(link => markingAsReadRef.current.delete(link));
+      }, 500);
+    }
+  }, [readLinks, toggleReadStatus]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (batchTimeoutRef.current) {
+        clearTimeout(batchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Only show unread articles if hideRead is true
   const filteredArticles = useMemo(() => {
@@ -62,7 +93,6 @@ export default function HomePage() {
   // Handle refreshing feeds
   const handleRefresh = useCallback(async () => {
     try {
-      setHideRead(true);
       const feeds = loadFeedsFromStorage();
       if (feeds.length === 0) {
         return;
@@ -126,7 +156,6 @@ export default function HomePage() {
     const loadSavedFeeds = async () => {
       setIsLoading(true);
       try {
-        setHideRead(true);
         const feeds = loadFeedsFromStorage();
         if (feeds.length === 0) {
           setIsLoading(false);
@@ -199,7 +228,7 @@ export default function HomePage() {
                   onClick={() => setHideRead(!hideRead)}
                   className="text-xs"
                 >
-                  {hideRead ? "Show all" : "Hide read"}
+                  {hideRead ? "Show read" : "Hide read"}
                 </Button>
               </div>
             </div>
@@ -224,21 +253,29 @@ export default function HomePage() {
                   isRead={readLinks.has(article.link)}
                   onScrollPast={() => {
                     // Auto-mark as read when article is scrolled past
-                    // Use ref to prevent duplicate marks AND check if already read
                     const articleLink = article.link;
-                    if (autoMarkAsReadOnScroll && 
-                        !readLinks.has(articleLink) && 
-                        !markingAsReadRef.current.has(articleLink)) {
-                      markingAsReadRef.current.add(articleLink);
-                      // Use requestAnimationFrame to batch state updates
-                      requestAnimationFrame(() => {
-                        toggleReadStatus(articleLink);
-                        // Clean up after operation completes
-                        setTimeout(() => {
-                          markingAsReadRef.current.delete(articleLink);
-                        }, 1000);
-                      });
+                    
+                    // Skip if auto-mark is disabled, already read, or already being marked
+                    if (!autoMarkAsReadOnScroll || 
+                        readLinks.has(articleLink) || 
+                        markingAsReadRef.current.has(articleLink)) {
+                      return;
                     }
+                    
+                    // Add to tracking and pending batch
+                    markingAsReadRef.current.add(articleLink);
+                    pendingMarksRef.current.add(articleLink);
+                    
+                    // Clear existing timeout and set a new one to batch updates
+                    if (batchTimeoutRef.current) {
+                      clearTimeout(batchTimeoutRef.current);
+                    }
+                    
+                    // Process batch after a short delay (300ms)
+                    batchTimeoutRef.current = setTimeout(() => {
+                      processPendingMarks();
+                      batchTimeoutRef.current = null;
+                    }, 300);
                   }}
                   onToggleRead={(articleId) => toggleReadStatus(articleId)}
                 />

@@ -919,6 +919,74 @@ export async function parseOPMLFile(file: File): Promise<FeedData[]> {
 }
 
 /**
+ * Generates OPML XML content from feeds
+ * OPML is a standard format for exchanging lists of RSS feeds
+ */
+export function generateOPMLFromFeeds(feeds: FeedData[], categories: Category[]): string {
+  const now = new Date().toUTCString();
+  
+  // Group feeds by category
+  const feedsByCategory: Record<string, FeedData[]> = {};
+  feeds.forEach(feed => {
+    const category = feed.category || 'Uncategorized';
+    if (!feedsByCategory[category]) {
+      feedsByCategory[category] = [];
+    }
+    feedsByCategory[category].push(feed);
+  });
+  
+  // Start building OPML
+  let opml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>RSS Feeds Export</title>
+    <dateCreated>${now}</dateCreated>
+    <dateModified>${now}</dateModified>
+  </head>
+  <body>
+`;
+  
+  // Add feeds grouped by category
+  Object.keys(feedsByCategory).forEach(categoryId => {
+    const category = categories.find(c => c.id === categoryId);
+    const categoryName = category?.name || categoryId;
+    const categoryFeeds = feedsByCategory[categoryId];
+    
+    opml += `    <outline text="${escapeXml(categoryName)}" title="${escapeXml(categoryName)}">\n`;
+    
+    categoryFeeds.forEach(feed => {
+      opml += `      <outline type="rss" text="${escapeXml(feed.title)}" title="${escapeXml(feed.title)}" xmlUrl="${escapeXml(feed.url)}" htmlUrl="${escapeXml(feed.url)}"`;
+      
+      // Add tags if available
+      if (feed.tags && feed.tags.length > 0) {
+        opml += ` category="${escapeXml(feed.tags.join(','))}"`;
+      }
+      
+      opml += `/>\n`;
+    });
+    
+    opml += `    </outline>\n`;
+  });
+  
+  opml += `  </body>
+</opml>`;
+  
+  return opml;
+}
+
+/**
+ * Helper function to escape XML special characters
+ */
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
  * Attempts to discover the most likely RSS feed URL for a given website by searching:
  * - meta tags
  * - meta tags in parent pages

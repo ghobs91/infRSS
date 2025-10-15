@@ -618,6 +618,46 @@ export default function ManagePage() {
     }
   }, [savedFeeds]);
 
+  // Handle exporting OPML file
+  const handleExportOPML = useCallback(async () => {
+    try {
+      const response = await fetch('/api/export-opml', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feeds: savedFeeds,
+          categories: categories,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export OPML');
+      }
+
+      // Get the OPML content as a blob
+      const blob = await response.blob();
+      
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `feeds-export-${new Date().toISOString().split('T')[0]}.opml`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setError('Successfully exported feeds to OPML file');
+    } catch (error) {
+      console.error("Error exporting OPML file:", error);
+      setError("Error exporting OPML file. Please try again.");
+    }
+  }, [savedFeeds, categories]);
+
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6">
       {/* Page Header */}
@@ -709,6 +749,30 @@ export default function ManagePage() {
                 disabled={isImporting}
               />
               {isImporting && <Spinner size="sm" />}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="default"
+                onClick={handleExportOPML}
+                disabled={savedFeeds.length === 0}
+                className="w-full"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Export to OPML
+              </Button>
             </div>
             {error && (
               <div className={`p-3 rounded-lg border ${

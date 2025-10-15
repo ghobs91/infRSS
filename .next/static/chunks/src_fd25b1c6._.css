@@ -2569,6 +2569,15 @@ body {
   pointer-events: none;
 }
 
+body {
+  overflow-y: scroll;
+}
+
+.article-card-wrapper {
+  transition: opacity .2s ease-out, transform .2s ease-out;
+  will-change: opacity, transform;
+}
+
 @media (prefers-color-scheme: dark) {
   input[type="text"]:focus, input[type="url"]:focus, input[type="file"]:focus, select:focus, textarea:focus {
     box-shadow: 0 0 0 3px #0a84ff40;

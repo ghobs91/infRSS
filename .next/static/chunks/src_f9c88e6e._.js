@@ -326,6 +326,7 @@ __turbopack_context__.s({
     "fetchAndParseRSSWithFallbacks": (()=>fetchAndParseRSSWithFallbacks),
     "fetchWithCors": (()=>fetchWithCors),
     "filterArticlesBySentiment": (()=>filterArticlesBySentiment),
+    "generateOPMLFromFeeds": (()=>generateOPMLFromFeeds),
     "getAlternativeRSSSources": (()=>getAlternativeRSSSources),
     "getFeedUrlFromHtml": (()=>getFeedUrlFromHtml),
     "groupArticlesByCategory": (()=>groupArticlesByCategory),
@@ -1043,6 +1044,52 @@ async function parseOPMLFile(file) {
         };
         reader.readAsText(file);
     });
+}
+function generateOPMLFromFeeds(feeds, categories) {
+    const now = new Date().toUTCString();
+    // Group feeds by category
+    const feedsByCategory = {};
+    feeds.forEach((feed)=>{
+        const category = feed.category || 'Uncategorized';
+        if (!feedsByCategory[category]) {
+            feedsByCategory[category] = [];
+        }
+        feedsByCategory[category].push(feed);
+    });
+    // Start building OPML
+    let opml = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>RSS Feeds Export</title>
+    <dateCreated>${now}</dateCreated>
+    <dateModified>${now}</dateModified>
+  </head>
+  <body>
+`;
+    // Add feeds grouped by category
+    Object.keys(feedsByCategory).forEach((categoryId)=>{
+        const category = categories.find((c)=>c.id === categoryId);
+        const categoryName = category?.name || categoryId;
+        const categoryFeeds = feedsByCategory[categoryId];
+        opml += `    <outline text="${escapeXml(categoryName)}" title="${escapeXml(categoryName)}">\n`;
+        categoryFeeds.forEach((feed)=>{
+            opml += `      <outline type="rss" text="${escapeXml(feed.title)}" title="${escapeXml(feed.title)}" xmlUrl="${escapeXml(feed.url)}" htmlUrl="${escapeXml(feed.url)}"`;
+            // Add tags if available
+            if (feed.tags && feed.tags.length > 0) {
+                opml += ` category="${escapeXml(feed.tags.join(','))}"`;
+            }
+            opml += `/>\n`;
+        });
+        opml += `    </outline>\n`;
+    });
+    opml += `  </body>
+</opml>`;
+    return opml;
+}
+/**
+ * Helper function to escape XML special characters
+ */ function escapeXml(unsafe) {
+    return unsafe.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 async function discoverFeedUrlWithFallbacks(siteUrl) {
     // Helper to fetch and parse HTML
@@ -3759,6 +3806,45 @@ function ManagePage() {
     }["ManagePage.useCallback[handleImportOPML]"], [
         savedFeeds
     ]);
+    // Handle exporting OPML file
+    const handleExportOPML = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
+        "ManagePage.useCallback[handleExportOPML]": async ()=>{
+            try {
+                const response = await fetch('/api/export-opml', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        feeds: savedFeeds,
+                        categories: categories
+                    })
+                });
+                if (!response.ok) {
+                    throw new Error('Failed to export OPML');
+                }
+                // Get the OPML content as a blob
+                const blob = await response.blob();
+                // Create a download link and trigger it
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `feeds-export-${new Date().toISOString().split('T')[0]}.opml`;
+                document.body.appendChild(a);
+                a.click();
+                // Cleanup
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                setError('Successfully exported feeds to OPML file');
+            } catch (error) {
+                console.error("Error exporting OPML file:", error);
+                setError("Error exporting OPML file. Please try again.");
+            }
+        }
+    }["ManagePage.useCallback[handleExportOPML]"], [
+        savedFeeds,
+        categories
+    ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
         className: "space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6",
         children: [
@@ -3770,7 +3856,7 @@ function ManagePage() {
                         children: "Manage Feeds"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 625,
+                        lineNumber: 665,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3778,13 +3864,13 @@ function ManagePage() {
                         children: "Add, organize, and monitor your RSS feeds"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 626,
+                        lineNumber: 666,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 624,
+                lineNumber: 664,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3796,7 +3882,7 @@ function ManagePage() {
                         children: "Feeds"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 630,
+                        lineNumber: 670,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3805,7 +3891,7 @@ function ManagePage() {
                         children: "Categories"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 640,
+                        lineNumber: 680,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3814,7 +3900,7 @@ function ManagePage() {
                         children: "Sentiment"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 650,
+                        lineNumber: 690,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -3823,13 +3909,13 @@ function ManagePage() {
                         children: "Health"
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 660,
+                        lineNumber: 700,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 629,
+                lineNumber: 669,
                 columnNumber: 7
             }, this),
             activeTab === 'feeds' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -3846,7 +3932,7 @@ function ManagePage() {
                                         children: "Add Feed"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 677,
+                                        lineNumber: 717,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3854,13 +3940,13 @@ function ManagePage() {
                                         children: "Enter a feed URL or import from OPML file"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 678,
+                                        lineNumber: 718,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 676,
+                                lineNumber: 716,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3874,7 +3960,7 @@ function ManagePage() {
                                         className: "flex-1"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 681,
+                                        lineNumber: 721,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -3886,18 +3972,18 @@ function ManagePage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 694,
+                                            lineNumber: 734,
                                             columnNumber: 30
                                         }, this) : "Add Feed"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 688,
+                                        lineNumber: 728,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 680,
+                                lineNumber: 720,
                                 columnNumber: 13
                             }, this),
                             isLoading && !error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3907,7 +3993,7 @@ function ManagePage() {
                                         size: "sm"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 699,
+                                        lineNumber: 739,
                                         columnNumber: 17
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -3915,13 +4001,13 @@ function ManagePage() {
                                         children: "Searching for feeds..."
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 700,
+                                        lineNumber: 740,
                                         columnNumber: 17
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 698,
+                                lineNumber: 738,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3935,20 +4021,61 @@ function ManagePage() {
                                         disabled: isImporting
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 704,
+                                        lineNumber: 744,
                                         columnNumber: 15
                                     }, this),
                                     isImporting && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$spinner$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Spinner"], {
                                         size: "sm"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 711,
+                                        lineNumber: 751,
                                         columnNumber: 31
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 703,
+                                lineNumber: 743,
+                                columnNumber: 13
+                            }, this),
+                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                className: "flex items-center gap-3",
+                                children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "default",
+                                    onClick: handleExportOPML,
+                                    disabled: savedFeeds.length === 0,
+                                    className: "w-full",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
+                                            className: "w-4 h-4 mr-2",
+                                            fill: "none",
+                                            stroke: "currentColor",
+                                            viewBox: "0 0 24 24",
+                                            xmlns: "http://www.w3.org/2000/svg",
+                                            children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("path", {
+                                                strokeLinecap: "round",
+                                                strokeLinejoin: "round",
+                                                strokeWidth: 2,
+                                                d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/app/manage/page.tsx",
+                                                lineNumber: 767,
+                                                columnNumber: 19
+                                            }, this)
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/app/manage/page.tsx",
+                                            lineNumber: 760,
+                                            columnNumber: 17
+                                        }, this),
+                                        "Export to OPML"
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/app/manage/page.tsx",
+                                    lineNumber: 754,
+                                    columnNumber: 15
+                                }, this)
+                            }, void 0, false, {
+                                fileName: "[project]/src/app/manage/page.tsx",
+                                lineNumber: 753,
                                 columnNumber: 13
                             }, this),
                             error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3956,13 +4083,13 @@ function ManagePage() {
                                 children: error
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 714,
+                                lineNumber: 778,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 675,
+                        lineNumber: 715,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3976,7 +4103,7 @@ function ManagePage() {
                                         children: "Suggest Feeds"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 726,
+                                        lineNumber: 790,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3984,13 +4111,13 @@ function ManagePage() {
                                         children: "Discover new feeds based on topics"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 727,
+                                        lineNumber: 791,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 725,
+                                lineNumber: 789,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4004,7 +4131,7 @@ function ManagePage() {
                                         className: "flex-1"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 730,
+                                        lineNumber: 794,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -4016,24 +4143,24 @@ function ManagePage() {
                                             size: "sm"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/manage/page.tsx",
-                                            lineNumber: 743,
+                                            lineNumber: 807,
                                             columnNumber: 50
                                         }, this) : "Suggest"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 737,
+                                        lineNumber: 801,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 729,
+                                lineNumber: 793,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 724,
+                        lineNumber: 788,
                         columnNumber: 11
                     }, this),
                     suggestedFeeds.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4044,7 +4171,7 @@ function ManagePage() {
                                 children: "Suggested Feeds"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 750,
+                                lineNumber: 814,
                                 columnNumber: 15
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4054,24 +4181,24 @@ function ManagePage() {
                                         onSubscribe: handleSubscribeToFeed
                                     }, feed.url, false, {
                                         fileName: "[project]/src/app/manage/page.tsx",
-                                        lineNumber: 753,
+                                        lineNumber: 817,
                                         columnNumber: 19
                                     }, this))
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 751,
+                                lineNumber: 815,
                                 columnNumber: 15
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 749,
+                        lineNumber: 813,
                         columnNumber: 13
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 674,
+                lineNumber: 714,
                 columnNumber: 9
             }, this),
             activeTab === 'categories' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -4083,12 +4210,12 @@ function ManagePage() {
                     onDeleteCategory: handleDeleteCategory
                 }, void 0, false, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 764,
+                    lineNumber: 828,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 763,
+                lineNumber: 827,
                 columnNumber: 9
             }, this),
             activeTab === 'sentiment' && preferences && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -4098,12 +4225,12 @@ function ManagePage() {
                     onUpdatePreferences: handleUpdatePreferences
                 }, void 0, false, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 776,
+                    lineNumber: 840,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 775,
+                lineNumber: 839,
                 columnNumber: 9
             }, this),
             activeTab === 'health' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -4113,12 +4240,12 @@ function ManagePage() {
                     onUpdateFeed: handleFeedUrlUpdate
                 }, void 0, false, {
                     fileName: "[project]/src/app/manage/page.tsx",
-                    lineNumber: 786,
+                    lineNumber: 850,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 785,
+                lineNumber: 849,
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
@@ -4132,7 +4259,7 @@ function ManagePage() {
                                 children: "Your Feeds"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 796,
+                                lineNumber: 860,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4140,13 +4267,13 @@ function ManagePage() {
                                 children: "Manage and organize your subscribed feeds"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 797,
+                                lineNumber: 861,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 795,
+                        lineNumber: 859,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4160,17 +4287,17 @@ function ManagePage() {
                                     children: "No feeds added yet. Add some feeds to get started."
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/manage/page.tsx",
-                                    lineNumber: 803,
+                                    lineNumber: 867,
                                     columnNumber: 17
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 802,
+                                lineNumber: 866,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/manage/page.tsx",
-                            lineNumber: 801,
+                            lineNumber: 865,
                             columnNumber: 13
                         }, this) : savedFeeds.map((feed)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(SavedFeed, {
                                 feed: feed,
@@ -4179,28 +4306,28 @@ function ManagePage() {
                                 onUpdate: handleUpdateFeed
                             }, feed.url, false, {
                                 fileName: "[project]/src/app/manage/page.tsx",
-                                lineNumber: 808,
+                                lineNumber: 872,
                                 columnNumber: 15
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/app/manage/page.tsx",
-                        lineNumber: 799,
+                        lineNumber: 863,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/app/manage/page.tsx",
-                lineNumber: 794,
+                lineNumber: 858,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/app/manage/page.tsx",
-        lineNumber: 622,
+        lineNumber: 662,
         columnNumber: 5
     }, this);
 }
-_s3(ManagePage, "iRMZhriDNbpyVw7qprFZ+oJYBRs=", false, function() {
+_s3(ManagePage, "nDh56EehBWUFy8SzuuXgNitqQok=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useTransformerWorker$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useTransformerWorker"],
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useRSSParserWorker$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRSSParserWorker"]

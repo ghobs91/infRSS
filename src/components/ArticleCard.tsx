@@ -108,43 +108,41 @@ export const ArticleCard = ({
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
-  const [wasVisible, setWasVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const hasTriggeredRef = useRef(false);
+  const wasVisibleRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!ref.current || !onScrollPast) return;
-    
-    let hasTriggered = false;
+    if (!ref.current || !onScrollPast || isRead) return;
     
     const observer = new window.IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          // Track if the article is currently visible (at least 70% visible)
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
-            setWasVisible(true);
-          }
-          // Mark as read when scrolling PAST (was visible, now not visible)
-          // Only trigger once per scroll-past event
-          else if (wasVisible && !entry.isIntersecting && !hasTriggered) {
-            hasTriggered = true;
-            onScrollPast();
-            setWasVisible(false);
-          }
-        });
+        const entry = entries[0];
+        if (!entry) return;
+        
+        // Article is now visible - mark it as "seen"
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          wasVisibleRef.current = true;
+        }
+        // Article has scrolled out of view AND was previously seen AND hasn't been triggered yet
+        else if (!entry.isIntersecting && wasVisibleRef.current && !hasTriggeredRef.current) {
+          hasTriggeredRef.current = true;
+          onScrollPast();
+        }
       },
       { 
-        threshold: [0, 0.7], // Only track fully visible and not visible
-        rootMargin: '-50px' // Require article to be well within viewport before marking as "seen"
+        threshold: [0, 0.6],
+        rootMargin: '-80px 0px' // Top margin to ensure article is well in viewport
       }
     );
     
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [onScrollPast, wasVisible]);
+  }, [onScrollPast, isRead]); // Only depend on onScrollPast and isRead, not on state variables
 
   const handleToggleRead = () => {
     if (onToggleRead) {

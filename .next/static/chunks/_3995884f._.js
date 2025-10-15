@@ -451,7 +451,7 @@ const UnreadProvider = ({ children })=>{
         "UnreadProvider.useCallback[markAsRead]": (link)=>{
             setReadLinks({
                 "UnreadProvider.useCallback[markAsRead]": (prev)=>{
-                    if (prev.has(link)) return prev;
+                    if (prev.has(link)) return prev; // No change needed
                     const next = new Set(prev);
                     next.add(link);
                     return next;
@@ -463,17 +463,14 @@ const UnreadProvider = ({ children })=>{
         "UnreadProvider.useCallback[toggleReadStatus]": (link)=>{
             setReadLinks({
                 "UnreadProvider.useCallback[toggleReadStatus]": (prev)=>{
-                    // Check if state would actually change to prevent unnecessary re-renders
-                    if (prev.has(link)) {
-                        const next = new Set(prev);
+                    const next = new Set(prev);
+                    if (next.has(link)) {
                         next.delete(link);
                         return next;
-                    } else if (!prev.has(link)) {
-                        const next = new Set(prev);
+                    } else {
                         next.add(link);
                         return next;
                     }
-                    return prev; // No change needed
                 }
             }["UnreadProvider.useCallback[toggleReadStatus]"]);
         }
@@ -498,7 +495,7 @@ const UnreadProvider = ({ children })=>{
         children: children
     }, void 0, false, {
         fileName: "[project]/src/lib/unreadContext.tsx",
-        lineNumber: 108,
+        lineNumber: 105,
         columnNumber: 5
     }, this);
 };

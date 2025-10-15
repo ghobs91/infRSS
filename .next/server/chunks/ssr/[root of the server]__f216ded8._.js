@@ -432,7 +432,7 @@ const UnreadProvider = ({ children })=>{
     ]);
     const markAsRead = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((link)=>{
         setReadLinks((prev)=>{
-            if (prev.has(link)) return prev;
+            if (prev.has(link)) return prev; // No change needed
             const next = new Set(prev);
             next.add(link);
             return next;
@@ -440,17 +440,14 @@ const UnreadProvider = ({ children })=>{
     }, []);
     const toggleReadStatus = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])((link)=>{
         setReadLinks((prev)=>{
-            // Check if state would actually change to prevent unnecessary re-renders
-            if (prev.has(link)) {
-                const next = new Set(prev);
+            const next = new Set(prev);
+            if (next.has(link)) {
                 next.delete(link);
                 return next;
-            } else if (!prev.has(link)) {
-                const next = new Set(prev);
+            } else {
                 next.add(link);
                 return next;
             }
-            return prev; // No change needed
         });
     }, []);
     const toggleAutoMarkAsRead = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useCallback"])(()=>{
@@ -469,7 +466,7 @@ const UnreadProvider = ({ children })=>{
         children: children
     }, void 0, false, {
         fileName: "[project]/src/lib/unreadContext.tsx",
-        lineNumber: 108,
+        lineNumber: 105,
         columnNumber: 5
     }, this);
 };
