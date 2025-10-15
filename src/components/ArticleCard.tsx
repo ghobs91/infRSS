@@ -11,7 +11,6 @@ interface ArticleCardProps {
   article: Article;
   isRead: boolean;
   onScrollPast?: () => void;
-  onToggleRead?: (articleId: string) => void;
   onArchive?: (articleId: string) => void;
   showSentiment?: boolean;
   showSummary?: boolean;
@@ -99,8 +98,7 @@ const ArticleSummary = ({ summary, isExpanded, onToggle }: {
 export const ArticleCard = ({ 
   article, 
   isRead, 
-  onScrollPast, 
-  onToggleRead,
+  onScrollPast,
   onArchive,
   showSentiment = true,
   showSummary = true
@@ -143,12 +141,6 @@ export const ArticleCard = ({
     observer.observe(ref.current);
     return () => observer.disconnect();
   }, [onScrollPast, isRead]); // Only depend on onScrollPast and isRead, not on state variables
-
-  const handleToggleRead = () => {
-    if (onToggleRead) {
-      onToggleRead(article.id);
-    }
-  };
 
   const handleArchive = () => {
     if (onArchive) {

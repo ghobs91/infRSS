@@ -63,7 +63,7 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
 function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null {
   try {
     // Replace HTML entities with numeric equivalents before parsing
-    let text = xmlText
+    const text = xmlText
       .replace(/&nbsp;/g, '&#160;')
       .replace(/&ndash;/g, '&#8211;')
       .replace(/&mdash;/g, '&#8212;')

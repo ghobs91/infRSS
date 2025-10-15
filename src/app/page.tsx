@@ -277,9 +277,7 @@ export default function HomePage() {
                       processPendingMarks();
                       batchTimeoutRef.current = null;
                     }, 300);
-                  }}
-                  onToggleRead={(articleId) => toggleReadStatus(articleId)}
-                />
+                  }}                />
               ))
             )}
             {filteredArticles.length > visibleCount && (
