@@ -159,7 +159,7 @@ export const ArticleCard = ({
   return (
     <div ref={ref} className="animate-[fadeIn_0.5s_ease-out]">
       <Card className={cn(
-        "overflow-hidden transition-all duration-300 hover:scale-[1.01] max-w-full",
+        "overflow-hidden transition-all duration-300 max-w-full",
         isRead && "opacity-60 saturate-50",
         article.sentiment?.isClickbait && "border-orange-300",
         article.sentiment?.isRagebait && "border-red-300"
@@ -191,18 +191,6 @@ export const ArticleCard = ({
                 </a>
                 
                 <div className="flex gap-1 flex-shrink-0">
-                  {onToggleRead && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleToggleRead}
-                      className="text-xs p-2 h-auto whitespace-nowrap hover:scale-110"
-                      title={isRead ? "Mark as unread" : "Mark as read"}
-                    >
-                      {isRead ? "👁️" : "👁️‍🗨️"}
-                    </Button>
-                  )}
-                  
                   {onArchive && (
                     <Button
                       variant="ghost"

@@ -379,17 +379,29 @@ const useUnread = ()=>{
     return ctx;
 };
 const READ_KEY = 'infrss_read_links';
+const PREVIOUSLY_READ_KEY = 'infrss_previously_read_links';
 const PREFERENCES_KEY = 'userPreferences';
 const UnreadProvider = ({ children })=>{
     const [readLinks, setReadLinks] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(new Set());
+    const [previouslyReadLinks, setPreviouslyReadLinks] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(new Set());
     const [unreadCount, setUnreadCount] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
     const [totalArticles, setTotalArticles] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(0);
     const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
+    const [isInitialLoad, setIsInitialLoad] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
     // Load read links and preferences from localStorage
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         const stored = localStorage.getItem(READ_KEY);
+        const previouslyStored = localStorage.getItem(PREVIOUSLY_READ_KEY);
         if (stored) {
-            setReadLinks(new Set(JSON.parse(stored)));
+            const readLinksArray = JSON.parse(stored);
+            setReadLinks(new Set(readLinksArray));
+            // On initial load, move current read links to previouslyReadLinks
+            if (previouslyStored) {
+                setPreviouslyReadLinks(new Set(JSON.parse(previouslyStored)));
+            } else {
+                // First time migration: existing read links become "previously read"
+                setPreviouslyReadLinks(new Set(readLinksArray));
+            }
         }
         const prefs = localStorage.getItem(PREFERENCES_KEY);
         if (prefs) {
@@ -402,14 +414,29 @@ const UnreadProvider = ({ children })=>{
                 console.error('Error parsing preferences:', error);
             }
         }
+        setIsInitialLoad(false);
     }, []);
-    // Save read links to localStorage
+    // Save read links to localStorage and update previously read on app close/reload
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        if (isInitialLoad) return;
         localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks)));
         setUnreadCount(Math.max(totalArticles - readLinks.size, 0));
     }, [
         readLinks,
-        totalArticles
+        totalArticles,
+        isInitialLoad
+    ]);
+    // Before the app unloads, save current read links as previously read for next session
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
+        const handleBeforeUnload = ()=>{
+            localStorage.setItem(PREVIOUSLY_READ_KEY, JSON.stringify(Array.from(readLinks)));
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return ()=>{
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [
+        readLinks
     ]);
     // Save preferences to localStorage
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
@@ -457,6 +484,7 @@ const UnreadProvider = ({ children })=>{
         value: {
             unreadCount,
             readLinks,
+            previouslyReadLinks,
             markAsRead,
             toggleReadStatus,
             setTotalArticles,
@@ -466,7 +494,7 @@ const UnreadProvider = ({ children })=>{
         children: children
     }, void 0, false, {
         fileName: "[project]/src/lib/unreadContext.tsx",
-        lineNumber: 105,
+        lineNumber: 136,
         columnNumber: 5
     }, this);
 };

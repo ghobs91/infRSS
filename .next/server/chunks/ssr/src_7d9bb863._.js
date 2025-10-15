@@ -399,7 +399,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
         ref: ref,
         className: "animate-[fadeIn_0.5s_ease-out]",
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
-            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("overflow-hidden transition-all duration-300 hover:scale-[1.01] max-w-full", isRead && "opacity-60 saturate-50", article.sentiment?.isClickbait && "border-orange-300", article.sentiment?.isRagebait && "border-red-300"),
+            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("overflow-hidden transition-all duration-300 max-w-full", isRead && "opacity-60 saturate-50", article.sentiment?.isClickbait && "border-orange-300", article.sentiment?.isRagebait && "border-red-300"),
             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
                 className: "p-0",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -443,33 +443,19 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "flex gap-1 flex-shrink-0",
-                                            children: [
-                                                onToggleRead && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
-                                                    variant: "ghost",
-                                                    size: "sm",
-                                                    onClick: handleToggleRead,
-                                                    className: "text-xs p-2 h-auto whitespace-nowrap hover:scale-110",
-                                                    title: isRead ? "Mark as unread" : "Mark as read",
-                                                    children: isRead ? "👁️" : "👁️‍🗨️"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 195,
-                                                    columnNumber: 21
-                                                }, this),
-                                                onArchive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
-                                                    variant: "ghost",
-                                                    size: "sm",
-                                                    onClick: handleArchive,
-                                                    className: "text-xs p-2 h-auto whitespace-nowrap hover:scale-110",
-                                                    title: "Archive article",
-                                                    children: "📁"
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 207,
-                                                    columnNumber: 21
-                                                }, this)
-                                            ]
-                                        }, void 0, true, {
+                                            children: onArchive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
+                                                variant: "ghost",
+                                                size: "sm",
+                                                onClick: handleArchive,
+                                                className: "text-xs p-2 h-auto whitespace-nowrap hover:scale-110",
+                                                title: "Archive article",
+                                                children: "📁"
+                                            }, void 0, false, {
+                                                fileName: "[project]/src/components/ArticleCard.tsx",
+                                                lineNumber: 195,
+                                                columnNumber: 21
+                                            }, this)
+                                        }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
                                             lineNumber: 193,
                                             columnNumber: 17
@@ -493,12 +479,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                 className: "object-contain"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                                lineNumber: 223,
+                                                lineNumber: 211,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 222,
+                                            lineNumber: 210,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -512,7 +498,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                             })()
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 232,
+                                            lineNumber: 220,
                                             columnNumber: 17
                                         }, this),
                                         article.tags && article.tags.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -522,18 +508,18 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                     children: tag
                                                 }, index, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 245,
+                                                    lineNumber: 233,
                                                     columnNumber: 23
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 243,
+                                            lineNumber: 231,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 220,
+                                    lineNumber: 208,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -545,7 +531,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                     })
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 256,
+                                    lineNumber: 244,
                                     columnNumber: 15
                                 }, this),
                                 showSentiment && article.sentiment && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -554,12 +540,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         sentiment: article.sentiment
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 267,
+                                        lineNumber: 255,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 266,
+                                    lineNumber: 254,
                                     columnNumber: 17
                                 }, this),
                                 showSummary && article.summary && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -570,12 +556,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         onToggle: ()=>setSummaryExpanded(!summaryExpanded)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 274,
+                                        lineNumber: 262,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 273,
+                                    lineNumber: 261,
                                     columnNumber: 17
                                 }, this),
                                 (!article.summary || showSummary === false) && article.content && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -588,12 +574,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 285,
+                                        lineNumber: 273,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 284,
+                                    lineNumber: 272,
                                     columnNumber: 17
                                 }, this)
                             ]
@@ -1870,7 +1856,7 @@ function HomePage() {
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(true);
     const [hideRead, setHideRead] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"])(false); // Changed default to false - show all articles
     const loadMoreRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(null);
-    const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useUnread"])();
+    const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$unreadContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useUnread"])();
     const { parseRSSWithWorker } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$useRSSParserWorker$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRSSParserWorker"])();
     const markingAsReadRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(new Set()); // Track articles currently being marked
     const pendingMarksRef = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRef"])(new Set()); // Track pending marks to batch
@@ -1903,15 +1889,16 @@ function HomePage() {
             }
         };
     }, []);
-    // Only show unread articles if hideRead is true
+    // Only hide articles that were previously read (from a previous session)
+    // Articles marked as read in the current session will be grayed out but still visible
     const filteredArticles = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMemo"])(()=>{
         if (hideRead) {
-            return articles.filter((article)=>!readLinks.has(article.link));
+            return articles.filter((article)=>!previouslyReadLinks.has(article.link));
         }
         return articles;
     }, [
         articles,
-        readLinks,
+        previouslyReadLinks,
         hideRead
     ]);
     // Memoize visible articles to prevent unnecessary re-renders
@@ -2048,7 +2035,7 @@ function HomePage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 212,
+                                    lineNumber: 213,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2063,7 +2050,7 @@ function HomePage() {
                                             children: autoMarkAsReadOnScroll ? "📖 Auto-scroll" : "📖 Manual"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 216,
+                                            lineNumber: 217,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -2074,19 +2061,19 @@ function HomePage() {
                                             children: hideRead ? "Show read" : "Hide read"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 225,
+                                            lineNumber: 226,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 215,
+                                    lineNumber: 216,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 211,
+                            lineNumber: 212,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2099,12 +2086,12 @@ function HomePage() {
                                         size: "lg"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 239,
+                                        lineNumber: 240,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 238,
+                                    lineNumber: 239,
                                     columnNumber: 15
                                 }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
                                     className: "animate-[fadeIn_0.5s_ease-out]",
@@ -2115,17 +2102,17 @@ function HomePage() {
                                             children: "No articles found. Add some feeds to get started."
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 244,
+                                            lineNumber: 245,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 243,
+                                        lineNumber: 244,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 242,
+                                    lineNumber: 243,
                                     columnNumber: 15
                                 }, this) : // Show actual articles using ArticleCard component
                                 visibleArticles.map((article, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ArticleCard$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["ArticleCard"], {
@@ -2154,7 +2141,7 @@ function HomePage() {
                                         onToggleRead: (articleId)=>toggleReadStatus(articleId)
                                     }, `${article.link}-${idx}`, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 250,
+                                        lineNumber: 251,
                                         columnNumber: 17
                                     }, this)),
                                 filteredArticles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2167,18 +2154,18 @@ function HomePage() {
                                         children: "Load More"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 286,
+                                        lineNumber: 287,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 285,
+                                    lineNumber: 286,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 235,
+                            lineNumber: 236,
                             columnNumber: 13
                         }, this)
                     ]
@@ -2201,36 +2188,36 @@ function HomePage() {
                                 d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 310,
+                                lineNumber: 311,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 303,
+                            lineNumber: 304,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 317,
+                            lineNumber: 318,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 298,
+                    lineNumber: 299,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 208,
+            lineNumber: 209,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 207,
+        lineNumber: 208,
         columnNumber: 5
     }, this);
 }

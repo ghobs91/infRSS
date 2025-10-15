@@ -42,7 +42,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [hideRead, setHideRead] = useState(false); // Changed default to false - show all articles
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
+  const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
   const markingAsReadRef = useRef<Set<string>>(new Set()); // Track articles currently being marked
   const pendingMarksRef = useRef<Set<string>>(new Set()); // Track pending marks to batch
@@ -77,13 +77,14 @@ export default function HomePage() {
     };
   }, []);
 
-  // Only show unread articles if hideRead is true
+  // Only hide articles that were previously read (from a previous session)
+  // Articles marked as read in the current session will be grayed out but still visible
   const filteredArticles = useMemo(() => {
     if (hideRead) {
-      return articles.filter(article => !readLinks.has(article.link));
+      return articles.filter(article => !previouslyReadLinks.has(article.link));
     }
     return articles;
-  }, [articles, readLinks, hideRead]);
+  }, [articles, previouslyReadLinks, hideRead]);
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {

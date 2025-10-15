@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 interface UnreadContextType {
   unreadCount: number;
   readLinks: Set<string>;
+  previouslyReadLinks: Set<string>; // Articles that were read in a previous session
   markAsRead: (link: string) => void;
   toggleReadStatus: (link: string) => void;
   setTotalArticles: (count: number) => void;
@@ -21,19 +22,33 @@ export const useUnread = () => {
 };
 
 const READ_KEY = 'infrss_read_links';
+const PREVIOUSLY_READ_KEY = 'infrss_previously_read_links';
 const PREFERENCES_KEY = 'userPreferences';
 
 export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [readLinks, setReadLinks] = useState<Set<string>>(new Set());
+  const [previouslyReadLinks, setPreviouslyReadLinks] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalArticles, setTotalArticles] = useState(0);
   const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Load read links and preferences from localStorage
   useEffect(() => {
     const stored = localStorage.getItem(READ_KEY);
+    const previouslyStored = localStorage.getItem(PREVIOUSLY_READ_KEY);
+    
     if (stored) {
-      setReadLinks(new Set(JSON.parse(stored)));
+      const readLinksArray = JSON.parse(stored);
+      setReadLinks(new Set(readLinksArray));
+      
+      // On initial load, move current read links to previouslyReadLinks
+      if (previouslyStored) {
+        setPreviouslyReadLinks(new Set(JSON.parse(previouslyStored)));
+      } else {
+        // First time migration: existing read links become "previously read"
+        setPreviouslyReadLinks(new Set(readLinksArray));
+      }
     }
 
     const prefs = localStorage.getItem(PREFERENCES_KEY);
@@ -47,13 +62,29 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error('Error parsing preferences:', error);
       }
     }
+    
+    setIsInitialLoad(false);
   }, []);
 
-  // Save read links to localStorage
+  // Save read links to localStorage and update previously read on app close/reload
   useEffect(() => {
+    if (isInitialLoad) return;
+    
     localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks)));
     setUnreadCount(Math.max(totalArticles - readLinks.size, 0));
-  }, [readLinks, totalArticles]);
+  }, [readLinks, totalArticles, isInitialLoad]);
+
+  // Before the app unloads, save current read links as previously read for next session
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.setItem(PREVIOUSLY_READ_KEY, JSON.stringify(Array.from(readLinks)));
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [readLinks]);
 
   // Save preferences to localStorage
   useEffect(() => {
@@ -105,6 +136,7 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <UnreadContext.Provider value={{ 
       unreadCount, 
       readLinks, 
+      previouslyReadLinks,
       markAsRead, 
       toggleReadStatus, 
       setTotalArticles,
