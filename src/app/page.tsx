@@ -175,12 +175,12 @@ export default function HomePage() {
   }, [articles.length, setTotalArticles]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto pt-6 overflow-hidden">
-      <section className="space-y-4 w-full overflow-hidden">
+    <main className="space-y-8 px-4 max-w-5xl mx-auto pt-8 pb-12 md:pb-12 pb-28 overflow-hidden">
+      <section className="space-y-6 w-full overflow-hidden">
         {isClient && (
           <>
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between mb-6 glass-card p-4 rounded-3xl animate-[fadeIn_0.5s_ease-out]">
+              <div className="text-sm font-medium text-[var(--text-secondary)]">
                 {unreadCount} unread articles
               </div>
               <div className="flex gap-2">
@@ -203,16 +203,16 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <div className="grid gap-4 w-full overflow-hidden">
+            <div className="grid gap-6 w-full overflow-hidden">
             {isLoading ? (
               // Show spinner during initial load
               <div className="flex justify-center items-center py-12">
                 <Spinner size="lg" />
               </div>
             ) : articles.length === 0 ? (
-              <Card className="shadow-sm">
-                <CardContent className="p-4 text-center">
-                  <p className="text-[var(--text-secondary)]">No articles found. Add some feeds to get started.</p>
+              <Card className="animate-[fadeIn_0.5s_ease-out]">
+                <CardContent className="p-8 text-center">
+                  <p className="text-[var(--text-secondary)] text-lg">No articles found. Add some feeds to get started.</p>
                 </CardContent>
               </Card>
             ) : (
@@ -224,14 +224,20 @@ export default function HomePage() {
                   isRead={readLinks.has(article.link)}
                   onScrollPast={() => {
                     // Auto-mark as read when article is scrolled past
-                    // Prevent duplicate marks with ref tracking
-                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && !markingAsReadRef.current.has(article.link)) {
-                      markingAsReadRef.current.add(article.link);
-                      toggleReadStatus(article.link);
-                      // Clean up after a short delay
-                      setTimeout(() => {
-                        markingAsReadRef.current.delete(article.link);
-                      }, 500);
+                    // Use ref to prevent duplicate marks AND check if already read
+                    const articleLink = article.link;
+                    if (autoMarkAsReadOnScroll && 
+                        !readLinks.has(articleLink) && 
+                        !markingAsReadRef.current.has(articleLink)) {
+                      markingAsReadRef.current.add(articleLink);
+                      // Use requestAnimationFrame to batch state updates
+                      requestAnimationFrame(() => {
+                        toggleReadStatus(articleLink);
+                        // Clean up after operation completes
+                        setTimeout(() => {
+                          markingAsReadRef.current.delete(articleLink);
+                        }, 1000);
+                      });
                     }
                   }}
                   onToggleRead={(articleId) => toggleReadStatus(articleId)}
@@ -239,11 +245,11 @@ export default function HomePage() {
               ))
             )}
             {filteredArticles.length > visibleCount && (
-              <div ref={loadMoreRef} className="h-10 flex justify-center">
+              <div ref={loadMoreRef} className="h-10 flex justify-center animate-[fadeIn_0.5s_ease-out]">
                 <Button 
                   variant="default" 
                   onClick={() => setVisibleCount(prev => Math.min(prev + 20, filteredArticles.length))}
-                  className="w-full"
+                  className="w-full max-w-md"
                 >
                   Load More
                 </Button>
@@ -255,7 +261,7 @@ export default function HomePage() {
         <Button
           variant="default"
           onClick={handleRefresh}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 animate-[fadeIn_0.5s_ease-out]"
         >
           <svg
             className="w-4 h-4"

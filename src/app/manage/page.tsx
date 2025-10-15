@@ -619,7 +619,7 @@ export default function ManagePage() {
   }, [savedFeeds]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto py-6">
+    <main className="space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6">
       {/* Page Header */}
       <div className="border-b border-[var(--border)] pb-4">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>

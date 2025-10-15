@@ -1,23 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --card-bg: #ffffff;
-  --card-border: #e5e7eb;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
-  --text-primary: #171717;
-  --text-secondary: #6b7280;
-  --accent: #f3f4f6;
-  --accent-hover: #e5e7eb;
-  --muted: #f9fafb;
-  --muted-hover: #f3f4f6;
-  --background-hover: #f8fafc;
-  --border: #e5e7eb;
-  --input-bg: #ffffff;
-  --input-border: #d1d5db;
-  --input-focus: #3b82f6;
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card-bg: rgba(255, 255, 255, 0.72);
+  --card-border: rgba(0, 0, 0, 0.08);
+  --primary: #007aff;
+  --primary-hover: #0051d5;
+  --text-primary: #1d1d1f;
+  --text-secondary: #86868b;
+  --accent: rgba(120, 120, 128, 0.12);
+  --accent-hover: rgba(120, 120, 128, 0.2);
+  --muted: rgba(142, 142, 147, 0.08);
+  --muted-hover: rgba(142, 142, 147, 0.16);
+  --background-hover: rgba(0, 0, 0, 0.04);
+  --border: rgba(0, 0, 0, 0.1);
+  --input-bg: rgba(255, 255, 255, 0.8);
+  --input-border: rgba(0, 0, 0, 0.12);
+  --input-focus: #007aff;
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.04);
 }
 
 @theme inline {
@@ -29,49 +34,66 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --card-bg: #1e293b;
-    --card-border: #475569;
-    --primary: #60a5fa;
-    --primary-hover: #3b82f6;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --accent: #334155;
-    --accent-hover: #475569;
-    --muted: #1e293b;
-    --muted-hover: #334155;
-    --background-hover: #1e293b;
-    --border: #475569;
-    --input-bg: #1e293b;
-    --input-border: #475569;
-    --input-focus: #60a5fa;
+    --background: #000000;
+    --foreground: #f5f5f7;
+    --card-bg: rgba(28, 28, 30, 0.72);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --primary: #0a84ff;
+    --primary-hover: #409cff;
+    --text-primary: #f5f5f7;
+    --text-secondary: #98989d;
+    --accent: rgba(120, 120, 128, 0.24);
+    --accent-hover: rgba(120, 120, 128, 0.36);
+    --muted: rgba(142, 142, 147, 0.16);
+    --muted-hover: rgba(142, 142, 147, 0.24);
+    --background-hover: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.12);
+    --input-bg: rgba(28, 28, 30, 0.8);
+    --input-border: rgba(255, 255, 255, 0.16);
+    --input-focus: #0a84ff;
+    --glass-bg: rgba(28, 28, 30, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.6), 0 4px 6px rgba(0, 0, 0, 0.5);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar for dark mode */
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-hover);
+}
+
 @media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar {
-    width: 10px;
-  }
-  
-  ::-webkit-scrollbar-track {
+  ::-webkit-scrollbar-thumb {
     background: var(--accent);
   }
   
-  ::-webkit-scrollbar-thumb {
-    background: var(--card-border);
-    border-radius: 5px;
-  }
-  
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--text-secondary);
+    background: var(--accent-hover);
   }
 }
 
@@ -79,7 +101,7 @@ body {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -87,16 +109,103 @@ body {
   }
 }
 
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @keyframes pulse {
-  0% {
+  0%, 100% {
     opacity: 0.6;
   }
   50% {
     opacity: 1;
   }
-  100% {
-    opacity: 0.6;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
   }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Liquid Glass Effects */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.glass-nav {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.glass-tab-bar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .glass-tab-bar {
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* Safe area for iOS devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.glass-button {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  background: var(--accent-hover);
+  transform: scale(1.02);
+}
+
+.glass-button:active {
+  transform: scale(0.98);
 }
 
 /* Grayed out style for read articles */
@@ -106,112 +215,55 @@ body {
   pointer-events: none;
 }
 
-/* Improved dark mode form elements */
+/* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
-  input[type="text"],
-  input[type="url"],
-  input[type="file"],
-  select,
-  textarea {
-    background-color: var(--input-bg);
-    border-color: var(--input-border);
-    color: var(--text-primary);
-  }
-  
   input[type="text"]:focus,
   input[type="url"]:focus,
   input[type="file"]:focus,
   select:focus,
   textarea:focus {
-    border-color: var(--input-focus);
-    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
-  }
-  
-  /* Improve checkbox and radio button visibility */
-  input[type="checkbox"],
-  input[type="radio"] {
-    accent-color: var(--primary);
-  }
-  
-  /* Better contrast for range inputs */
-  input[type="range"] {
-    background: var(--accent);
-  }
-  
-  input[type="range"]::-webkit-slider-thumb {
-    background: var(--primary);
-  }
-  
-  input[type="range"]::-moz-range-thumb {
-    background: var(--primary);
-  }
-  
-  /* Improve file input styling */
-  input[type="file"] {
-    background: var(--input-bg);
-    border: 1px solid var(--input-border);
-    color: var(--text-primary);
+    box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.25);
   }
   
   input[type="file"]::-webkit-file-upload-button {
     background: var(--accent);
     color: var(--text-primary);
     border: 1px solid var(--input-border);
-    border-radius: 6px;
-    padding: 4px 12px;
+    border-radius: 8px;
+    padding: 6px 14px;
     margin-right: 12px;
     cursor: pointer;
+    transition: all 0.2s;
   }
   
   input[type="file"]::-webkit-file-upload-button:hover {
     background: var(--accent-hover);
+    transform: scale(1.02);
   }
   
-  /* Improve select dropdown styling */
   select {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 8px center;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2398989d' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 12px center;
     background-repeat: no-repeat;
     background-size: 16px;
-    padding-right: 40px;
-  }
-  
-  /* Better focus indicators for all interactive elements */
-  button:focus-visible,
-  input:focus-visible,
-  select:focus-visible,
-  textarea:focus-visible {
-    outline: 2px solid var(--input-focus);
-    outline-offset: 2px;
-  }
-  
-  /* Improve tab navigation contrast */
-  .tab-active {
-    background-color: var(--background-hover);
-    border-color: var(--primary);
-    color: var(--primary);
-  }
-  
-  .tab-inactive {
-    color: var(--text-secondary);
-  }
-  
-  .tab-inactive:hover {
-    background-color: var(--background-hover);
-    color: var(--text-primary);
+    padding-right: 44px;
   }
 }
 
-/* Light mode form element improvements */
+/* Enhanced form elements with glass effect */
 input[type="text"],
 input[type="url"],
 input[type="file"],
 select,
 textarea {
-  background-color: var(--input-bg);
-  border-color: var(--input-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid var(--input-border);
   color: var(--text-primary);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  border-radius: 12px;
+  padding: 10px 16px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 input[type="text"]:focus,
@@ -220,135 +272,110 @@ input[type="file"]:focus,
 select:focus,
 textarea:focus {
   border-color: var(--input-focus);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+  outline: none;
 }
 
-/* Improve checkbox and radio button visibility */
 input[type="checkbox"],
 input[type="radio"] {
   accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
 }
 
-/* Better contrast for range inputs */
-input[type="range"] {
-  background: var(--accent);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  background: var(--primary);
-}
-
-input[type="range"]::-moz-range-thumb {
-  background: var(--primary);
-}
-
-/* Improve file input styling */
-input[type="file"] {
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  color: var(--text-primary);
-}
-
+/* File input styling */
 input[type="file"]::-webkit-file-upload-button {
   background: var(--accent);
   color: var(--text-primary);
   border: 1px solid var(--input-border);
-  border-radius: 6px;
-  padding: 4px 12px;
+  border-radius: 8px;
+  padding: 6px 14px;
   margin-right: 12px;
   cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
 input[type="file"]::-webkit-file-upload-button:hover {
   background: var(--accent-hover);
+  transform: scale(1.02);
 }
 
-/* Improve select dropdown styling */
+/* Select dropdown styling */
 select {
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 8px center;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2386868b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
   background-repeat: no-repeat;
   background-size: 16px;
-  padding-right: 40px;
+  padding-right: 44px;
 }
 
-/* Better focus indicators for all interactive elements */
+/* Focus indicators */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--input-focus);
   outline-offset: 2px;
+  border-radius: 8px;
 }
 
-/* Improve tab navigation contrast */
-.tab-active {
-  background-color: var(--background-hover);
-  border-color: var(--primary);
-  color: var(--primary);
+/* Status indicators with glass effect */
+.status-healthy {
+  color: #34c759;
+  background: rgba(52, 199, 89, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 500;
 }
 
-.tab-inactive {
+.status-error {
+  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 500;
+}
+
+.status-warning {
+  color: #ff9500;
+  background: rgba(255, 149, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-weight: 500;
+}
+
+/* Icon effects */
+.icon-secondary {
   color: var(--text-secondary);
+  opacity: 0.8;
+  transition: all 0.2s;
 }
 
-.tab-inactive:hover {
-  background-color: var(--background-hover);
+.icon-secondary:hover {
+  opacity: 1;
   color: var(--text-primary);
+  transform: scale(1.1);
 }
 
-/* Enhanced dark mode improvements */
-@media (prefers-color-scheme: dark) {
-  /* Better contrast for status indicators */
-  .status-healthy {
-    color: #4ade80;
-    background-color: rgba(74, 222, 128, 0.1);
-    border-color: rgba(74, 222, 128, 0.3);
-  }
-  
-  .status-error {
-    color: #f87171;
-    background-color: rgba(248, 113, 113, 0.1);
-    border-color: rgba(248, 113, 113, 0.3);
-  }
-  
-  .status-warning {
-    color: #fbbf24;
-    background-color: rgba(251, 191, 36, 0.1);
-    border-color: rgba(251, 191, 36, 0.3);
-  }
-  
-  /* Improve icon visibility */
-  .icon-secondary {
-    color: var(--text-secondary);
-    opacity: 0.8;
-  }
-  
-  .icon-secondary:hover {
-    opacity: 1;
-    color: var(--text-primary);
-  }
-  
-  /* Better card contrast */
-  .card-muted {
-    background-color: var(--muted);
-    border-color: var(--card-border);
-  }
-  
-  .card-muted:hover {
-    background-color: var(--muted-hover);
-    border-color: var(--primary);
-  }
-  
-  /* Enhanced form elements */
-  .form-element {
-    background-color: var(--input-bg);
-    border-color: var(--input-border);
-    color: var(--text-primary);
-  }
-  
-  .form-element:focus {
-    border-color: var(--input-focus);
-    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
-  }
+/* Card variants */
+.card-muted {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  transition: all 0.2s;
+}
+
+.card-muted:hover {
+  background: var(--muted-hover);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }

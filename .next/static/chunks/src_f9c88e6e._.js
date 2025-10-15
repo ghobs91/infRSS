@@ -12,7 +12,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 ;
 const Input = ({ className, ...props })=>{
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
-        className: `border border-[var(--input-border)] rounded-xl px-4 py-2 w-full text-base focus:outline-none focus:ring-2 focus:ring-[var(--input-focus)] focus:border-[var(--input-focus)] bg-[var(--input-bg)] text-[var(--text-primary)] transition-colors ${className}`,
+        className: `glass-card border border-[var(--input-border)] rounded-2xl px-4 py-3 w-full text-base focus:outline-none focus:ring-2 focus:ring-[var(--input-focus)] focus:border-transparent bg-[var(--input-bg)] text-[var(--text-primary)] transition-all duration-200 placeholder:text-[var(--text-secondary)] ${className}`,
         ...props
     }, void 0, false, {
         fileName: "[project]/src/components/ui/input.tsx",
@@ -38,17 +38,17 @@ __turbopack_context__.s({
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 ;
 const Button = ({ className = "", variant = "default", size = "md", children, ...props })=>{
-    const base = "font-semibold rounded-xl shadow-sm transition-colors";
+    const base = "font-semibold rounded-2xl transition-all duration-200 active:scale-95";
     const sizes = {
-        sm: "px-2 py-1 text-sm",
-        md: "px-4 py-2",
-        lg: "px-6 py-3 text-lg"
+        sm: "px-3 py-1.5 text-sm",
+        md: "px-5 py-2.5",
+        lg: "px-7 py-3.5 text-lg"
     };
     const variants = {
-        default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm",
-        destructive: "bg-red-600 hover:bg-red-700 text-white shadow-sm",
-        ghost: "bg-transparent hover:bg-[var(--muted-hover)] text-[var(--text-primary)] border border-transparent hover:border-[var(--card-border)]",
-        outline: "bg-transparent border border-[var(--card-border)] text-[var(--text-primary)] hover:bg-[var(--muted)] hover:border-[var(--card-border)]"
+        default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md hover:shadow-lg",
+        destructive: "bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg",
+        ghost: "glass-button text-[var(--text-primary)]",
+        outline: "glass-button text-[var(--text-primary)] border-[var(--border)]"
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
         className: `${base} ${sizes[size]} ${variants[variant]} ${className}`,
@@ -82,7 +82,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 ;
 const Card = ({ className, children, ...props })=>{
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: `border border-[var(--card-border)] rounded-2xl shadow-sm bg-[var(--card-bg)] transition-colors ${className}`,
+        className: `glass-card rounded-3xl overflow-hidden transition-all duration-300 ${className}`,
         ...props,
         children: children
     }, void 0, false, {
@@ -1792,13 +1792,13 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$
 ;
 ;
 ;
-const badgeVariants = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$class$2d$variance$2d$authority$2f$dist$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cva"])("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2", {
+const badgeVariants = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$class$2d$variance$2d$authority$2f$dist$2f$index$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["cva"])("inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold transition-all duration-200 glass-card", {
     variants: {
         variant: {
-            default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
-            secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
-            destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
-            outline: "text-foreground"
+            default: "text-[var(--primary)] hover:scale-105",
+            secondary: "text-[var(--text-secondary)] hover:scale-105",
+            destructive: "text-red-500 hover:scale-105",
+            outline: "border border-[var(--border)] text-[var(--text-primary)] hover:scale-105"
         }
     },
     defaultVariants: {
@@ -3760,7 +3760,7 @@ function ManagePage() {
         savedFeeds
     ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
-        className: "space-y-8 px-4 max-w-4xl mx-auto py-6",
+        className: "space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                 className: "border-b border-[var(--border)] pb-4",

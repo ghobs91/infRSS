@@ -86,13 +86,17 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const toggleReadStatus = useCallback((link: string) => {
     setReadLinks(prev => {
-      const next = new Set(prev);
-      if (next.has(link)) {
+      // Check if state would actually change to prevent unnecessary re-renders
+      if (prev.has(link)) {
+        const next = new Set(prev);
         next.delete(link);
-      } else {
+        return next;
+      } else if (!prev.has(link)) {
+        const next = new Set(prev);
         next.add(link);
+        return next;
       }
-      return next;
+      return prev; // No change needed
     });
   }, []);
 

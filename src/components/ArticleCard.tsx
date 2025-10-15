@@ -20,9 +20,9 @@ interface ArticleCardProps {
 // Sentiment indicator component
 const SentimentIndicator = ({ sentiment }: { sentiment: SentimentAnalysis }) => {
   const getSentimentColor = (score: number) => {
-    if (score > 0.3) return 'text-green-600';
-    if (score < -0.3) return 'text-red-600';
-    return 'text-yellow-600';
+    if (score > 0.3) return 'text-green-500';
+    if (score < -0.3) return 'text-red-500';
+    return 'text-yellow-500';
   };
 
   const getSentimentIcon = (score: number) => {
@@ -32,33 +32,33 @@ const SentimentIndicator = ({ sentiment }: { sentiment: SentimentAnalysis }) => 
   };
 
   const getToxicityColor = (toxicity: number) => {
-    if (toxicity > 0.7) return 'text-red-600';
-    if (toxicity > 0.4) return 'text-yellow-600';
-    return 'text-green-600';
+    if (toxicity > 0.7) return 'text-red-500';
+    if (toxicity > 0.4) return 'text-yellow-500';
+    return 'text-green-500';
   };
 
   return (
     <div className="flex flex-wrap gap-2 text-xs w-full overflow-hidden">
-      <div className={cn("flex items-center gap-1 flex-shrink-0", getSentimentColor(sentiment.score))}>
+      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getSentimentColor(sentiment.score))}>
         <span>{getSentimentIcon(sentiment.score)}</span>
         <span>{Math.round(sentiment.score * 100)}%</span>
       </div>
       
       {sentiment.isClickbait && (
-        <div className="text-orange-600 flex items-center gap-1 flex-shrink-0">
+        <div className="text-orange-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium">
           <span>🚨</span>
           <span>Clickbait</span>
         </div>
       )}
       
       {sentiment.isRagebait && (
-        <div className="text-red-600 flex items-center gap-1 flex-shrink-0">
+        <div className="text-red-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium">
           <span>💥</span>
           <span>Ragebait</span>
         </div>
       )}
       
-      <div className={cn("flex items-center gap-1 flex-shrink-0", getToxicityColor(sentiment.toxicity))}>
+      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getToxicityColor(sentiment.toxicity))}>
         <span>⚠️</span>
         <span>{Math.round(sentiment.toxicity * 100)}%</span>
       </div>
@@ -118,24 +118,27 @@ export const ArticleCard = ({
   useEffect(() => {
     if (!ref.current || !onScrollPast) return;
     
+    let hasTriggered = false;
+    
     const observer = new window.IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Track if the article is currently visible
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+          // Track if the article is currently visible (at least 70% visible)
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
             setWasVisible(true);
           }
           // Mark as read when scrolling PAST (was visible, now not visible)
-          // Only trigger if the article has fully left the viewport
-          else if (wasVisible && !entry.isIntersecting && entry.intersectionRatio === 0) {
+          // Only trigger once per scroll-past event
+          else if (wasVisible && !entry.isIntersecting && !hasTriggered) {
+            hasTriggered = true;
             onScrollPast();
-            setWasVisible(false); // Reset to prevent multiple triggers
+            setWasVisible(false);
           }
         });
       },
       { 
-        threshold: [0, 0.5, 1], // Multiple thresholds to track visibility more accurately
-        rootMargin: '0px' // No margin - use actual viewport boundaries
+        threshold: [0, 0.7], // Only track fully visible and not visible
+        rootMargin: '-50px' // Require article to be well within viewport before marking as "seen"
       }
     );
     
@@ -156,23 +159,23 @@ export const ArticleCard = ({
   };
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="animate-[fadeIn_0.5s_ease-out]">
       <Card className={cn(
-        "shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md max-w-full",
-        isRead && "read-article opacity-75",
-        article.sentiment?.isClickbait && "border-orange-200",
-        article.sentiment?.isRagebait && "border-red-200"
+        "overflow-hidden transition-all duration-300 hover:scale-[1.01] max-w-full",
+        isRead && "opacity-60 saturate-50",
+        article.sentiment?.isClickbait && "border-orange-300",
+        article.sentiment?.isRagebait && "border-red-300"
       )}>
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row w-full overflow-hidden">
             {article.thumbnail && !imgError && (
-              <div className="w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0">
+              <div className="w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0 overflow-hidden">
                 <Image 
                   src={article.thumbnail} 
                   alt={article.title}
                   fill
                   unoptimized
-                  className="object-cover"
+                  className="object-cover transition-transform duration-300 hover:scale-105"
                   onError={() => setImgError(true)}
                 />
               </div>
@@ -182,7 +185,7 @@ export const ArticleCard = ({
               <div className="flex items-start justify-between gap-2 w-full overflow-hidden">
                 <a
                   href={article.link}
-                  className="text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 flex-1 break-words overflow-hidden"
+                  className="text-base sm:text-lg font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-2 flex-1 break-words overflow-hidden transition-all duration-200 hover:scale-[1.01]"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -195,7 +198,7 @@ export const ArticleCard = ({
                       variant="ghost"
                       size="sm"
                       onClick={handleToggleRead}
-                      className="text-xs p-2 h-auto whitespace-nowrap"
+                      className="text-xs p-2 h-auto whitespace-nowrap hover:scale-110"
                       title={isRead ? "Mark as unread" : "Mark as read"}
                     >
                       {isRead ? "👁️" : "👁️‍🗨️"}
@@ -207,7 +210,7 @@ export const ArticleCard = ({
                       variant="ghost"
                       size="sm"
                       onClick={handleArchive}
-                      className="text-xs p-2 h-auto whitespace-nowrap"
+                      className="text-xs p-2 h-auto whitespace-nowrap hover:scale-110"
                       title="Archive article"
                     >
                       📁
@@ -243,7 +246,7 @@ export const ArticleCard = ({
                     {article.tags.slice(0, 3).map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full whitespace-nowrap"
+                        className="px-3 py-1 text-xs glass-card rounded-full whitespace-nowrap font-medium"
                       >
                         {tag}
                       </span>

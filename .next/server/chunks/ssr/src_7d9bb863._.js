@@ -11,17 +11,17 @@ __turbopack_context__.s({
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/server/route-modules/app-page/vendored/ssr/react-jsx-dev-runtime.js [app-ssr] (ecmascript)");
 ;
 const Button = ({ className = "", variant = "default", size = "md", children, ...props })=>{
-    const base = "font-semibold rounded-xl shadow-sm transition-colors";
+    const base = "font-semibold rounded-2xl transition-all duration-200 active:scale-95";
     const sizes = {
-        sm: "px-2 py-1 text-sm",
-        md: "px-4 py-2",
-        lg: "px-6 py-3 text-lg"
+        sm: "px-3 py-1.5 text-sm",
+        md: "px-5 py-2.5",
+        lg: "px-7 py-3.5 text-lg"
     };
     const variants = {
-        default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm",
-        destructive: "bg-red-600 hover:bg-red-700 text-white shadow-sm",
-        ghost: "bg-transparent hover:bg-[var(--muted-hover)] text-[var(--text-primary)] border border-transparent hover:border-[var(--card-border)]",
-        outline: "bg-transparent border border-[var(--card-border)] text-[var(--text-primary)] hover:bg-[var(--muted)] hover:border-[var(--card-border)]"
+        default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md hover:shadow-lg",
+        destructive: "bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg",
+        ghost: "glass-button text-[var(--text-primary)]",
+        outline: "glass-button text-[var(--text-primary)] border-[var(--border)]"
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
         className: `${base} ${sizes[size]} ${variants[variant]} ${className}`,
@@ -49,7 +49,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist
 ;
 const Card = ({ className, children, ...props })=>{
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-        className: `border border-[var(--card-border)] rounded-2xl shadow-sm bg-[var(--card-bg)] transition-colors ${className}`,
+        className: `glass-card rounded-3xl overflow-hidden transition-all duration-300 ${className}`,
         ...props,
         children: children
     }, void 0, false, {
@@ -185,9 +185,9 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$
 // Sentiment indicator component
 const SentimentIndicator = ({ sentiment })=>{
     const getSentimentColor = (score)=>{
-        if (score > 0.3) return 'text-green-600';
-        if (score < -0.3) return 'text-red-600';
-        return 'text-yellow-600';
+        if (score > 0.3) return 'text-green-500';
+        if (score < -0.3) return 'text-red-500';
+        return 'text-yellow-500';
     };
     const getSentimentIcon = (score)=>{
         if (score > 0.3) return '😊';
@@ -195,15 +195,15 @@ const SentimentIndicator = ({ sentiment })=>{
         return '😐';
     };
     const getToxicityColor = (toxicity)=>{
-        if (toxicity > 0.7) return 'text-red-600';
-        if (toxicity > 0.4) return 'text-yellow-600';
-        return 'text-green-600';
+        if (toxicity > 0.7) return 'text-red-500';
+        if (toxicity > 0.4) return 'text-yellow-500';
+        return 'text-green-500';
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         className: "flex flex-wrap gap-2 text-xs w-full overflow-hidden",
         children: [
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("flex items-center gap-1 flex-shrink-0", getSentimentColor(sentiment.score)),
+                className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getSentimentColor(sentiment.score)),
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         children: getSentimentIcon(sentiment.score)
@@ -229,7 +229,7 @@ const SentimentIndicator = ({ sentiment })=>{
                 columnNumber: 7
             }, this),
             sentiment.isClickbait && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "text-orange-600 flex items-center gap-1 flex-shrink-0",
+                className: "text-orange-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         children: "🚨"
@@ -252,7 +252,7 @@ const SentimentIndicator = ({ sentiment })=>{
                 columnNumber: 9
             }, this),
             sentiment.isRagebait && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: "text-red-600 flex items-center gap-1 flex-shrink-0",
+                className: "text-red-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         children: "💥"
@@ -275,7 +275,7 @@ const SentimentIndicator = ({ sentiment })=>{
                 columnNumber: 9
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("flex items-center gap-1 flex-shrink-0", getToxicityColor(sentiment.toxicity)),
+                className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getToxicityColor(sentiment.toxicity)),
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                         children: "⚠️"
@@ -361,23 +361,24 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
     }, []);
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!ref.current || !onScrollPast) return;
+        let hasTriggered = false;
         const observer = new window.IntersectionObserver((entries)=>{
             entries.forEach((entry)=>{
-                // Track if the article is currently visible
-                if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+                // Track if the article is currently visible (at least 70% visible)
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.7) {
                     setWasVisible(true);
-                } else if (wasVisible && !entry.isIntersecting && entry.intersectionRatio === 0) {
+                } else if (wasVisible && !entry.isIntersecting && !hasTriggered) {
+                    hasTriggered = true;
                     onScrollPast();
-                    setWasVisible(false); // Reset to prevent multiple triggers
+                    setWasVisible(false);
                 }
             });
         }, {
             threshold: [
                 0,
-                0.5,
-                1
+                0.7
             ],
-            rootMargin: '0px' // No margin - use actual viewport boundaries
+            rootMargin: '-50px' // Require article to be well within viewport before marking as "seen"
         });
         observer.observe(ref.current);
         return ()=>observer.disconnect();
@@ -397,30 +398,31 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
     };
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
         ref: ref,
+        className: "animate-[fadeIn_0.5s_ease-out]",
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
-            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md max-w-full", isRead && "read-article opacity-75", article.sentiment?.isClickbait && "border-orange-200", article.sentiment?.isRagebait && "border-red-200"),
+            className: (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["cn"])("overflow-hidden transition-all duration-300 hover:scale-[1.01] max-w-full", isRead && "opacity-60 saturate-50", article.sentiment?.isClickbait && "border-orange-300", article.sentiment?.isRagebait && "border-red-300"),
             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
                 className: "p-0",
                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                     className: "flex flex-col sm:flex-row w-full overflow-hidden",
                     children: [
                         article.thumbnail && !imgError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0",
+                            className: "w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0 overflow-hidden",
                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$image$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"], {
                                 src: article.thumbnail,
                                 alt: article.title,
                                 fill: true,
                                 unoptimized: true,
-                                className: "object-cover",
+                                className: "object-cover transition-transform duration-300 hover:scale-105",
                                 onError: ()=>setImgError(true)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                lineNumber: 170,
+                                lineNumber: 173,
                                 columnNumber: 17
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/ArticleCard.tsx",
-                            lineNumber: 169,
+                            lineNumber: 172,
                             columnNumber: 15
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -431,13 +433,13 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                     children: [
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
                                             href: article.link,
-                                            className: "text-base sm:text-lg font-medium text-[var(--primary)] hover:underline line-clamp-2 flex-1 break-words overflow-hidden",
+                                            className: "text-base sm:text-lg font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-2 flex-1 break-words overflow-hidden transition-all duration-200 hover:scale-[1.01]",
                                             target: "_blank",
                                             rel: "noopener noreferrer",
                                             children: article.title
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 183,
+                                            lineNumber: 186,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -447,36 +449,36 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                     variant: "ghost",
                                                     size: "sm",
                                                     onClick: handleToggleRead,
-                                                    className: "text-xs p-2 h-auto whitespace-nowrap",
+                                                    className: "text-xs p-2 h-auto whitespace-nowrap hover:scale-110",
                                                     title: isRead ? "Mark as unread" : "Mark as read",
                                                     children: isRead ? "👁️" : "👁️‍🗨️"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 194,
+                                                    lineNumber: 197,
                                                     columnNumber: 21
                                                 }, this),
                                                 onArchive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
                                                     variant: "ghost",
                                                     size: "sm",
                                                     onClick: handleArchive,
-                                                    className: "text-xs p-2 h-auto whitespace-nowrap",
+                                                    className: "text-xs p-2 h-auto whitespace-nowrap hover:scale-110",
                                                     title: "Archive article",
                                                     children: "📁"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 206,
+                                                    lineNumber: 209,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 192,
+                                            lineNumber: 195,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 182,
+                                    lineNumber: 185,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -492,12 +494,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                                 className: "object-contain"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/ArticleCard.tsx",
-                                                lineNumber: 222,
+                                                lineNumber: 225,
                                                 columnNumber: 21
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 221,
+                                            lineNumber: 224,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -511,28 +513,28 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                             })()
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 231,
+                                            lineNumber: 234,
                                             columnNumber: 17
                                         }, this),
                                         article.tags && article.tags.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "flex gap-1 flex-shrink-0",
                                             children: article.tags.slice(0, 3).map((tag, index)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                                    className: "px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full whitespace-nowrap",
+                                                    className: "px-3 py-1 text-xs glass-card rounded-full whitespace-nowrap font-medium",
                                                     children: tag
                                                 }, index, false, {
                                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                                    lineNumber: 244,
+                                                    lineNumber: 247,
                                                     columnNumber: 23
                                                 }, this))
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/ArticleCard.tsx",
-                                            lineNumber: 242,
+                                            lineNumber: 245,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 219,
+                                    lineNumber: 222,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -544,7 +546,7 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                     })
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 255,
+                                    lineNumber: 258,
                                     columnNumber: 15
                                 }, this),
                                 showSentiment && article.sentiment && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -553,12 +555,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         sentiment: article.sentiment
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 266,
+                                        lineNumber: 269,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 265,
+                                    lineNumber: 268,
                                     columnNumber: 17
                                 }, this),
                                 showSummary && article.summary && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -569,12 +571,12 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         onToggle: ()=>setSummaryExpanded(!summaryExpanded)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 273,
+                                        lineNumber: 276,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 272,
+                                    lineNumber: 275,
                                     columnNumber: 17
                                 }, this),
                                 (!article.summary || showSummary === false) && article.content && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -587,39 +589,39 @@ const ArticleCard = ({ article, isRead, onScrollPast, onToggleRead, onArchive, s
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/ArticleCard.tsx",
-                                        lineNumber: 284,
+                                        lineNumber: 287,
                                         columnNumber: 19
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/ArticleCard.tsx",
-                                    lineNumber: 283,
+                                    lineNumber: 286,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/ArticleCard.tsx",
-                            lineNumber: 181,
+                            lineNumber: 184,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/ArticleCard.tsx",
-                    lineNumber: 167,
+                    lineNumber: 170,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/ArticleCard.tsx",
-                lineNumber: 166,
+                lineNumber: 169,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/components/ArticleCard.tsx",
-            lineNumber: 160,
+            lineNumber: 163,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/components/ArticleCard.tsx",
-        lineNumber: 159,
+        lineNumber: 162,
         columnNumber: 5
     }, this);
 };
@@ -1955,17 +1957,17 @@ function HomePage() {
         setTotalArticles
     ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
-        className: "space-y-8 px-4 max-w-4xl mx-auto pt-6 overflow-hidden",
+        className: "space-y-8 px-4 max-w-5xl mx-auto pt-8 pb-12 md:pb-12 pb-28 overflow-hidden",
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("section", {
-            className: "space-y-4 w-full overflow-hidden",
+            className: "space-y-6 w-full overflow-hidden",
             children: [
                 isClient && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Fragment"], {
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "flex items-center justify-between mb-4",
+                            className: "flex items-center justify-between mb-6 glass-card p-4 rounded-3xl animate-[fadeIn_0.5s_ease-out]",
                             children: [
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "text-sm text-[var(--text-secondary)]",
+                                    className: "text-sm font-medium text-[var(--text-secondary)]",
                                     children: [
                                         unreadCount,
                                         " unread articles"
@@ -2014,7 +2016,7 @@ function HomePage() {
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "grid gap-4 w-full overflow-hidden",
+                            className: "grid gap-6 w-full overflow-hidden",
                             children: [
                                 isLoading ? // Show spinner during initial load
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2031,11 +2033,11 @@ function HomePage() {
                                     lineNumber: 209,
                                     columnNumber: 15
                                 }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Card"], {
-                                    className: "shadow-sm",
+                                    className: "animate-[fadeIn_0.5s_ease-out]",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
-                                        className: "p-4 text-center",
+                                        className: "p-8 text-center",
                                         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                            className: "text-[var(--text-secondary)]",
+                                            className: "text-[var(--text-secondary)] text-lg",
                                             children: "No articles found. Add some feeds to get started."
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
@@ -2057,14 +2059,18 @@ function HomePage() {
                                         isRead: readLinks.has(article.link),
                                         onScrollPast: ()=>{
                                             // Auto-mark as read when article is scrolled past
-                                            // Prevent duplicate marks with ref tracking
-                                            if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && !markingAsReadRef.current.has(article.link)) {
-                                                markingAsReadRef.current.add(article.link);
-                                                toggleReadStatus(article.link);
-                                                // Clean up after a short delay
-                                                setTimeout(()=>{
-                                                    markingAsReadRef.current.delete(article.link);
-                                                }, 500);
+                                            // Use ref to prevent duplicate marks AND check if already read
+                                            const articleLink = article.link;
+                                            if (autoMarkAsReadOnScroll && !readLinks.has(articleLink) && !markingAsReadRef.current.has(articleLink)) {
+                                                markingAsReadRef.current.add(articleLink);
+                                                // Use requestAnimationFrame to batch state updates
+                                                requestAnimationFrame(()=>{
+                                                    toggleReadStatus(articleLink);
+                                                    // Clean up after operation completes
+                                                    setTimeout(()=>{
+                                                        markingAsReadRef.current.delete(articleLink);
+                                                    }, 1000);
+                                                });
                                             }
                                         },
                                         onToggleRead: (articleId)=>toggleReadStatus(articleId)
@@ -2075,20 +2081,20 @@ function HomePage() {
                                     }, this)),
                                 filteredArticles.length > visibleCount && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     ref: loadMoreRef,
-                                    className: "h-10 flex justify-center",
+                                    className: "h-10 flex justify-center animate-[fadeIn_0.5s_ease-out]",
                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
                                         variant: "default",
                                         onClick: ()=>setVisibleCount((prev)=>Math.min(prev + 20, filteredArticles.length)),
-                                        className: "w-full",
+                                        className: "w-full max-w-md",
                                         children: "Load More"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 243,
+                                        lineNumber: 249,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 242,
+                                    lineNumber: 248,
                                     columnNumber: 15
                                 }, this)
                             ]
@@ -2102,7 +2108,7 @@ function HomePage() {
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
                     variant: "default",
                     onClick: handleRefresh,
-                    className: "flex items-center gap-2",
+                    className: "flex items-center gap-2 animate-[fadeIn_0.5s_ease-out]",
                     children: [
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("svg", {
                             className: "w-4 h-4",
@@ -2117,25 +2123,25 @@ function HomePage() {
                                 d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 267,
+                                lineNumber: 273,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 260,
+                            lineNumber: 266,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 274,
+                            lineNumber: 280,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 255,
+                    lineNumber: 261,
                     columnNumber: 9
                 }, this)
             ]

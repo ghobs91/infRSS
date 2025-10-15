@@ -4,17 +4,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ className = "", variant = "default", size = "md", children, ...props }) => {
-  const base = "font-semibold rounded-xl shadow-sm transition-colors";
+  const base = "font-semibold rounded-2xl transition-all duration-200 active:scale-95";
   const sizes = {
-    sm: "px-2 py-1 text-sm",
-    md: "px-4 py-2",
-    lg: "px-6 py-3 text-lg",
+    sm: "px-3 py-1.5 text-sm",
+    md: "px-5 py-2.5",
+    lg: "px-7 py-3.5 text-lg",
   };
   const variants = {
-    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm",
-    destructive: "bg-red-600 hover:bg-red-700 text-white shadow-sm",
-    ghost: "bg-transparent hover:bg-[var(--muted-hover)] text-[var(--text-primary)] border border-transparent hover:border-[var(--card-border)]",
-    outline: "bg-transparent border border-[var(--card-border)] text-[var(--text-primary)] hover:bg-[var(--muted)] hover:border-[var(--card-border)]",
+    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md hover:shadow-lg",
+    destructive: "bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg",
+    ghost: "glass-button text-[var(--text-primary)]",
+    outline: "glass-button text-[var(--text-primary)] border-[var(--border)]",
   };
 
   return (
