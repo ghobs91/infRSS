@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+// Use Edge Runtime for minimal proxying without server instance
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();

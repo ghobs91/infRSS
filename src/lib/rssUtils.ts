@@ -1,6 +1,11 @@
 // lib/rssUtils.ts
+// This file contains both server-side and client-side RSS utilities
+// Client-side parsing should use Web Workers when available
 
 import type { FeedData, Article, Category } from './types';
+
+// Re-export client-side utilities
+export { fetchAndParseRSSClient } from './rssUtilsClient';
 
 // ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
 
@@ -174,6 +179,12 @@ function extractThumbnailFromItem(item: Element): string | undefined {
 
 /**
  * Fetches and parses an RSS feed with robust error handling for malformed XML.
+ * 
+ * ⚠️ DEPRECATED FOR CLIENT-SIDE USE: Use fetchAndParseRSSClient() instead
+ * which leverages Web Workers for better performance.
+ * 
+ * This function is kept for backward compatibility and server-side rendering,
+ * but client components should use the worker-based approach.
  * 
  * This function implements a multi-layered approach to handle common RSS parsing issues:
  * 1. Pre-parse detection and cleanup of malformed CDATA patterns (e.g., "><![CDATA[>>")

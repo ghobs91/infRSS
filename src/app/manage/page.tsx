@@ -10,7 +10,6 @@ import { Spinner } from "@/components/ui/spinner";
 import Image from "next/image";
 import {
   getFeedUrlFromHtml,
-  fetchAndParseRSS,
   loadFeedsFromStorage,
   saveFeedToStorage,
   parseOPMLFile,
@@ -20,8 +19,10 @@ import {
   saveUserPreferences,
   discoverFeedUrlWithFallbacks,
 } from "@/lib/rssUtils";
+import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import type { FeedData } from "@/lib/types";
 import { useTransformerWorker } from "@/lib/useTransformerWorker";
+import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import type { Category, UserPreferences } from "@/lib/types";
 import { FeedHealthChecker } from "@/components/FeedHealthChecker";
 
@@ -389,6 +390,7 @@ export default function ManagePage() {
   const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'sentiment' | 'health'>('feeds');
 
   const { suggestFeedsWithWorker, isLoading: workerLoading } = useTransformerWorker();
+  const { parseRSSWithWorker } = useRSSParserWorker();
 
   // Load saved data on initial render
   useEffect(() => {
@@ -420,21 +422,21 @@ export default function ManagePage() {
       }
 
       // Try to parse the feed directly first
-      let feedData = await fetchAndParseRSS(feedUrlInput.trim());
+      let feedData = await fetchAndParseRSSClient(feedUrlInput.trim(), parseRSSWithWorker);
       
       // If that fails, try to extract the feed URL from the HTML
       let discoveredFeedUrl: string | null = null;
       if (!feedData) {
         discoveredFeedUrl = await getFeedUrlFromHtml(feedUrlInput.trim());
         if (discoveredFeedUrl) {
-          feedData = await fetchAndParseRSS(discoveredFeedUrl);
+          feedData = await fetchAndParseRSSClient(discoveredFeedUrl, parseRSSWithWorker);
         }
       }
       // If still no feed, try advanced discovery
       if (!feedData) {
         discoveredFeedUrl = await discoverFeedUrlWithFallbacks(feedUrlInput.trim());
         if (discoveredFeedUrl) {
-          feedData = await fetchAndParseRSS(discoveredFeedUrl);
+          feedData = await fetchAndParseRSSClient(discoveredFeedUrl, parseRSSWithWorker);
         }
       }
 
@@ -463,7 +465,7 @@ export default function ManagePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [feedUrlInput, savedFeeds]);
+  }, [feedUrlInput, savedFeeds, parseRSSWithWorker]);
 
   // Handle suggesting feeds
   const handleSuggestFeeds = useCallback(async () => {

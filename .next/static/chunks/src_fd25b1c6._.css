@@ -609,6 +609,11 @@
     display: table-row-group;
   }
 
+  .size-1 {
+    width: calc(var(--spacing) * 1);
+    height: calc(var(--spacing) * 1);
+  }
+
   .h-3 {
     height: calc(var(--spacing) * 3);
   }
@@ -1105,10 +1110,6 @@
     border-color: var(--input-border);
   }
 
-  .border-\[var\(--primary\)\] {
-    border-color: var(--primary);
-  }
-
   .border-blue-200 {
     border-color: var(--color-blue-200);
   }
@@ -1199,10 +1200,6 @@
 
   .bg-blue-50 {
     background-color: var(--color-blue-50);
-  }
-
-  .bg-blue-50\/30 {
-    background-color: color-mix(in oklab, var(--color-blue-50) 30%, transparent);
   }
 
   .bg-blue-100 {
@@ -1868,12 +1865,6 @@
   }
 
   @media (hover: hover) {
-    .hover\:bg-gray-200:hover {
-      background-color: var(--color-gray-200);
-    }
-  }
-
-  @media (hover: hover) {
     .hover\:bg-green-100:hover {
       background-color: var(--color-green-100);
     }
@@ -1915,10 +1906,6 @@
 
   .focus\:ring-\[var\(--input-focus\)\]:focus {
     --tw-ring-color: var(--input-focus);
-  }
-
-  .focus\:ring-\[var\(--primary\)\]:focus {
-    --tw-ring-color: var(--primary);
   }
 
   .focus\:ring-offset-2:focus {

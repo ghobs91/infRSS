@@ -121,19 +121,21 @@ export const ArticleCard = ({
     const observer = new window.IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Mark as read when scrolling PAST (was visible, now not visible)
-          if (wasVisible && !entry.isIntersecting) {
-            onScrollPast();
-          }
           // Track if the article is currently visible
-          if (entry.isIntersecting) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
             setWasVisible(true);
+          }
+          // Mark as read when scrolling PAST (was visible, now not visible)
+          // Only trigger if the article has fully left the viewport
+          else if (wasVisible && !entry.isIntersecting && entry.intersectionRatio === 0) {
+            onScrollPast();
+            setWasVisible(false); // Reset to prevent multiple triggers
           }
         });
       },
       { 
-        threshold: 0,
-        rootMargin: '-50px 0px -50px 0px' // Only trigger when article is well within viewport
+        threshold: [0, 0.5, 1], // Multiple thresholds to track visibility more accurately
+        rootMargin: '0px' // No margin - use actual viewport boundaries
       }
     );
     

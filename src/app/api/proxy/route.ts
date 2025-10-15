@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, fetchWithRetry } from '@/lib/rateLimit';
 
+// Use Edge Runtime for minimal proxying without server instance
+export const runtime = 'edge';
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const targetUrl = searchParams.get('url');

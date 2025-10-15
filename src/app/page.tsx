@@ -7,9 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ArticleCard } from "@/components/ArticleCard";
 import {
-  fetchAndParseRSS,
   loadFeedsFromStorage,
 } from "@/lib/rssUtils";
+import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
+import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import { useUnread } from "@/lib/unreadContext";
 
 
@@ -42,6 +43,8 @@ export default function HomePage() {
   const [hideRead, setHideRead] = useState(true);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { toggleReadStatus, setTotalArticles, readLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
+  const { parseRSSWithWorker } = useRSSParserWorker();
+  const markingAsReadRef = useRef<Set<string>>(new Set()); // Track articles currently being marked
 
   // Only show unread articles if hideRead is true
   const filteredArticles = useMemo(() => {
@@ -71,7 +74,8 @@ export default function HomePage() {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
           
-          const data = await fetchAndParseRSS(feed.url);
+          // Use client-side parsing with Web Worker
+          const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
           clearTimeout(timeoutId);
           return data?.items || [];
         } catch (error) {
@@ -87,7 +91,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Error refreshing feeds:", error);
     }
-  }, []);
+  }, [parseRSSWithWorker]);
 
   // Intersection observer for infinite scrolling
   useEffect(() => {
@@ -135,7 +139,8 @@ export default function HomePage() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
             
-            const data = await fetchAndParseRSS(feed.url);
+            // Use client-side parsing with Web Worker
+            const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
             clearTimeout(timeoutId);
             return data?.items || [];
           } catch (error) {
@@ -156,7 +161,7 @@ export default function HomePage() {
 
     setIsClient(true);
     loadSavedFeeds();
-  }, [handleRefresh]);
+  }, [handleRefresh, parseRSSWithWorker]);
 
   // Don't automatically show read articles - let user control this
   // useEffect(() => {
@@ -219,8 +224,14 @@ export default function HomePage() {
                   isRead={readLinks.has(article.link)}
                   onScrollPast={() => {
                     // Auto-mark as read when article is scrolled past
-                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link)) {
+                    // Prevent duplicate marks with ref tracking
+                    if (autoMarkAsReadOnScroll && !readLinks.has(article.link) && !markingAsReadRef.current.has(article.link)) {
+                      markingAsReadRef.current.add(article.link);
                       toggleReadStatus(article.link);
+                      // Clean up after a short delay
+                      setTimeout(() => {
+                        markingAsReadRef.current.delete(article.link);
+                      }, 500);
                     }
                   }}
                   onToggleRead={(articleId) => toggleReadStatus(articleId)}
