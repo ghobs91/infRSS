@@ -24,7 +24,6 @@ import type { FeedData } from "@/lib/types";
 import { useTransformerWorker } from "@/lib/useTransformerWorker";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import type { Category, UserPreferences } from "@/lib/types";
-import { FeedHealthChecker } from "@/components/FeedHealthChecker";
 
 // Category management component
 const CategoryManager = ({ 
@@ -143,92 +142,65 @@ const CategoryManager = ({
   );
 };
 
-// Sentiment filter settings component
-const SentimentFilterSettings = ({ 
+// Vibes filter settings component
+const VibesFilterSettings = ({ 
   preferences, 
   onUpdatePreferences 
 }: {
   preferences: UserPreferences;
   onUpdatePreferences: (prefs: UserPreferences) => void;
 }) => {
-  const updateSentimentFilter = (updates: Partial<UserPreferences['sentimentFilter']>) => {
+  const updateVibesFilter = (updates: Partial<UserPreferences['vibesFilter']>) => {
+    const newFilter = {
+      ...preferences.vibesFilter,
+      ...updates
+    };
+    
+    // Auto-enable vibes filtering if either clickbait or ragebait is checked
+    // Auto-disable if both are unchecked
+    if ('hideClickbait' in updates || 'hideRagebait' in updates) {
+      newFilter.enabled = newFilter.hideClickbait || newFilter.hideRagebait;
+    }
+    
+    // Set sensible defaults for internal values if not already set
+    if (newFilter.minVibes === undefined) {
+      newFilter.minVibes = -0.5;
+    }
+    if (newFilter.maxToxicity === undefined) {
+      newFilter.maxToxicity = 0.7;
+    }
+    
     onUpdatePreferences({
       ...preferences,
-      sentimentFilter: {
-        ...preferences.sentimentFilter,
-        ...updates
-      }
+      vibesFilter: newFilter
     });
   };
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium text-[var(--text-primary)]">Sentiment Filtering</h3>
+      <h3 className="text-lg font-medium text-[var(--text-primary)]">Vibes Filtering</h3>
+      <p className="text-sm text-[var(--text-secondary)]">Filter out low-quality content from your feed</p>
       
       <div className="space-y-3">
         <label className="flex items-center gap-2 text-[var(--text-primary)]">
           <input
             type="checkbox"
-            checked={preferences.sentimentFilter.enabled}
-            onChange={(e) => updateSentimentFilter({ enabled: e.target.checked })}
+            checked={preferences.vibesFilter.hideClickbait}
+            onChange={(e) => updateVibesFilter({ hideClickbait: e.target.checked })}
             className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
           />
-          <span>Enable sentiment filtering</span>
+          <span>Hide clickbait articles</span>
         </label>
 
-        {preferences.sentimentFilter.enabled && (
-          <>
-            <div className="space-y-2">
-              <label className="block text-sm text-[var(--text-primary)]">
-                Minimum sentiment score: {preferences.sentimentFilter.minSentiment}
-                <input
-                  type="range"
-                  min="-1"
-                  max="1"
-                  step="0.1"
-                  value={preferences.sentimentFilter.minSentiment}
-                  onChange={(e) => updateSentimentFilter({ minSentiment: parseFloat(e.target.value) })}
-                  className="w-full mt-2"
-                />
-              </label>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm text-[var(--text-primary)]">
-                Maximum toxicity: {Math.round(preferences.sentimentFilter.maxToxicity * 100)}%
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={preferences.sentimentFilter.maxToxicity}
-                  onChange={(e) => updateSentimentFilter({ maxToxicity: parseFloat(e.target.value) })}
-                  className="w-full mt-2"
-                />
-              </label>
-            </div>
-
-            <label className="flex items-center gap-2 text-[var(--text-primary)]">
-              <input
-                type="checkbox"
-                checked={preferences.sentimentFilter.hideClickbait}
-                onChange={(e) => updateSentimentFilter({ hideClickbait: e.target.checked })}
-                className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
-              />
-              <span>Hide clickbait articles</span>
-            </label>
-
-            <label className="flex items-center gap-2 text-[var(--text-primary)]">
-              <input
-                type="checkbox"
-                checked={preferences.sentimentFilter.hideRagebait}
-                onChange={(e) => updateSentimentFilter({ hideRagebait: e.target.checked })}
-                className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
-              />
-              <span>Hide ragebait articles</span>
-            </label>
-          </>
-        )}
+        <label className="flex items-center gap-2 text-[var(--text-primary)]">
+          <input
+            type="checkbox"
+            checked={preferences.vibesFilter.hideRagebait}
+            onChange={(e) => updateVibesFilter({ hideRagebait: e.target.checked })}
+            className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
+          />
+          <span>Hide ragebait articles</span>
+        </label>
       </div>
     </div>
   );
@@ -387,7 +359,7 @@ export default function ManagePage() {
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'sentiment' | 'health'>('feeds');
+  const [activeTab, setActiveTab] = useState<'feeds' | 'categories' | 'vibes'>('feeds');
 
   const { suggestFeedsWithWorker, isLoading: workerLoading } = useTransformerWorker();
   const { parseRSSWithWorker } = useRSSParserWorker();
@@ -524,19 +496,6 @@ export default function ManagePage() {
     // Update in storage
     const updatedFeeds = savedFeeds.map(feed => 
       feed.url === url ? { ...feed, ...updates } : feed
-    );
-    localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
-  }, [savedFeeds]);
-
-  // Handle feed URL updates for health checker
-  const handleFeedUrlUpdate = useCallback((oldUrl: string, newUrl: string) => {
-    setSavedFeeds(prev => prev.map(feed => 
-      feed.url === oldUrl ? { ...feed, url: newUrl } : feed
-    ));
-    
-    // Update in storage
-    const updatedFeeds = savedFeeds.map(feed => 
-      feed.url === oldUrl ? { ...feed, url: newUrl } : feed
     );
     localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
   }, [savedFeeds]);
@@ -688,24 +647,14 @@ export default function ManagePage() {
           Categories
         </button>
         <button
-          onClick={() => setActiveTab('sentiment')}
+          onClick={() => setActiveTab('vibes')}
           className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
-            activeTab === 'sentiment' 
+            activeTab === 'vibes' 
               ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
           }`}
         >
-          Sentiment
-        </button>
-        <button
-          onClick={() => setActiveTab('health')}
-          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
-            activeTab === 'health' 
-              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
-          }`}
-        >
-          Health
+          Vibes
         </button>
       </div>
 
@@ -834,22 +783,12 @@ export default function ManagePage() {
         </section>
       )}
 
-      {/* Sentiment Tab */}
-      {activeTab === 'sentiment' && preferences && (
+      {/* Vibes Tab */}
+      {activeTab === 'vibes' && preferences && preferences.vibesFilter && (
         <section className="space-y-6">
-          <SentimentFilterSettings
+          <VibesFilterSettings
             preferences={preferences}
             onUpdatePreferences={handleUpdatePreferences}
-          />
-        </section>
-      )}
-
-      {/* Health Tab */}
-      {activeTab === 'health' && (
-        <section className="space-y-6">
-          <FeedHealthChecker
-            feeds={savedFeeds}
-            onUpdateFeed={handleFeedUrlUpdate}
           />
         </section>
       )}

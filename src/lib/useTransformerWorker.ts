@@ -2,15 +2,23 @@
 
 // lib/useTransformerWorker.ts
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import type { FeedData, Article, SentimentAnalysis } from './types';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import type { FeedData, Article, VibesAnalysis } from './types';
 
-interface FeedDataWithScore extends FeedData {
-  score?: number;
+interface AnalyzedArticle {
+  title: string;
+  link: string;
+  pubDate: string;
+  content: string;
+  summary: string;
+  thumbnail?: string;
+  vibes: VibesAnalysis;
 }
 
+type FeedDataWithScore = FeedData & { score: number };
+
 interface ArticleAnalysis {
-  sentiment: SentimentAnalysis;
+  vibes: VibesAnalysis;
   summary: string;
 }
 

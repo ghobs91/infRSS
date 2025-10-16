@@ -19,13 +19,13 @@ export interface Article {
   content: string;
   sourceDomain: string;
   summary?: string;
-  sentiment?: SentimentAnalysis;
+  vibes?: VibesAnalysis;
   tags?: string[];
   readStatus: 'unread' | 'read' | 'archived';
   lastRead?: number;
 }
 
-export interface SentimentAnalysis {
+export interface VibesAnalysis {
   score: number; // -1 to 1 (negative to positive)
   label: 'positive' | 'negative' | 'neutral';
   confidence: number;
@@ -44,9 +44,9 @@ export interface Category {
 
 export interface UserPreferences {
   id: string;
-  sentimentFilter: {
+  vibesFilter: {
     enabled: boolean;
-    minSentiment: number; // -1 to 1
+    minVibes: number; // -1 to 1
     maxToxicity: number; // 0 to 1
     hideClickbait: boolean;
     hideRagebait: boolean;

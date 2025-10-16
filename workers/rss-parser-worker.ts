@@ -12,7 +12,7 @@ interface Article {
   sourceDomain: string;
   readStatus: 'read' | 'unread';
   tags: string[];
-  sentiment?: any;
+  vibes?: any;
 }
 
 /**

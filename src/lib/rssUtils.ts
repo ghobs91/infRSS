@@ -828,31 +828,38 @@ export function saveCategoriesToStorage(categories: Category[]): void {
 }
 
 export function loadUserPreferences() {
+  const defaultPreferences = {
+    id: 'default',
+    vibesFilter: {
+      enabled: false,
+      minVibes: -0.5,
+      maxToxicity: 0.7,
+      hideClickbait: false,
+      hideRagebait: false
+    },
+    categories: loadCategoriesFromStorage(),
+    syncEnabled: false,
+    syncDeviceId: generateDeviceId(),
+    lastSync: 0,
+    language: 'en',
+    autoMarkAsReadOnScroll: true // Default to enabled
+  };
+  
   try {
     const preferences = localStorage.getItem("userPreferences");
     if (preferences) {
-      return JSON.parse(preferences);
+      const parsed = JSON.parse(preferences);
+      // Ensure vibesFilter exists in loaded preferences
+      if (!parsed.vibesFilter) {
+        parsed.vibesFilter = defaultPreferences.vibesFilter;
+      }
+      return parsed;
     }
     // Return default preferences
-    return {
-      id: 'default',
-      sentimentFilter: {
-        enabled: false,
-        minSentiment: -0.5,
-        maxToxicity: 0.7,
-        hideClickbait: false,
-        hideRagebait: false
-      },
-      categories: loadCategoriesFromStorage(),
-      syncEnabled: false,
-      syncDeviceId: generateDeviceId(),
-      lastSync: 0,
-      language: 'en',
-      autoMarkAsReadOnScroll: true // Default to enabled
-    };
+    return defaultPreferences;
   } catch (error) {
     console.error("Error loading user preferences:", error);
-    return null;
+    return defaultPreferences;
   }
 }
 
@@ -868,20 +875,20 @@ function generateDeviceId(): string {
   return 'device-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
 }
 
-export function filterArticlesBySentiment(articles: Article[], preferences: any): Article[] {
-  if (!preferences?.sentimentFilter?.enabled) {
+export function filterArticlesByVibes(articles: Article[], preferences: any): Article[] {
+  if (!preferences?.vibesFilter?.enabled) {
     return articles;
   }
 
-  const { minSentiment, maxToxicity, hideClickbait, hideRagebait } = preferences.sentimentFilter;
+  const { minVibes, maxToxicity, hideClickbait, hideRagebait } = preferences.vibesFilter;
 
   return articles.filter(article => {
-    if (!article.sentiment) return true;
+    if (!article.vibes) return true;
 
-    const { score, toxicity, isClickbait, isRagebait } = article.sentiment;
+    const { score, toxicity, isClickbait, isRagebait } = article.vibes;
 
-    // Filter by sentiment score
-    if (score < minSentiment) return false;
+    // Filter by vibes score
+    if (score < minVibes) return false;
 
     // Filter by toxicity
     if (toxicity > maxToxicity) return false;

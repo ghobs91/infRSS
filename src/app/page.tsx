@@ -8,15 +8,17 @@ import { Spinner } from "@/components/ui/spinner";
 import { ArticleCard } from "@/components/ArticleCard";
 import {
   loadFeedsFromStorage,
+  loadUserPreferences,
 } from "@/lib/rssUtils";
 import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import { useUnread } from "@/lib/unreadContext";
+import type { UserPreferences } from "@/lib/types";
 
 
 
 // Helper function to convert article format for ArticleCard
-const convertArticleForCard = (article: { title: string; link: string; pubDate: string; thumbnail?: string }) => ({
+const convertArticleForCard = (article: { title: string; link: string; pubDate: string; thumbnail?: string; vibes?: any }) => ({
   id: article.link,
   title: article.title,
   link: article.link,
@@ -24,6 +26,7 @@ const convertArticleForCard = (article: { title: string; link: string; pubDate: 
   thumbnail: article.thumbnail,
   content: '',
   summary: '',
+  vibes: article.vibes,
   sourceDomain: (() => {
     try {
       return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
@@ -35,12 +38,33 @@ const convertArticleForCard = (article: { title: string; link: string; pubDate: 
   tags: []
 });
 
+// Helper function to check if article should be filtered based on vibes
+const shouldFilterArticle = (article: any, preferences: UserPreferences | null): { filtered: boolean; reason: string } => {
+  if (!preferences?.vibesFilter?.enabled || !article.vibes) {
+    return { filtered: false, reason: '' };
+  }
+
+  const { hideClickbait, hideRagebait } = preferences.vibesFilter;
+  const { isClickbait, isRagebait } = article.vibes;
+
+  if (hideClickbait && isClickbait) {
+    return { filtered: true, reason: 'Clickbait' };
+  }
+
+  if (hideRagebait && isRagebait) {
+    return { filtered: true, reason: 'Ragebait' };
+  }
+
+  return { filtered: false, reason: '' };
+};
+
 export default function HomePage() {
-  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string }[]>([]);
+  const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string; vibes?: any }[]>([]);
   const [visibleCount, setVisibleCount] = useState(20);
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [hideRead, setHideRead] = useState(false); // Changed default to false - show all articles
+  const [hideRead, setHideRead] = useState(true); // Default to true - hide read articles
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
@@ -193,6 +217,14 @@ export default function HomePage() {
     loadSavedFeeds();
   }, [handleRefresh, parseRSSWithWorker]);
 
+  // Load user preferences
+  useEffect(() => {
+    if (isClient) {
+      const prefs = loadUserPreferences();
+      setPreferences(prefs);
+    }
+  }, [isClient]);
+
   // Don't automatically show read articles - let user control this
   // useEffect(() => {
   //   if (!isLoading) {
@@ -247,38 +279,43 @@ export default function HomePage() {
               </Card>
             ) : (
               // Show actual articles using ArticleCard component
-              visibleArticles.map((article, idx) => (
-                <ArticleCard
-                  key={`${article.link}-${idx}`}
-                  article={convertArticleForCard(article)}
-                  isRead={readLinks.has(article.link)}
-                  onScrollPast={() => {
-                    // Auto-mark as read when article is scrolled past
-                    const articleLink = article.link;
-                    
-                    // Skip if auto-mark is disabled, already read, or already being marked
-                    if (!autoMarkAsReadOnScroll || 
-                        readLinks.has(articleLink) || 
-                        markingAsReadRef.current.has(articleLink)) {
-                      return;
-                    }
-                    
-                    // Add to tracking and pending batch
-                    markingAsReadRef.current.add(articleLink);
-                    pendingMarksRef.current.add(articleLink);
-                    
-                    // Clear existing timeout and set a new one to batch updates
-                    if (batchTimeoutRef.current) {
-                      clearTimeout(batchTimeoutRef.current);
-                    }
-                    
-                    // Process batch after a short delay (300ms)
-                    batchTimeoutRef.current = setTimeout(() => {
-                      processPendingMarks();
-                      batchTimeoutRef.current = null;
-                    }, 300);
-                  }}                />
-              ))
+              visibleArticles.map((article, idx) => {
+                const { filtered, reason } = shouldFilterArticle(article, preferences);
+                return (
+                  <ArticleCard
+                    key={`${article.link}-${idx}`}
+                    article={convertArticleForCard(article)}
+                    isRead={readLinks.has(article.link)}
+                    filtered={filtered}
+                    filterReason={reason}
+                    onScrollPast={() => {
+                      // Auto-mark as read when article is scrolled past
+                      const articleLink = article.link;
+                      
+                      // Skip if auto-mark is disabled, already read, or already being marked
+                      if (!autoMarkAsReadOnScroll || 
+                          readLinks.has(articleLink) || 
+                          markingAsReadRef.current.has(articleLink)) {
+                        return;
+                      }
+                      
+                      // Add to tracking and pending batch
+                      markingAsReadRef.current.add(articleLink);
+                      pendingMarksRef.current.add(articleLink);
+                      
+                      // Clear existing timeout and set a new one to batch updates
+                      if (batchTimeoutRef.current) {
+                        clearTimeout(batchTimeoutRef.current);
+                      }
+                      
+                      // Process batch after a short delay (300ms)
+                      batchTimeoutRef.current = setTimeout(() => {
+                        processPendingMarks();
+                        batchTimeoutRef.current = null;
+                      }, 300);
+                    }}                />
+                );
+              })
             )}
             {filteredArticles.length > visibleCount && (
               <div ref={loadMoreRef} className="h-10 flex justify-center animate-[fadeIn_0.5s_ease-out]">

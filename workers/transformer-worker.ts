@@ -6,7 +6,7 @@ env.allowLocalModels = false;
 env.useBrowserCache = true;
 
 let embedder: any = null;
-let sentimentClassifier: any = null;
+let vibesClassifier: any = null;
 let summarizer: any = null;
 let textClassifier: any = null;
 
@@ -17,11 +17,11 @@ async function loadEmbedder() {
   return embedder;
 }
 
-async function loadSentimentClassifier() {
-  if (!sentimentClassifier) {
-    sentimentClassifier = await pipeline("sentiment-analysis", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
+async function loadVibesClassifier() {
+  if (!vibesClassifier) {
+    vibesClassifier = await pipeline("sentiment-analysis", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
   }
-  return sentimentClassifier;
+  return vibesClassifier;
 }
 
 async function loadSummarizer() {
@@ -45,11 +45,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dot / (magA * magB);
 }
 
-async function analyzeSentiment(text: string) {
-  const classifier = await loadSentimentClassifier();
+async function analyzeVibes(text: string) {
+  const classifier = await loadVibesClassifier();
   const result = await classifier(text);
   
-  // Convert sentiment score to -1 to 1 scale
+  // Convert vibes score to -1 to 1 scale
   let score = 0;
   if (result[0].label === 'POSITIVE') {
     score = result[0].score;
@@ -169,8 +169,8 @@ self.onmessage = async (e: MessageEvent) => {
         const { title, content } = data;
         const fullText = `${title}. ${content}`;
         
-        // Analyze sentiment
-        const sentiment = await analyzeSentiment(fullText);
+        // Analyze vibes
+        const vibes = await analyzeVibes(fullText);
         
         // Detect clickbait and toxicity
         const clickbaitToxicity = await detectClickbaitAndToxicity(fullText);
@@ -179,8 +179,8 @@ self.onmessage = async (e: MessageEvent) => {
         const summary = await generateSummary(content);
         
         const analysis = {
-          sentiment: {
-            ...sentiment,
+          vibes: {
+            ...vibes,
             ...clickbaitToxicity
           },
           summary
@@ -197,15 +197,15 @@ self.onmessage = async (e: MessageEvent) => {
         const analyses = await Promise.all(
           articles.map(async (article: any) => {
             const fullText = `${article.title}. ${article.content}`;
-            const sentiment = await analyzeSentiment(fullText);
+            const vibes = await analyzeVibes(fullText);
             const clickbaitToxicity = await detectClickbaitAndToxicity(fullText);
             const summary = await generateSummary(article.content);
             
             return {
               articleId: article.id,
               analysis: {
-                sentiment: {
-                  ...sentiment,
+                vibes: {
+                  ...vibes,
                   ...clickbaitToxicity
                 },
                 summary

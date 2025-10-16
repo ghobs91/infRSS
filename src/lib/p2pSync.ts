@@ -239,9 +239,9 @@ export class P2PSyncService {
       const prefs = localStorage.getItem("userPreferences");
       const defaultPrefs: UserPreferences = {
         id: crypto.randomUUID(),
-        sentimentFilter: {
+        vibesFilter: {
           enabled: false,
-          minSentiment: 0,
+          minVibes: 0,
           maxToxicity: 1,
           hideClickbait: false,
           hideRagebait: false
@@ -257,9 +257,9 @@ export class P2PSyncService {
     } catch {
       return {
         id: crypto.randomUUID(),
-        sentimentFilter: {
+        vibesFilter: {
           enabled: false,
-          minSentiment: 0,
+          minVibes: 0,
           maxToxicity: 1,
           hideClickbait: false,
           hideRagebait: false

@@ -5,26 +5,28 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { Article, SentimentAnalysis } from "@/lib/types";
+import type { Article, VibesAnalysis } from "@/lib/types";
 
 interface ArticleCardProps {
   article: Article;
   isRead: boolean;
   onScrollPast?: () => void;
   onArchive?: (articleId: string) => void;
-  showSentiment?: boolean;
+  showVibes?: boolean;
   showSummary?: boolean;
+  filtered?: boolean;
+  filterReason?: string;
 }
 
-// Sentiment indicator component
-const SentimentIndicator = ({ sentiment }: { sentiment: SentimentAnalysis }) => {
-  const getSentimentColor = (score: number) => {
+// Vibes indicator component
+const VibesIndicator = ({ vibes }: { vibes: VibesAnalysis }) => {
+  const getVibesColor = (score: number) => {
     if (score > 0.3) return 'text-green-500';
     if (score < -0.3) return 'text-red-500';
     return 'text-yellow-500';
   };
 
-  const getSentimentIcon = (score: number) => {
+  const getVibesIcon = (score: number) => {
     if (score > 0.3) return '😊';
     if (score < -0.3) return '😞';
     return '😐';
@@ -38,28 +40,28 @@ const SentimentIndicator = ({ sentiment }: { sentiment: SentimentAnalysis }) => 
 
   return (
     <div className="flex flex-wrap gap-2 text-xs w-full overflow-hidden">
-      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getSentimentColor(sentiment.score))}>
-        <span>{getSentimentIcon(sentiment.score)}</span>
-        <span>{Math.round(sentiment.score * 100)}%</span>
+      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getVibesColor(vibes.score))}>
+        <span>{getVibesIcon(vibes.score)}</span>
+        <span>{Math.round(vibes.score * 100)}%</span>
       </div>
       
-      {sentiment.isClickbait && (
+      {vibes.isClickbait && (
         <div className="text-orange-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium">
           <span>🚨</span>
           <span>Clickbait</span>
         </div>
       )}
       
-      {sentiment.isRagebait && (
+      {vibes.isRagebait && (
         <div className="text-red-500 flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium">
           <span>💥</span>
           <span>Ragebait</span>
         </div>
       )}
       
-      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getToxicityColor(sentiment.toxicity))}>
+      <div className={cn("flex items-center gap-1 glass-card px-3 py-1.5 rounded-full flex-shrink-0 font-medium", getToxicityColor(vibes.toxicity))}>
         <span>⚠️</span>
-        <span>{Math.round(sentiment.toxicity * 100)}%</span>
+        <span>{Math.round(vibes.toxicity * 100)}%</span>
       </div>
     </div>
   );
@@ -100,12 +102,15 @@ export const ArticleCard = ({
   isRead, 
   onScrollPast,
   onArchive,
-  showSentiment = true,
-  showSummary = true
+  showVibes = true,
+  showSummary = true,
+  filtered = false,
+  filterReason = ''
 }: ArticleCardProps) => {
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [showFiltered, setShowFiltered] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hasTriggeredRef = useRef(false);
   const wasVisibleRef = useRef(false);
@@ -151,12 +156,49 @@ export const ArticleCard = ({
   return (
     <div ref={ref} className="animate-[fadeIn_0.5s_ease-out]">
       <Card className={cn(
-        "overflow-hidden transition-all duration-300 max-w-full",
+        "overflow-hidden transition-all duration-300 max-w-full relative",
         isRead && "opacity-60 saturate-50",
-        article.sentiment?.isClickbait && "border-orange-300",
-        article.sentiment?.isRagebait && "border-red-300"
+        article.vibes?.isClickbait && "border-orange-300",
+        article.vibes?.isRagebait && "border-red-300",
+        filtered && "border-2"
       )}>
-        <CardContent className="p-0">
+        {filtered && !showFiltered && (
+          <div className="absolute inset-0 z-10 bg-[var(--background)]/95 backdrop-blur-md flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-[var(--border)]">
+            <div className="text-center space-y-2">
+              <div className="text-2xl">
+                {filterReason === 'Clickbait' ? '🚨' : '💥'}
+              </div>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">
+                Filtered: {filterReason}
+              </p>
+              <p className="text-xs text-[var(--text-secondary)] max-w-xs">
+                This article was hidden based on your content preferences
+              </p>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowFiltered(true)}
+              className="text-xs shadow-lg"
+            >
+              👁️ Show Article
+            </Button>
+          </div>
+        )}
+        {filtered && showFiltered && (
+          <div className="absolute top-2 right-2 z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFiltered(false)}
+              className="text-xs bg-[var(--background)]/80 backdrop-blur-sm hover:bg-[var(--background)]/90"
+              title="Hide this article again"
+            >
+              🙈 Hide
+            </Button>
+          </div>
+        )}
+        <CardContent className={cn("p-0 transition-all duration-300", filtered && !showFiltered && "blur-md")}>
           <div className="flex flex-col sm:flex-row w-full overflow-hidden">
             {article.thumbnail && !imgError && (
               <div className="w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0 overflow-hidden">
@@ -241,10 +283,10 @@ export const ArticleCard = ({
                 })}
               </p>
 
-              {/* Sentiment Analysis */}
-              {showSentiment && article.sentiment && (
+              {/* Vibes Analysis */}
+              {showVibes && article.vibes && (
                 <div className="mb-2 w-full overflow-hidden">
-                  <SentimentIndicator sentiment={article.sentiment} />
+                  <VibesIndicator vibes={article.vibes} />
                 </div>
               )}
 
