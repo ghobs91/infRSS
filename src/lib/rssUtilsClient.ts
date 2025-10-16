@@ -155,7 +155,53 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       
       const summary = content.length > 300 ? content.substring(0, 300) + '...' : content;
       
-      const thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url") || undefined;
+      // Enhanced thumbnail extraction
+      let thumbnail: string | undefined = item.querySelector("enclosure[type^='image']")?.getAttribute("url") || undefined;
+      
+      // Try media:content and media:thumbnail
+      if (!thumbnail) {
+        const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:content[medium='image']") ||
+                            item.querySelector("media\\:thumbnail");
+        if (mediaContent) {
+          thumbnail = mediaContent.getAttribute("url") || undefined;
+        }
+      }
+      
+      // Try to extract from description/content HTML
+      if (!thumbnail) {
+        const desc = item.querySelector("description")?.textContent || 
+                    item.querySelector("content")?.textContent || "";
+        if (desc) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = desc;
+          const imgTag = tempDiv.querySelector("img");
+          if (imgTag) {
+            thumbnail = imgTag.getAttribute("src") || 
+                       imgTag.getAttribute("data-src") || undefined;
+          }
+        }
+      }
+      
+      // Try iTunes image
+      if (!thumbnail) {
+        const itunesImage = item.querySelector("itunes\\:image");
+        if (itunesImage) {
+          thumbnail = itunesImage.getAttribute("href") || undefined;
+        }
+      }
+      
+      // Try Atom link rel="enclosure"
+      if (!thumbnail) {
+        const atomEnclosure = item.querySelector("link[rel='enclosure'][type^='image']");
+        if (atomEnclosure) {
+          thumbnail = atomEnclosure.getAttribute("href") || undefined;
+        }
+      }
+      
+      // Validate thumbnail URL
+      if (thumbnail && !thumbnail.startsWith('http://') && !thumbnail.startsWith('https://')) {
+        thumbnail = undefined;
+      }
       
       let sourceDomain = "Unknown Source";
       if (link) {

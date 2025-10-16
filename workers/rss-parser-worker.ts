@@ -76,32 +76,123 @@ function cleanXMLContent(xmlString: string): string {
 }
 
 /**
- * Extract thumbnail from RSS item
+ * Extract thumbnail from RSS item - Enhanced version
+ * Supports multiple formats: enclosure, media:content, media:thumbnail, 
+ * content/description img tags, and various other patterns
  */
 function extractThumbnailFromItem(item: Element): string | undefined {
+  // 1. Try standard enclosure with image type
   let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
   
+  // 2. Try media:content and media:thumbnail (RSS Media namespace)
   if (!thumbnail) {
     try {
-      const mediaContent = item.querySelector("media\\:content[type^='image']") ||
+      const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:content[medium='image']") ||
                           item.querySelector("media\\:thumbnail");
       
       if (mediaContent) {
-        const url = mediaContent.getAttribute("url");
-        thumbnail = url ? url : undefined;
-      } else {
-        const allElements = item.querySelectorAll("*");
-        for (const element of allElements) {
-          if (element.tagName.toLowerCase().includes('media') && 
-              element.getAttribute('type')?.startsWith('image')) {
-            const url = element.getAttribute('url');
-            thumbnail = url ? url : undefined;
+        thumbnail = mediaContent.getAttribute("url") || undefined;
+      }
+      
+      // Also check for media:group
+      if (!thumbnail) {
+        const mediaGroup = item.querySelector("media\\:group");
+        if (mediaGroup) {
+          const groupContent = mediaGroup.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+          if (groupContent) {
+            thumbnail = groupContent.getAttribute("url") || undefined;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error extracting media namespace thumbnail:', error);
+    }
+  }
+  
+  // 3. Try to extract from description or content:encoded HTML
+  if (!thumbnail) {
+    try {
+      const description = item.querySelector("description")?.textContent || 
+                         item.querySelector("content\\:encoded")?.textContent || 
+                         item.querySelector("content")?.textContent || "";
+      
+      if (description) {
+        // Create a temporary DOM to parse HTML content
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = description;
+        
+        // Look for img tags in the content
+        const imgTag = tempDiv.querySelector("img");
+        if (imgTag) {
+          thumbnail = imgTag.getAttribute("src") || 
+                     imgTag.getAttribute("data-src") || 
+                     imgTag.getAttribute("data-lazy-src") || undefined;
+        }
+        
+        // Also check for Open Graph images in content
+        if (!thumbnail) {
+          const ogImage = tempDiv.querySelector("meta[property='og:image']");
+          if (ogImage) {
+            thumbnail = ogImage.getAttribute("content") || undefined;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Error extracting thumbnail from content HTML:', error);
+    }
+  }
+  
+  // 4. Try iTunes image (common in podcast feeds)
+  if (!thumbnail) {
+    const itunesImage = item.querySelector("itunes\\:image");
+    if (itunesImage) {
+      thumbnail = itunesImage.getAttribute("href") || undefined;
+    }
+  }
+  
+  // 5. Try image element (some feeds use this)
+  if (!thumbnail) {
+    const imageEl = item.querySelector("image > url");
+    if (imageEl) {
+      thumbnail = imageEl.textContent?.trim() || undefined;
+    }
+  }
+  
+  // 6. Try Atom link rel="enclosure"
+  if (!thumbnail) {
+    const atomEnclosure = item.querySelector("link[rel='enclosure'][type^='image']");
+    if (atomEnclosure) {
+      thumbnail = atomEnclosure.getAttribute("href") || undefined;
+    }
+  }
+  
+  // 7. Try any element with 'thumbnail' in the name
+  if (!thumbnail) {
+    try {
+      const allElements = item.querySelectorAll("*");
+      for (const element of allElements) {
+        const tagName = element.tagName.toLowerCase();
+        if (tagName.includes('thumbnail') || tagName.includes('image')) {
+          const url = element.getAttribute('url') || 
+                     element.getAttribute('href') || 
+                     element.textContent?.trim();
+          if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            thumbnail = url;
             break;
           }
         }
       }
     } catch (error) {
-      console.warn('Error extracting thumbnail from media elements:', error);
+      console.warn('Error in fallback thumbnail extraction:', error);
+    }
+  }
+  
+  // Validate and clean the thumbnail URL
+  if (thumbnail) {
+    thumbnail = thumbnail.trim();
+    // Check if it's a valid URL
+    if (!thumbnail.startsWith('http://') && !thumbnail.startsWith('https://')) {
+      thumbnail = undefined;
     }
   }
   
@@ -120,6 +211,22 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
       text = text.replace(
         /<rss[^>]*>/,
         match => match.replace('>', ' xmlns:media="http://search.yahoo.com/mrss/">')
+      );
+    }
+    
+    // Add content namespace if missing
+    if (text.includes('content:encoded') && !text.includes('xmlns:content')) {
+      text = text.replace(
+        /<rss[^>]*>/,
+        match => match.replace('>', ' xmlns:content="http://purl.org/rss/1.0/modules/content/">')
+      );
+    }
+    
+    // Add iTunes namespace if missing
+    if (text.includes('itunes:') && !text.includes('xmlns:itunes')) {
+      text = text.replace(
+        /<rss[^>]*>/,
+        match => match.replace('>', ' xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">')
       );
     }
 

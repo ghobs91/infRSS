@@ -39,22 +39,83 @@
     let thumbnail = item.querySelector("enclosure[type^='image']")?.getAttribute("url");
     if (!thumbnail) {
       try {
-        const mediaContent = item.querySelector("media\\:content[type^='image']") || item.querySelector("media\\:thumbnail");
+        const mediaContent = item.querySelector("media\\:content[type^='image'], media\\:content[medium='image']") || item.querySelector("media\\:thumbnail");
         if (mediaContent) {
-          const url = mediaContent.getAttribute("url");
-          thumbnail = url ? url : void 0;
-        } else {
-          const allElements = item.querySelectorAll("*");
-          for (const element of allElements) {
-            if (element.tagName.toLowerCase().includes("media") && element.getAttribute("type")?.startsWith("image")) {
-              const url = element.getAttribute("url");
-              thumbnail = url ? url : void 0;
+          thumbnail = mediaContent.getAttribute("url") || void 0;
+        }
+        if (!thumbnail) {
+          const mediaGroup = item.querySelector("media\\:group");
+          if (mediaGroup) {
+            const groupContent = mediaGroup.querySelector("media\\:content[type^='image'], media\\:thumbnail");
+            if (groupContent) {
+              thumbnail = groupContent.getAttribute("url") || void 0;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Error extracting media namespace thumbnail:", error);
+      }
+    }
+    if (!thumbnail) {
+      try {
+        const description = item.querySelector("description")?.textContent || item.querySelector("content\\:encoded")?.textContent || item.querySelector("content")?.textContent || "";
+        if (description) {
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = description;
+          const imgTag = tempDiv.querySelector("img");
+          if (imgTag) {
+            thumbnail = imgTag.getAttribute("src") || imgTag.getAttribute("data-src") || imgTag.getAttribute("data-lazy-src") || void 0;
+          }
+          if (!thumbnail) {
+            const ogImage = tempDiv.querySelector("meta[property='og:image']");
+            if (ogImage) {
+              thumbnail = ogImage.getAttribute("content") || void 0;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Error extracting thumbnail from content HTML:", error);
+      }
+    }
+    if (!thumbnail) {
+      const itunesImage = item.querySelector("itunes\\:image");
+      if (itunesImage) {
+        thumbnail = itunesImage.getAttribute("href") || void 0;
+      }
+    }
+    if (!thumbnail) {
+      const imageEl = item.querySelector("image > url");
+      if (imageEl) {
+        thumbnail = imageEl.textContent?.trim() || void 0;
+      }
+    }
+    if (!thumbnail) {
+      const atomEnclosure = item.querySelector("link[rel='enclosure'][type^='image']");
+      if (atomEnclosure) {
+        thumbnail = atomEnclosure.getAttribute("href") || void 0;
+      }
+    }
+    if (!thumbnail) {
+      try {
+        const allElements = item.querySelectorAll("*");
+        for (const element of allElements) {
+          const tagName = element.tagName.toLowerCase();
+          if (tagName.includes("thumbnail") || tagName.includes("image")) {
+            const url = element.getAttribute("url") || element.getAttribute("href") || element.textContent?.trim();
+            if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+              thumbnail = url;
               break;
             }
           }
         }
       } catch (error) {
-        console.warn("Error extracting thumbnail from media elements:", error);
+        console.warn("Error in fallback thumbnail extraction:", error);
+      }
+    }
+    if (thumbnail) {
+      thumbnail = thumbnail.trim();
+      if (!thumbnail.startsWith("http://") && !thumbnail.startsWith("https://")) {
+        thumbnail = void 0;
       }
     }
     return thumbnail || void 0;
@@ -66,6 +127,18 @@
         text = text.replace(
           /<rss[^>]*>/,
           (match) => match.replace(">", ' xmlns:media="http://search.yahoo.com/mrss/">')
+        );
+      }
+      if (text.includes("content:encoded") && !text.includes("xmlns:content")) {
+        text = text.replace(
+          /<rss[^>]*>/,
+          (match) => match.replace(">", ' xmlns:content="http://purl.org/rss/1.0/modules/content/">')
+        );
+      }
+      if (text.includes("itunes:") && !text.includes("xmlns:itunes")) {
+        text = text.replace(
+          /<rss[^>]*>/,
+          (match) => match.replace(">", ' xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">')
         );
       }
       text = text.replace(/<br\s*(?=[^/>]*>)/gi, "<br />").replace(/<img([^>]*?)(?<!\/)>/gi, "<img$1 />").replace(/<hr\s*(?=[^/>]*>)/gi, "<hr />").replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content) => {
