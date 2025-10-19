@@ -5,15 +5,15 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { FeedData, Article, VibesAnalysis } from './types';
 
-interface AnalyzedArticle {
-  title: string;
-  link: string;
-  pubDate: string;
-  content: string;
-  summary: string;
-  thumbnail?: string;
-  vibes: VibesAnalysis;
-}
+// interface AnalyzedArticle {
+//   title: string;
+//   link: string;
+//   pubDate: string;
+//   content: string;
+//   summary: string;
+//   thumbnail?: string;
+//   vibes: VibesAnalysis;
+// }
 
 type FeedDataWithScore = FeedData & { score: number };
 

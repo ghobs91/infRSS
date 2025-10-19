@@ -28992,7 +28992,7 @@ ${t2}`);
   env.allowLocalModels = false;
   env.useBrowserCache = true;
   var embedder = null;
-  var sentimentClassifier = null;
+  var vibesClassifier = null;
   var summarizer = null;
   var textClassifier = null;
   async function loadEmbedder() {
@@ -29001,11 +29001,11 @@ ${t2}`);
     }
     return embedder;
   }
-  async function loadSentimentClassifier() {
-    if (!sentimentClassifier) {
-      sentimentClassifier = await pipeline("sentiment-analysis", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
+  async function loadVibesClassifier() {
+    if (!vibesClassifier) {
+      vibesClassifier = await pipeline("sentiment-analysis", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
     }
-    return sentimentClassifier;
+    return vibesClassifier;
   }
   async function loadSummarizer() {
     if (!summarizer) {
@@ -29025,8 +29025,8 @@ ${t2}`);
     const magB = Math.sqrt(b.reduce((acc, val) => acc + val * val, 0));
     return dot / (magA * magB);
   }
-  async function analyzeSentiment(text) {
-    const classifier = await loadSentimentClassifier();
+  async function analyzeVibes(text) {
+    const classifier = await loadVibesClassifier();
     const result = await classifier(text);
     let score = 0;
     if (result[0].label === "POSITIVE") {
@@ -29128,12 +29128,12 @@ ${t2}`);
         case "analyze_article":
           const { title, content } = data;
           const fullText = `${title}. ${content}`;
-          const sentiment = await analyzeSentiment(fullText);
+          const vibes = await analyzeVibes(fullText);
           const clickbaitToxicity = await detectClickbaitAndToxicity(fullText);
           const summary = await generateSummary(content);
           const analysis = {
-            sentiment: {
-              ...sentiment,
+            vibes: {
+              ...vibes,
               ...clickbaitToxicity
             },
             summary
@@ -29148,14 +29148,14 @@ ${t2}`);
           const analyses = await Promise.all(
             articles.map(async (article) => {
               const fullText2 = `${article.title}. ${article.content}`;
-              const sentiment2 = await analyzeSentiment(fullText2);
+              const vibes2 = await analyzeVibes(fullText2);
               const clickbaitToxicity2 = await detectClickbaitAndToxicity(fullText2);
               const summary2 = await generateSummary(article.content);
               return {
                 articleId: article.id,
                 analysis: {
-                  sentiment: {
-                    ...sentiment2,
+                  vibes: {
+                    ...vibes2,
                     ...clickbaitToxicity2
                   },
                   summary: summary2
