@@ -3,6 +3,7 @@ import "./globals.css";
 import "../styles/scroll-fix.css";
 import { Navigation } from "@/components/Navigation";
 import { UnreadProvider } from "@/lib/unreadContext";
+import { ViewProvider } from "@/lib/viewContext";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -16,10 +17,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <body className="bg-[var(--background)] text-[var(--foreground)]">
         <div className="min-h-screen">
           <UnreadProvider>
-            <Navigation />
-            <div className="pt-16">
-              {children}
-            </div>
+            <ViewProvider>
+              <Navigation />
+              <div className="pt-16">
+                {children}
+              </div>
+            </ViewProvider>
           </UnreadProvider>
         </div>
       </body>

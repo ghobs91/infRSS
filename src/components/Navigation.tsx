@@ -3,14 +3,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Drawer } from '@/components/ui/drawer';
 import { IconButton } from '@/components/ui/icon-button';
-import { MenuIcon, CloseIcon, HomeIcon, PlusIcon, RssIcon } from '@/components/ui/icons';
+import { MenuIcon, CloseIcon, HomeIcon, PlusIcon, RssIcon, GridIcon, ListIcon } from '@/components/ui/icons';
 import { useUnread } from '@/lib/unreadContext';
+import { useView } from '@/lib/viewContext';
 
 export const Navigation = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
+  const { viewMode, toggleViewMode } = useView();
 
   // Detect if we're on a mobile device based on screen size
   useEffect(() => {
@@ -61,10 +63,11 @@ export const Navigation = () => {
 
   return (
     <>
-      {/* Top Navigation Bar - Show hamburger on desktop, hide on mobile */}
-      <header className={`glass-nav fixed top-0 left-0 right-0 h-16 z-30 transition-all duration-300 ${
-        isScrolled ? 'shadow-lg' : 'shadow-sm'
-      } ${isMobile ? 'md:flex' : ''}`}>
+      {/* Top Navigation Bar - Desktop only, hidden on mobile */}
+      {!isMobile && (
+        <header className={`glass-nav fixed top-0 left-0 right-0 h-16 z-30 transition-all duration-300 ${
+          isScrolled ? 'shadow-lg' : 'shadow-sm'
+        }`}>
         <div className="h-full flex items-center px-4 justify-between">
           <div className="flex items-center">
             {!isMobile && (
@@ -79,10 +82,22 @@ export const Navigation = () => {
               {getPageTitle()}
             </h1>
           </div>
-          {/* Unread Counter */}
-          <UnreadCounter />
+          <div className="flex items-center gap-2">
+            {/* View Toggle - Only show on home page */}
+            {pathname === '/' && (
+              <IconButton
+                icon={viewMode === 'magazine' ? <GridIcon /> : <ListIcon />}
+                label={viewMode === 'magazine' ? 'Cards View' : 'Magazine View'}
+                variant="ghost"
+                onClick={toggleViewMode}
+              />
+            )}
+            {/* Unread Counter */}
+            <UnreadCounter />
+          </div>
         </div>
       </header>
+      )}
 
       {/* Navigation Drawer - Desktop only */}
       {!isMobile && (
@@ -103,10 +118,10 @@ export const Navigation = () => {
                 <li>
                   <Link 
                     href="/" 
-                    className={`flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 ${
+                    className={`flex items-center gap-4 p-4 rounded-3xl transition-all duration-400 font-medium ${
                       pathname === '/' 
-                        ? 'glass-card text-[var(--primary)] scale-[1.02]' 
-                        : 'text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+                        ? 'glass-card text-[var(--primary)] scale-105 shadow-lg' 
+                        : 'text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
                     }`}
                     onClick={closeDrawer}
                   >
@@ -117,10 +132,10 @@ export const Navigation = () => {
                 <li>
                   <Link 
                     href="/manage" 
-                    className={`flex items-center gap-3 p-3 rounded-2xl transition-all duration-200 ${
+                    className={`flex items-center gap-4 p-4 rounded-3xl transition-all duration-400 font-medium ${
                       pathname === '/manage' 
-                        ? 'glass-card text-[var(--primary)] scale-[1.02]' 
-                        : 'text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+                        ? 'glass-card text-[var(--primary)] scale-105 shadow-lg' 
+                        : 'text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
                     }`}
                     onClick={closeDrawer}
                   >
@@ -143,30 +158,30 @@ export const Navigation = () => {
 
       {/* Bottom Tab Bar - Mobile only */}
       {isMobile && (
-        <nav className="glass-tab-bar fixed bottom-0 left-0 right-0 z-30 safe-area-bottom">
-          <div className="flex items-center justify-around h-20 px-4">
+        <nav className="glass-tab-bar fixed bottom-0 left-0 right-0 z-40">
+          <div className="flex items-center justify-around safe-area-inset">
             <Link 
               href="/" 
-              className={`flex flex-col items-center justify-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 ${
+              className={`liquid-glass-tab flex flex-col items-center justify-center gap-1 px-5 py-2 ${
                 pathname === '/' 
-                  ? 'glass-card text-[var(--primary)] scale-110' 
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:scale-105'
+                  ? 'active text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)]'
               }`}
             >
               <HomeIcon />
-              <span className="text-xs font-medium">Home</span>
+              <span className="text-[11px] font-semibold">Home</span>
             </Link>
             
             <Link 
               href="/manage" 
-              className={`flex flex-col items-center justify-center gap-1 px-6 py-2 rounded-2xl transition-all duration-300 ${
+              className={`liquid-glass-tab flex flex-col items-center justify-center gap-1 px-5 py-2 ${
                 pathname === '/manage' 
-                  ? 'glass-card text-[var(--primary)] scale-110' 
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:scale-105'
+                  ? 'active text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)]'
               }`}
             >
               <PlusIcon />
-              <span className="text-xs font-medium">Feeds</span>
+              <span className="text-[11px] font-semibold">Feeds</span>
             </Link>
           </div>
         </nav>
@@ -181,7 +196,7 @@ const UnreadCounter = () => {
   if (unreadCount === 0) return null;
   return (
     <div className="relative">
-      <span className="inline-flex items-center justify-center glass-card px-4 py-2 rounded-full text-[var(--primary)] text-sm font-semibold shadow-md animate-[scaleIn_0.3s_ease-out]">
+      <span className="inline-flex items-center justify-center glass-card px-5 py-2.5 rounded-full text-[var(--primary)] text-sm font-bold shadow-lg animate-[scaleIn_0.3s_ease-out] hover:scale-110 transition-all duration-300">
         {unreadCount}
       </span>
     </div>

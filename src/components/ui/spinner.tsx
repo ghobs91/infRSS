@@ -22,8 +22,8 @@ export const Spinner: React.FC<SpinnerProps> = ({
       {...props}
     >
       <div 
-        className={`${sizeClasses[size]} border-4 border-[var(--accent)] border-t-[var(--primary)] rounded-full animate-spin`}
-        style={{ borderWidth: '3px' }}
+        className={`${sizeClasses[size]} border-4 border-[var(--accent)] border-t-[var(--primary)] rounded-full animate-spin shadow-lg`}
+        style={{ borderWidth: '4px', animationDuration: '0.8s' }}
       />
     </div>
   );

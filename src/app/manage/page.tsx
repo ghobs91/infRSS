@@ -67,8 +67,10 @@ const CategoryManager = ({
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-[var(--text-primary)]">Manage Categories</h3>
+    <div className="space-y-6">
+      <div className="glass-card p-5 rounded-[28px] shadow-md">
+        <h3 className="text-xl font-bold text-[var(--text-primary)]">Manage Categories</h3>
+      </div>
       
       <form onSubmit={handleSubmit} className="flex gap-2">
         <Input
@@ -101,9 +103,9 @@ const CategoryManager = ({
         )}
       </form>
 
-      <div className="grid gap-2">
+      <div className="grid gap-3">
         {categories.map((category) => (
-          <div key={category.id} className="flex items-center justify-between p-4 bg-[var(--muted)] border border-[var(--card-border)] rounded-lg hover:bg-[var(--muted-hover)] transition-colors">
+          <div key={category.id} className="flex items-center justify-between p-5 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-400">
             <div className="flex items-center gap-3">
               <div 
                 className="w-4 h-4 rounded-full border border-[var(--card-border)]" 
@@ -177,29 +179,31 @@ const VibesFilterSettings = ({
   };
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-[var(--text-primary)]">Vibes Filtering</h3>
-      <p className="text-sm text-[var(--text-secondary)]">Filter out low-quality content from your feed</p>
+    <div className="space-y-6">
+      <div className="glass-card p-5 rounded-[28px] shadow-md">
+        <h3 className="text-xl font-bold text-[var(--text-primary)]">Vibes Filtering</h3>
+        <p className="text-sm text-[var(--text-secondary)] mt-2">Filter out low-quality content from your feed</p>
+      </div>
       
-      <div className="space-y-3">
-        <label className="flex items-center gap-2 text-[var(--text-primary)]">
+      <div className="space-y-4">
+        <label className="flex items-center gap-3 p-4 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer">
           <input
             type="checkbox"
             checked={preferences.vibesFilter.hideClickbait}
             onChange={(e) => updateVibesFilter({ hideClickbait: e.target.checked })}
-            className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
+            className="rounded-lg border-[var(--input-border)] focus:ring-[var(--input-focus)] w-5 h-5"
           />
-          <span>Hide clickbait articles</span>
+          <span className="font-semibold text-[var(--text-primary)]">Hide clickbait articles</span>
         </label>
 
-        <label className="flex items-center gap-2 text-[var(--text-primary)]">
+        <label className="flex items-center gap-3 p-4 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer">
           <input
             type="checkbox"
             checked={preferences.vibesFilter.hideRagebait}
             onChange={(e) => updateVibesFilter({ hideRagebait: e.target.checked })}
-            className="rounded border-[var(--input-border)] focus:ring-[var(--input-focus)]"
+            className="rounded-lg border-[var(--input-border)] focus:ring-[var(--input-focus)] w-5 h-5"
           />
-          <span>Hide ragebait articles</span>
+          <span className="font-semibold text-[var(--text-primary)]">Hide ragebait articles</span>
         </label>
       </div>
     </div>
@@ -620,38 +624,38 @@ export default function ManagePage() {
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6">
       {/* Page Header */}
-      <div className="border-b border-[var(--border)] pb-4">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
-        <p className="text-[var(--text-secondary)] mt-1">Add, organize, and monitor your RSS feeds</p>
+      <div className="glass-card p-6 rounded-[32px] shadow-lg animate-[fadeIn_0.5s_ease-out]">
+        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
+        <p className="text-[var(--text-secondary)] mt-2 text-base">Add, organize, and monitor your RSS feeds</p>
       </div>
       {/* Tab Navigation */}
-      <div className="flex gap-1 border-b border-[var(--border)] bg-[var(--muted)] rounded-t-lg p-1">
+      <div className="flex gap-2 glass-card p-2 rounded-[28px] shadow-md">
         <button
           onClick={() => setActiveTab('feeds')}
-          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
             activeTab === 'feeds' 
-              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+              ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
           }`}
         >
           Feeds
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
             activeTab === 'categories' 
-              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+              ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
           }`}
         >
           Categories
         </button>
         <button
           onClick={() => setActiveTab('vibes')}
-          className={`px-4 py-3 rounded-lg transition-all duration-200 font-medium ${
+          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
             activeTab === 'vibes' 
-              ? 'bg-[var(--background)] text-[var(--primary)] shadow-sm border border-[var(--card-border)]' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--background-hover)]'
+              ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
           }`}
         >
           Vibes
@@ -662,9 +666,9 @@ export default function ManagePage() {
       {activeTab === 'feeds' && (
         <section className="space-y-6">
           <div className="space-y-3">
-            <div className="border-b border-[var(--border)] pb-2">
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Add Feed</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">Enter a feed URL or import from OPML file</p>
+            <div className="glass-card p-5 rounded-[28px] shadow-md">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Feed</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Enter a feed URL or import from OPML file</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
@@ -684,9 +688,9 @@ export default function ManagePage() {
               </Button>
             </div>
             {isLoading && !error && (
-              <div className="flex items-center gap-2 mt-2 p-3 bg-[var(--muted)] border border-[var(--card-border)] rounded-lg">
+              <div className="flex items-center gap-3 mt-2 p-4 glass-card rounded-[24px] shadow-md animate-[fadeIn_0.3s_ease-out]">
                 <Spinner size="sm" />
-                <span className="text-sm text-[var(--text-secondary)]">Searching for feeds...</span>
+                <span className="text-sm font-medium text-[var(--text-secondary)]">Searching for feeds...</span>
               </div>
             )}
             <div className="flex items-center gap-3">
@@ -724,10 +728,10 @@ export default function ManagePage() {
               </Button>
             </div>
             {error && (
-              <div className={`p-3 rounded-lg border ${
+              <div className={`p-4 rounded-[24px] border-2 backdrop-blur-xl shadow-lg animate-[fadeIn_0.3s_ease-out] font-medium ${
                 error.includes("Successfully") 
-                  ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200" 
-                  : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200"
+                  ? "bg-green-50 border-green-300 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-200" 
+                  : "bg-red-50 border-red-300 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200"
               }`}>
                 {error}
               </div>
@@ -735,9 +739,9 @@ export default function ManagePage() {
           </div>
 
           <div className="space-y-3">
-            <div className="border-b border-[var(--border)] pb-2">
-              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Suggest Feeds</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-1">Discover new feeds based on topics</p>
+            <div className="glass-card p-5 rounded-[28px] shadow-md">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Suggest Feeds</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Discover new feeds based on topics</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
@@ -759,8 +763,10 @@ export default function ManagePage() {
           </div>
 
           {suggestedFeeds.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-[var(--text-primary)]">Suggested Feeds</h3>
+            <div className="space-y-4">
+              <div className="glass-card p-5 rounded-[28px] shadow-md">
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">Suggested Feeds</h3>
+              </div>
               <div className="grid gap-3">
                 {suggestedFeeds.map((feed) => (
                   <SuggestedFeed key={feed.url} feed={feed} onSubscribe={handleSubscribeToFeed} />
@@ -794,16 +800,16 @@ export default function ManagePage() {
       )}
 
       {/* Your Feeds Section */}
-      <section className="space-y-4 pt-6 border-t border-[var(--border)]">
-        <div className="border-b border-[var(--border)] pb-2">
-          <h2 className="text-xl font-semibold text-[var(--text-primary)]">Your Feeds</h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-1">Manage and organize your subscribed feeds</p>
+      <section className="space-y-6 pt-8">
+        <div className="glass-card p-6 rounded-[32px] shadow-lg">
+          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Your Feeds</h2>
+          <p className="text-sm text-[var(--text-secondary)] mt-2">Manage and organize your subscribed feeds</p>
         </div>
         <div className="grid gap-3">
           {savedFeeds.length === 0 ? (
-            <Card className="shadow-sm border-[var(--card-border)]">
-              <CardContent className="p-6 text-center">
-                <p className="text-[var(--text-secondary)] text-lg">No feeds added yet. Add some feeds to get started.</p>
+            <Card className="shadow-lg border-[var(--card-border)]">
+              <CardContent className="p-8 text-center">
+                <p className="text-[var(--text-secondary)] text-lg font-medium">No feeds added yet. Add some feeds to get started.</p>
               </CardContent>
             </Card>
           ) : (

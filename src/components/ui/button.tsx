@@ -4,17 +4,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ className = "", variant = "default", size = "md", children, ...props }) => {
-  const base = "font-semibold rounded-2xl transition-all duration-200 active:scale-95";
+  const base = "font-semibold rounded-3xl transition-all duration-300 active:scale-95 relative overflow-hidden";
   const sizes = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-5 py-2.5",
-    lg: "px-7 py-3.5 text-lg",
+    sm: "px-4 py-2 text-sm",
+    md: "px-6 py-3",
+    lg: "px-8 py-4 text-lg",
   };
   const variants = {
-    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md hover:shadow-lg",
-    destructive: "bg-red-500 hover:bg-red-600 text-white shadow-md hover:shadow-lg",
-    ghost: "glass-button text-[var(--text-primary)]",
-    outline: "glass-button text-[var(--text-primary)] border-[var(--border)]",
+    default: "bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-lg hover:shadow-xl hover:scale-105",
+    destructive: "bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl hover:scale-105",
+    ghost: "glass-button text-[var(--text-primary)] hover:scale-105",
+    outline: "glass-button text-[var(--text-primary)] border-[var(--border)] hover:border-[var(--primary)] hover:scale-105",
   };
 
   return (

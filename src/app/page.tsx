@@ -13,6 +13,7 @@ import {
 import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import { useUnread } from "@/lib/unreadContext";
+import { useView } from "@/lib/viewContext";
 import type { UserPreferences } from "@/lib/types";
 
 
@@ -68,6 +69,7 @@ export default function HomePage() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
+  const { viewMode } = useView();
   const markingAsReadRef = useRef<Set<string>>(new Set()); // Track articles currently being marked
   const pendingMarksRef = useRef<Set<string>>(new Set()); // Track pending marks to batch
   const batchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -241,11 +243,11 @@ export default function HomePage() {
       <section className="space-y-6 w-full overflow-hidden">
         {isClient && (
           <>
-            <div className="flex items-center justify-between mb-6 glass-card p-4 rounded-3xl animate-[fadeIn_0.5s_ease-out]">
-              <div className="text-sm font-medium text-[var(--text-secondary)]">
+            <div className="flex items-center justify-between mb-8 glass-card p-5 rounded-[32px] animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl transition-all duration-400">
+              <div className="text-sm font-semibold text-[var(--text-secondary)]">
                 {unreadCount} unread articles
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -265,14 +267,14 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            <div className="grid gap-6 w-full overflow-hidden">
+            <div className={viewMode === 'cards' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full overflow-hidden' : 'grid gap-6 w-full overflow-hidden'}>
             {isLoading ? (
               // Show spinner during initial load
-              <div className="flex justify-center items-center py-12">
+              <div className="flex justify-center items-center py-12 col-span-full">
                 <Spinner size="lg" />
               </div>
             ) : articles.length === 0 ? (
-              <Card className="animate-[fadeIn_0.5s_ease-out]">
+              <Card className="animate-[fadeIn_0.5s_ease-out] col-span-full">
                 <CardContent className="p-8 text-center">
                   <p className="text-[var(--text-secondary)] text-lg">No articles found. Add some feeds to get started.</p>
                 </CardContent>
@@ -288,6 +290,7 @@ export default function HomePage() {
                     isRead={readLinks.has(article.link)}
                     filtered={filtered}
                     filterReason={reason}
+                    viewMode={viewMode}
                     onScrollPast={() => {
                       // Auto-mark as read when article is scrolled past
                       const articleLink = article.link;
@@ -318,7 +321,7 @@ export default function HomePage() {
               })
             )}
             {filteredArticles.length > visibleCount && (
-              <div ref={loadMoreRef} className="h-10 flex justify-center animate-[fadeIn_0.5s_ease-out]">
+              <div ref={loadMoreRef} className="h-10 flex justify-center animate-[fadeIn_0.5s_ease-out] col-span-full">
                 <Button 
                   variant="default" 
                   onClick={() => setVisibleCount(prev => Math.min(prev + 20, filteredArticles.length))}
@@ -334,10 +337,10 @@ export default function HomePage() {
         <Button
           variant="default"
           onClick={handleRefresh}
-          className="flex items-center gap-2 animate-[fadeIn_0.5s_ease-out]"
+          className="flex items-center gap-3 animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl"
         >
           <svg
-            className="w-4 h-4"
+            className="w-5 h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -350,7 +353,7 @@ export default function HomePage() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          <span>Refresh</span>
+          <span className="font-semibold">Refresh</span>
         </Button>
       </section>
     </main>

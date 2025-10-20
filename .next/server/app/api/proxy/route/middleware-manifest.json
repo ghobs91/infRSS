@@ -1,0 +1,39 @@
+{
+  "sorted_middleware": [
+    "/api/proxy/route"
+  ],
+  "middleware": {},
+  "instrumentation": null,
+  "functions": {
+    "/api/proxy/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/app/api/proxy/route_client-reference-manifest.js",
+        "server/edge/chunks/_ec19c4cc._.js",
+        "server/edge/chunks/[root of the server]__63361b77._.js",
+        "server/edge/chunks/edge-wrapper_afff795a.js",
+        "server/app/api/proxy/route/react-loadable-manifest.js"
+      ],
+      "name": "/api/proxy",
+      "page": "/api/proxy/route",
+      "matchers": [
+        {
+          "regexp": "^/api/proxy(?:/)?$",
+          "originalSource": "/api/proxy"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "development",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "xYZ0ebBRma9Sfs3iqjXbpOpwQwf21T8v+7LarhPTXJk=",
+        "__NEXT_PREVIEW_MODE_ID": "8781b9d37b6bf669a5aebc6891444344",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "3ea8e8781325235f66a33cdda2aacb19452b1a861c5c4f50077e935ceb79acb7",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "00b97b974cb4d367e7ac59b50e36b634ab0d299779a4df67b815b645b4c6a072"
+      }
+    }
+  }
+}
