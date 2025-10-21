@@ -42,7 +42,7 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
           return result;
         }
       } catch (workerError) {
-        console.warn('Worker parsing failed for:', url, '- falling back to inline parsing');
+        console.warn(`Error: ${workerError.message}. Worker parsing failed for: ${url} - falling back to inline parsing`);
       }
     }
 

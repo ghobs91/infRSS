@@ -1,6 +1,9 @@
 {
+  "/api/export-opml/route": "app/api/export-opml/route.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/proxy/route": "app-edge-has-no-entrypoint",
   "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/page": "app/page.js"
+  "/manage/page": "app/manage/page.js",
+  "/page": "app/page.js",
+  "/api/fetch-rss/route": "app/api/fetch-rss/route.js",
+  "/api/proxy/route": "app/api/proxy/route.js"
 }
