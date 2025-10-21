@@ -1043,17 +1043,15 @@ async function fetchAndParseRSSClient(url, parseRSSWorker) {
         const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
         const response = await fetch(proxyUrl);
         if (!response.ok) {
-            console.error(`Proxy fetch failed for ${url}. Status: ${response.status}`);
+            console.warn(`Feed fetch failed: ${url} (HTTP ${response.status})`);
             return null;
         }
         const xmlText = await response.text();
         if (!xmlText.trim()) {
-            console.error(`Empty response from ${url}`);
             return null;
         }
         // Check if response is XML
         if (!xmlText.trim().startsWith('<?xml') && !xmlText.trim().startsWith('<')) {
-            console.error(`Response from ${url} is not XML`);
             return null;
         }
         // If worker parser is provided, use it
@@ -1064,13 +1062,16 @@ async function fetchAndParseRSSClient(url, parseRSSWorker) {
                     return result;
                 }
             } catch (workerError) {
-                console.warn('Worker parsing failed, falling back to inline parsing:', workerError);
+                console.warn('Worker parsing failed for:', url, '- falling back to inline parsing');
             }
         }
         // Fallback to inline parsing (same logic as worker, but runs in main thread)
         return parseRSSInline(xmlText, url);
     } catch (error) {
-        console.error(`Error fetching and parsing RSS from ${url}:`, error);
+        // Only log unexpected errors
+        if (error instanceof Error && error.name !== 'AbortError') {
+            console.error(`Unexpected error parsing feed ${url}:`, error.message);
+        }
         return null;
     }
 }
@@ -1079,14 +1080,56 @@ async function fetchAndParseRSSClient(url, parseRSSWorker) {
  * This is a simplified version of the worker parser
  */ function parseRSSInline(xmlText, feedUrl) {
     try {
-        // Replace HTML entities with numeric equivalents before parsing
-        const text = xmlText.replace(/&nbsp;/g, '&#160;').replace(/&ndash;/g, '&#8211;').replace(/&mdash;/g, '&#8212;').replace(/&lsquo;/g, '&#8216;').replace(/&rsquo;/g, '&#8217;').replace(/&ldquo;/g, '&#8220;').replace(/&rdquo;/g, '&#8221;').replace(/&hellip;/g, '&#8230;').replace(/&bull;/g, '&#8226;').replace(/&middot;/g, '&#183;').replace(/&euro;/g, '&#8364;').replace(/&pound;/g, '&#163;').replace(/&yen;/g, '&#165;').replace(/&cent;/g, '&#162;').replace(/&copy;/g, '&#169;').replace(/&reg;/g, '&#174;').replace(/&trade;/g, '&#8482;').replace(/&deg;/g, '&#176;').replace(/&plusmn;/g, '&#177;').replace(/&para;/g, '&#182;').replace(/&sect;/g, '&#167;').replace(/&times;/g, '&#215;').replace(/&divide;/g, '&#247;').replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(text, "text/xml");
-        const parseError = xmlDoc.querySelector("parsererror");
-        if (parseError) {
-            console.error('XML parsing error:', parseError.textContent);
+        // First check if this is actually HTML, not RSS/XML
+        const trimmedText = xmlText.trim();
+        const looksLikeHTML = (trimmedText.startsWith('<!DOCTYPE html') || trimmedText.startsWith('<html') || trimmedText.startsWith('<HTML')) && !trimmedText.includes('<rss') && !trimmedText.includes('<feed');
+        if (looksLikeHTML) {
+            console.warn(`Received HTML instead of RSS/XML feed from ${feedUrl}`);
             return null;
+        }
+        // Add missing namespaces if needed
+        let text = xmlText;
+        if (text.includes('media:') && !text.includes('xmlns:media')) {
+            text = text.replace(/<rss([^>]*?)>/i, '<rss$1 xmlns:media="http://search.yahoo.com/mrss/">');
+        }
+        if (text.includes('content:encoded') && !text.includes('xmlns:content')) {
+            text = text.replace(/<rss([^>]*?)>/i, '<rss$1 xmlns:content="http://purl.org/rss/1.0/modules/content/">');
+        }
+        if (text.includes('itunes:') && !text.includes('xmlns:itunes')) {
+            text = text.replace(/<rss([^>]*?)>/i, '<rss$1 xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">');
+        }
+        if (text.includes('dc:') && !text.includes('xmlns:dc')) {
+            text = text.replace(/<rss([^>]*?)>/i, '<rss$1 xmlns:dc="http://purl.org/dc/elements/1.1/">');
+        }
+        // Replace HTML entities with numeric equivalents before parsing
+        text = text.replace(/&nbsp;/g, '&#160;').replace(/&ndash;/g, '&#8211;').replace(/&mdash;/g, '&#8212;').replace(/&lsquo;/g, '&#8216;').replace(/&rsquo;/g, '&#8217;').replace(/&ldquo;/g, '&#8220;').replace(/&rdquo;/g, '&#8221;').replace(/&hellip;/g, '&#8230;').replace(/&bull;/g, '&#8226;').replace(/&middot;/g, '&#183;').replace(/&euro;/g, '&#8364;').replace(/&pound;/g, '&#163;').replace(/&yen;/g, '&#165;').replace(/&cent;/g, '&#162;').replace(/&copy;/g, '&#169;').replace(/&reg;/g, '&#174;').replace(/&trade;/g, '&#8482;').replace(/&deg;/g, '&#176;').replace(/&plusmn;/g, '&#177;').replace(/&para;/g, '&#182;').replace(/&sect;/g, '&#167;').replace(/&times;/g, '&#215;').replace(/&divide;/g, '&#247;')// Fix self-closing tags
+        .replace(/<(img|br|hr|input|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />')// Fix malformed CDATA
+        .replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content)=>{
+            if (!content.includes(']]>')) {
+                return `<![CDATA[${content}]]>`;
+            }
+            return match;
+        }).replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+        const parser = new DOMParser();
+        let xmlDoc = parser.parseFromString(text, "text/xml");
+        let parseError = xmlDoc.querySelector("parsererror");
+        if (parseError) {
+            const errorText = parseError.textContent || '';
+            // For HTML mismatch errors, fail silently
+            if (errorText.includes('Opening and ending tag mismatch') && (errorText.includes('head') || errorText.includes('body') || errorText.includes('html'))) {
+                return null;
+            }
+            console.warn(`XML parsing issue for ${feedUrl}:`, errorText.substring(0, 200));
+            // Try aggressive fallback: strip CDATA markers and ignore namespaces
+            const fallbackText = text.replace(/\]\]/g, '] ]').replace(/<!\[CDATA\[/g, '').replace(/] ]>/g, '] ] ')// Remove namespace prefixes that are causing issues
+            .replace(/<(\/?)(media|content|dc|itunes):(\w+)/g, '<$1$3');
+            xmlDoc = parser.parseFromString(fallbackText, "text/xml");
+            parseError = xmlDoc.querySelector("parsererror");
+            if (parseError) {
+                console.warn(`Failed to parse ${feedUrl} even with fallback`);
+                return null;
+            }
+            console.log(`Successfully parsed ${feedUrl} using fallback method`);
         }
         const channelTitle = xmlDoc.querySelector("channel > title")?.textContent || xmlDoc.querySelector("feed > title")?.textContent || new URL(feedUrl).hostname.replace("www.", "");
         let items;
@@ -1095,7 +1138,7 @@ async function fetchAndParseRSSClient(url, parseRSSWorker) {
         } else if (xmlDoc.querySelector("entry")) {
             items = Array.from(xmlDoc.querySelectorAll("entry"));
         } else {
-            console.error('No items found in feed');
+            console.debug(`No items found in feed: ${feedUrl}`);
             return null;
         }
         const parsedItems = items.map((item, index)=>{
@@ -2636,9 +2679,15 @@ function HomePage() {
                                     // Use client-side parsing with Web Worker
                                     const data = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$rssUtilsClient$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["fetchAndParseRSSClient"])(feed.url, parseRSSWithWorker);
                                     clearTimeout(timeoutId);
-                                    return data?.items || [];
+                                    if (data && data.items.length > 0) {
+                                        console.log(`✓ Loaded ${data.items.length} articles from ${feed.url}`);
+                                        return data.items;
+                                    } else {
+                                        console.warn(`⚠ No articles from ${feed.url}`);
+                                        return [];
+                                    }
                                 } catch (error) {
-                                    console.error(`Error fetching feed ${feed.url}:`, error);
+                                    console.error(`✗ Error fetching feed ${feed.url}:`, error);
                                     return [];
                                 }
                             }
@@ -2705,7 +2754,7 @@ function HomePage() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 247,
+                                    lineNumber: 254,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2720,7 +2769,7 @@ function HomePage() {
                                             children: autoMarkAsReadOnScroll ? "📖 Auto-scroll" : "📖 Manual"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 251,
+                                            lineNumber: 258,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -2731,19 +2780,19 @@ function HomePage() {
                                             children: hideRead ? "Show read" : "Hide read"
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 260,
+                                            lineNumber: 267,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 250,
+                                    lineNumber: 257,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 246,
+                            lineNumber: 253,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2756,12 +2805,12 @@ function HomePage() {
                                         size: "lg"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 274,
+                                        lineNumber: 281,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 273,
+                                    lineNumber: 280,
                                     columnNumber: 15
                                 }, this) : articles.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Card"], {
                                     className: "animate-[fadeIn_0.5s_ease-out] col-span-full",
@@ -2772,17 +2821,17 @@ function HomePage() {
                                             children: "No articles found. Add some feeds to get started."
                                         }, void 0, false, {
                                             fileName: "[project]/src/app/page.tsx",
-                                            lineNumber: 279,
+                                            lineNumber: 286,
                                             columnNumber: 19
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 278,
+                                        lineNumber: 285,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 277,
+                                    lineNumber: 284,
                                     columnNumber: 15
                                 }, this) : // Show actual articles using ArticleCard component
                                 visibleArticles.map((article, idx)=>{
@@ -2815,7 +2864,7 @@ function HomePage() {
                                         }
                                     }, `${article.link}-${idx}`, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 287,
+                                        lineNumber: 294,
                                         columnNumber: 19
                                     }, this);
                                 }),
@@ -2829,18 +2878,18 @@ function HomePage() {
                                         children: "Load More"
                                     }, void 0, false, {
                                         fileName: "[project]/src/app/page.tsx",
-                                        lineNumber: 325,
+                                        lineNumber: 332,
                                         columnNumber: 17
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/app/page.tsx",
-                                    lineNumber: 324,
+                                    lineNumber: 331,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 270,
+                            lineNumber: 277,
                             columnNumber: 13
                         }, this)
                     ]
@@ -2863,12 +2912,12 @@ function HomePage() {
                                 d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                             }, void 0, false, {
                                 fileName: "[project]/src/app/page.tsx",
-                                lineNumber: 349,
+                                lineNumber: 356,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 342,
+                            lineNumber: 349,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2876,24 +2925,24 @@ function HomePage() {
                             children: "Refresh"
                         }, void 0, false, {
                             fileName: "[project]/src/app/page.tsx",
-                            lineNumber: 356,
+                            lineNumber: 363,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/app/page.tsx",
-                    lineNumber: 337,
+                    lineNumber: 344,
                     columnNumber: 9
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/app/page.tsx",
-            lineNumber: 243,
+            lineNumber: 250,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/src/app/page.tsx",
-        lineNumber: 242,
+        lineNumber: 249,
         columnNumber: 5
     }, this);
 }

@@ -211,8 +211,22 @@ async function GET(req) {
         }
         const contentType = response.headers.get('content-type') || 'text/plain';
         const data = await response.text();
-        // Validate that we actually got RSS/XML content
-        if (isRSSHub && !data.includes('<rss') && !data.includes('<feed') && !data.includes('<xml')) {
+        // Validate that we actually got RSS/XML content (not HTML)
+        const trimmedData = data.trim();
+        const isHTML = (trimmedData.startsWith('<!DOCTYPE html') || trimmedData.startsWith('<html') || trimmedData.startsWith('<HTML')) && !trimmedData.includes('<rss') && !trimmedData.includes('<feed');
+        if (isHTML) {
+            console.warn('Server returned HTML instead of RSS/XML:', data.substring(0, 200));
+            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$spec$2d$extension$2f$response$2e$js__$5b$app$2d$edge$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
+                error: 'The URL returned a webpage instead of an RSS feed',
+                status: 422,
+                suggestion: 'Please verify this is a valid RSS feed URL. You may need to look for a feed icon or RSS link on the website.',
+                url: validatedUrl.toString()
+            }, {
+                status: 422
+            });
+        }
+        // Additional validation for RSSHub feeds
+        if (isRSSHub && !data.includes('<rss') && !data.includes('<feed')) {
             console.warn('RSSHub returned non-RSS content:', data.substring(0, 200));
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$spec$2d$extension$2f$response$2e$js__$5b$app$2d$edge$2d$route$5d$__$28$ecmascript$29$__["NextResponse"].json({
                 error: 'RSSHub returned invalid RSS content',

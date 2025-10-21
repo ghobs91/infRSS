@@ -19,20 +19,18 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
     const response = await fetch(proxyUrl);
     
     if (!response.ok) {
-      console.error(`Proxy fetch failed for ${url}. Status: ${response.status}`);
+      console.warn(`Feed fetch failed: ${url} (HTTP ${response.status})`);
       return null;
     }
 
     const xmlText = await response.text();
     
     if (!xmlText.trim()) {
-      console.error(`Empty response from ${url}`);
       return null;
     }
 
     // Check if response is XML
     if (!xmlText.trim().startsWith('<?xml') && !xmlText.trim().startsWith('<')) {
-      console.error(`Response from ${url} is not XML`);
       return null;
     }
 
@@ -44,14 +42,17 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
           return result;
         }
       } catch (workerError) {
-        console.warn('Worker parsing failed, falling back to inline parsing:', workerError);
+        console.warn('Worker parsing failed for:', url, '- falling back to inline parsing');
       }
     }
 
     // Fallback to inline parsing (same logic as worker, but runs in main thread)
     return parseRSSInline(xmlText, url);
   } catch (error) {
-    console.error(`Error fetching and parsing RSS from ${url}:`, error);
+    // Only log unexpected errors
+    if (error instanceof Error && error.name !== 'AbortError') {
+      console.error(`Unexpected error parsing feed ${url}:`, error.message);
+    }
     return null;
   }
 }
@@ -62,8 +63,52 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
  */
 function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null {
   try {
+    // First check if this is actually HTML, not RSS/XML
+    const trimmedText = xmlText.trim();
+    const looksLikeHTML = (trimmedText.startsWith('<!DOCTYPE html') || 
+                          trimmedText.startsWith('<html') || 
+                          trimmedText.startsWith('<HTML')) &&
+                         !trimmedText.includes('<rss') && 
+                         !trimmedText.includes('<feed');
+    
+    if (looksLikeHTML) {
+      console.warn(`Received HTML instead of RSS/XML feed from ${feedUrl}`);
+      return null;
+    }
+
+    // Add missing namespaces if needed
+    let text = xmlText;
+    
+    if (text.includes('media:') && !text.includes('xmlns:media')) {
+      text = text.replace(
+        /<rss([^>]*?)>/i,
+        '<rss$1 xmlns:media="http://search.yahoo.com/mrss/">'
+      );
+    }
+    
+    if (text.includes('content:encoded') && !text.includes('xmlns:content')) {
+      text = text.replace(
+        /<rss([^>]*?)>/i,
+        '<rss$1 xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+      );
+    }
+    
+    if (text.includes('itunes:') && !text.includes('xmlns:itunes')) {
+      text = text.replace(
+        /<rss([^>]*?)>/i,
+        '<rss$1 xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">'
+      );
+    }
+    
+    if (text.includes('dc:') && !text.includes('xmlns:dc')) {
+      text = text.replace(
+        /<rss([^>]*?)>/i,
+        '<rss$1 xmlns:dc="http://purl.org/dc/elements/1.1/">'
+      );
+    }
+
     // Replace HTML entities with numeric equivalents before parsing
-    const text = xmlText
+    text = text
       .replace(/&nbsp;/g, '&#160;')
       .replace(/&ndash;/g, '&#8211;')
       .replace(/&mdash;/g, '&#8212;')
@@ -87,15 +132,49 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       .replace(/&sect;/g, '&#167;')
       .replace(/&times;/g, '&#215;')
       .replace(/&divide;/g, '&#247;')
+      // Fix self-closing tags
+      .replace(/<(img|br|hr|input|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />')
+      // Fix malformed CDATA
+      .replace(/<!\[CDATA\[([^\]>]*?)(?!\]\]>)/g, (match, content) => {
+        if (!content.includes(']]>')) {
+          return `<![CDATA[${content}]]>`;
+        }
+        return match;
+      })
       .replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
 
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(text, "text/xml");
+    let xmlDoc = parser.parseFromString(text, "text/xml");
 
-    const parseError = xmlDoc.querySelector("parsererror");
+    let parseError = xmlDoc.querySelector("parsererror");
     if (parseError) {
-      console.error('XML parsing error:', parseError.textContent);
-      return null;
+      const errorText = parseError.textContent || '';
+      
+      // For HTML mismatch errors, fail silently
+      if (errorText.includes('Opening and ending tag mismatch') && 
+          (errorText.includes('head') || errorText.includes('body') || errorText.includes('html'))) {
+        return null;
+      }
+      
+      console.warn(`XML parsing issue for ${feedUrl}:`, errorText.substring(0, 200));
+      
+      // Try aggressive fallback: strip CDATA markers and ignore namespaces
+      const fallbackText = text
+        .replace(/\]\]/g, '] ]')
+        .replace(/<!\[CDATA\[/g, '')
+        .replace(/] ]>/g, '] ] ')
+        // Remove namespace prefixes that are causing issues
+        .replace(/<(\/?)(media|content|dc|itunes):(\w+)/g, '<$1$3');
+      
+      xmlDoc = parser.parseFromString(fallbackText, "text/xml");
+      parseError = xmlDoc.querySelector("parsererror");
+      
+      if (parseError) {
+        console.warn(`Failed to parse ${feedUrl} even with fallback`);
+        return null;
+      }
+      
+      console.log(`Successfully parsed ${feedUrl} using fallback method`);
     }
 
     const channelTitle = xmlDoc.querySelector("channel > title")?.textContent || 
@@ -108,7 +187,7 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
     } else if (xmlDoc.querySelector("entry")) {
       items = Array.from(xmlDoc.querySelectorAll("entry"));
     } else {
-      console.error('No items found in feed');
+      console.debug(`No items found in feed: ${feedUrl}`);
       return null;
     }
 

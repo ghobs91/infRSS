@@ -198,9 +198,16 @@ export default function HomePage() {
             // Use client-side parsing with Web Worker
             const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
             clearTimeout(timeoutId);
-            return data?.items || [];
+            
+            if (data && data.items.length > 0) {
+              console.log(`✓ Loaded ${data.items.length} articles from ${feed.url}`);
+              return data.items;
+            } else {
+              console.warn(`⚠ No articles from ${feed.url}`);
+              return [];
+            }
           } catch (error) {
-            console.error(`Error fetching feed ${feed.url}:`, error);
+            console.error(`✗ Error fetching feed ${feed.url}:`, error);
             return [];
           }
         });

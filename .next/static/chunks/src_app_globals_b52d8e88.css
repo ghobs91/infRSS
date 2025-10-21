@@ -2848,6 +2848,11 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.safe-area-inset {
+  height: 80px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .liquid-glass-tab {
   position: relative;
   background: none;
