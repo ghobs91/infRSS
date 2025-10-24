@@ -192,7 +192,7 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       
       // Common RSS parsing errors - try to fix automatically
       let fallbackText = text;
-      let attemptedFixes: string[] = [];
+      const attemptedFixes: string[] = [];
       
       // Fix 1: Handle self-closing link tags (most common issue)
       if (errorText.includes('Opening and ending tag mismatch') && errorText.includes('link')) {

@@ -138,7 +138,7 @@ export default function HomePage() {
           } else {
             return { success: false, items: [] };
           }
-        } catch (error) {
+        } catch {
           return { success: false, items: [] };
         }
       });

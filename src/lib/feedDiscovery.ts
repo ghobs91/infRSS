@@ -173,7 +173,7 @@ export async function discoverFeed(inputUrl: string): Promise<FeedDiscoveryResul
             });
             console.log(`✅ Found feed in meta tags: ${absoluteUrl}`);
           }
-        } catch (e) {
+        } catch {
           console.warn(`Invalid href in meta tag: ${href}`);
         }
       }
@@ -197,7 +197,7 @@ export async function discoverFeed(inputUrl: string): Promise<FeedDiscoveryResul
             });
             console.log(`✅ Found feed in page links: ${absoluteUrl}`);
           }
-        } catch (e) {
+        } catch {
           console.warn(`Invalid href in link: ${href}`);
         }
       }
@@ -240,7 +240,7 @@ export async function discoverFeed(inputUrl: string): Promise<FeedDiscoveryResul
                 });
                 console.log(`✅ Found feed in parent page meta tags: ${absoluteUrl}`);
               }
-            } catch (e) {
+            } catch {
               console.warn(`Invalid href in parent meta tag: ${href}`);
             }
           }
@@ -380,7 +380,7 @@ export async function discoverFeed(inputUrl: string): Promise<FeedDiscoveryResul
               });
               console.log(`✅ Found feed in blog meta tags: ${absoluteUrl}`);
             }
-          } catch (e) {
+          } catch {
             console.warn(`Invalid blog meta content: ${content}`);
           }
         }
