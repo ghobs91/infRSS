@@ -126,8 +126,6 @@ export default function HomePage() {
         return;
       }
 
-      console.log(`🔄 Refreshing ${feeds.length} feeds...`);
-
       // Fetch feeds in parallel with a timeout
       const fetchPromises = feeds.map(async (feed) => {
         try {
@@ -148,7 +146,9 @@ export default function HomePage() {
       const failCount = results.filter(r => !r.success).length;
       const allArticles = results.flatMap(r => r.items);
       const sorted = allArticles.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-      console.log(`✅ Refresh complete: ${successCount}/${feeds.length} feeds loaded, ${sorted.length} total articles`);
+      
+      console.log(`✅ Refreshed: ${successCount}/${feeds.length} feeds loaded, ${sorted.length} articles`);
+      
       setArticles(sorted);
       setVisibleCount(100); // Reset visible count to show more articles initially
       setFeedStats({ total: feeds.length, successful: successCount, failed: failCount });
@@ -205,14 +205,11 @@ export default function HomePage() {
             const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
             
             if (data && data.items.length > 0) {
-              console.log(`✓ Loaded ${data.items.length} articles from ${feed.url}`);
               return { success: true, items: data.items, url: feed.url };
             } else {
-              console.warn(`⚠ No articles from ${feed.url}`);
               return { success: false, items: [], url: feed.url };
             }
           } catch (error) {
-            console.error(`✗ Error fetching feed ${feed.url}:`, error);
             return { success: false, items: [], url: feed.url };
           }
         });

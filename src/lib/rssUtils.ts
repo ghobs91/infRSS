@@ -799,6 +799,14 @@ export function saveFeedToStorage(feed: FeedData): void {
   }
 }
 
+export function saveFeedsToStorage(feeds: FeedData[]): void {
+  try {
+    localStorage.setItem("feeds", JSON.stringify(feeds));
+  } catch (error) {
+    console.error("Error saving feeds to storage:", error);
+  }
+}
+
 export function loadCategoriesFromStorage(): Category[] {
   try {
     const categories = localStorage.getItem("categories");

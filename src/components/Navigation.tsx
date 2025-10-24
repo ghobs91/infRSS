@@ -56,6 +56,8 @@ export const Navigation = () => {
         return 'Home';
       case '/manage':
         return 'Manage Feeds';
+      case '/health':
+        return 'Feed Health';
       default:
         return 'Infrss Reader';
     }
@@ -143,6 +145,20 @@ export const Navigation = () => {
                     <span>Manage Feeds</span>
                   </Link>
                 </li>
+                <li>
+                  <Link 
+                    href="/health" 
+                    className={`flex items-center gap-4 p-4 rounded-3xl transition-all duration-400 font-medium ${
+                      pathname === '/health' 
+                        ? 'glass-card text-[var(--primary)] scale-105 shadow-lg' 
+                        : 'text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
+                    }`}
+                    onClick={closeDrawer}
+                  >
+                    <RssIcon />
+                    <span>Feed Health</span>
+                  </Link>
+                </li>
               </ul>
             </nav>
 
@@ -182,6 +198,18 @@ export const Navigation = () => {
             >
               <PlusIcon />
               <span className="text-[11px] font-semibold">Feeds</span>
+            </Link>
+            
+            <Link 
+              href="/health" 
+              className={`liquid-glass-tab flex flex-col items-center justify-center gap-1 px-5 py-2 ${
+                pathname === '/health' 
+                  ? 'active text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              <RssIcon />
+              <span className="text-[11px] font-semibold">Health</span>
             </Link>
           </div>
         </nav>
