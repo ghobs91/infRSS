@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout (client has 30s)
 
     const response = await fetchWithRetry(validatedUrl.toString(), {
       signal: controller.signal,
@@ -146,20 +146,82 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ 
           error: 'Request timeout - the server took too long to respond',
           status: 408,
-          suggestion: 'Try again later or check if the RSS source is experiencing issues.',
+          suggestion: 'The feed server is taking too long to respond. Try again later or check if the RSS source is online.',
           url: validatedUrl.toString()
         }, { status: 408 });
       }
       
-      // Handle network timeouts and connection errors
-      if (error.message.includes('fetch') || error.message.includes('timeout') || error.message.includes('connect')) {
+      // Handle specific fetch errors
+      if (error.message.includes('ENOTFOUND') || error.message.includes('getaddrinfo')) {
         return NextResponse.json({ 
-          error: 'Network error - server may be unreachable or too slow',
+          error: 'DNS resolution failed - the domain could not be found',
+          details: error.message,
+          status: 502,
+          suggestion: 'The domain may not exist or may be temporarily unavailable. Please verify the URL is correct.',
+          url: validatedUrl.toString()
+        }, { status: 502 });
+      }
+      
+      if (error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json({ 
+          error: 'Connection refused - the server is not accepting connections',
+          details: error.message,
+          status: 502,
+          suggestion: 'The server is not responding. It may be down or blocking requests.',
+          url: validatedUrl.toString()
+        }, { status: 502 });
+      }
+      
+      if (error.message.includes('ETIMEDOUT') || error.message.includes('timeout')) {
+        return NextResponse.json({ 
+          error: 'Connection timeout - the server is too slow or unreachable',
           details: error.message,
           status: 504,
-          suggestion: 'Check your internet connection and try again.',
+          suggestion: 'The server is not responding in time. Try again later.',
           url: validatedUrl.toString()
         }, { status: 504 });
+      }
+      
+      if (error.message.includes('ECONNRESET') || error.message.includes('socket hang up')) {
+        return NextResponse.json({ 
+          error: 'Connection reset - the server closed the connection unexpectedly',
+          details: error.message,
+          status: 502,
+          suggestion: 'The server had an issue processing the request. Try again in a few moments.',
+          url: validatedUrl.toString()
+        }, { status: 502 });
+      }
+      
+      if (error.message.includes('SSL') || error.message.includes('TLS') || error.message.includes('certificate')) {
+        return NextResponse.json({ 
+          error: 'SSL/TLS error - there is an issue with the server\'s security certificate',
+          details: error.message,
+          status: 502,
+          suggestion: 'The server may have an invalid or expired SSL certificate. Contact the website administrator.',
+          url: validatedUrl.toString()
+        }, { status: 502 });
+      }
+      
+      // Handle retry errors with more context
+      if (error.message.includes('retries')) {
+        return NextResponse.json({ 
+          error: 'Multiple attempts failed - the server is not responding reliably',
+          details: error.message,
+          status: 503,
+          suggestion: 'The feed server is experiencing issues. Please try again in a few minutes, or check if the feed URL is correct.',
+          url: validatedUrl.toString()
+        }, { status: 503 });
+      }
+      
+      // General network errors
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        return NextResponse.json({ 
+          error: 'Network error - unable to reach the server',
+          details: error.message,
+          status: 502,
+          suggestion: 'There was a network issue connecting to the feed. Check your internet connection and try again.',
+          url: validatedUrl.toString()
+        }, { status: 502 });
       }
     }
     
@@ -167,6 +229,7 @@ export async function GET(req: NextRequest) {
       error: 'Internal server error',
       status: 500,
       details: error instanceof Error ? error.message : 'Unknown error',
+      suggestion: 'An unexpected error occurred. Please try again or contact support if the issue persists.',
       url: validatedUrl.toString()
     }, { status: 500 });
   }

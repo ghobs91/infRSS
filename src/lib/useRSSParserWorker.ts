@@ -66,7 +66,7 @@ export function useRSSParserWorker() {
       return await new Promise((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           reject(new Error('Worker timeout'));
-        }, 15000);
+        }, 20000); // 20 second timeout for worker parsing
 
         const handleMessage = (event: MessageEvent) => {
           clearTimeout(timeoutId);

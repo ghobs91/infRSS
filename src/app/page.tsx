@@ -61,11 +61,12 @@ const shouldFilterArticle = (article: any, preferences: UserPreferences | null):
 
 export default function HomePage() {
   const [articles, setArticles] = useState<{ title: string; link: string; pubDate: string; thumbnail?: string; vibes?: any }[]>([]);
-  const [visibleCount, setVisibleCount] = useState(20);
+  const [visibleCount, setVisibleCount] = useState(100); // Increased from 20 to 100 to show more articles initially
   const [isClient, setIsClient] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hideRead, setHideRead] = useState(true); // Default to true - hide read articles
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [feedStats, setFeedStats] = useState<{ total: number; successful: number; failed: number }>({ total: 0, successful: 0, failed: 0 });
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
@@ -125,26 +126,32 @@ export default function HomePage() {
         return;
       }
 
+      console.log(`🔄 Refreshing ${feeds.length} feeds...`);
+
       // Fetch feeds in parallel with a timeout
       const fetchPromises = feeds.map(async (feed) => {
         try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
           // Use client-side parsing with Web Worker
           const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
-          clearTimeout(timeoutId);
-          return data?.items || [];
+          if (data?.items && data.items.length > 0) {
+            return { success: true, items: data.items };
+          } else {
+            return { success: false, items: [] };
+          }
         } catch (error) {
-          console.error(`Error fetching feed ${feed.url}:`, error);
-          return [];
+          return { success: false, items: [] };
         }
       });
 
-      const allArticles = await Promise.all(fetchPromises);
-      const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      const results = await Promise.all(fetchPromises);
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.filter(r => !r.success).length;
+      const allArticles = results.flatMap(r => r.items);
+      const sorted = allArticles.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+      console.log(`✅ Refresh complete: ${successCount}/${feeds.length} feeds loaded, ${sorted.length} total articles`);
       setArticles(sorted);
-      setVisibleCount(20); // Reset visible count
+      setVisibleCount(100); // Reset visible count to show more articles initially
+      setFeedStats({ total: feeds.length, successful: successCount, failed: failCount });
     } catch (error) {
       console.error("Error refreshing feeds:", error);
     }
@@ -155,7 +162,7 @@ export default function HomePage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !isLoading) {
-          setVisibleCount((prev) => Math.min(prev + 20, articles.length));
+          setVisibleCount((prev) => Math.min(prev + 50, articles.length)); // Load 50 articles at a time instead of 20
         }
       },
       { threshold: 0.5 }
@@ -189,32 +196,35 @@ export default function HomePage() {
           return;
         }
 
-        // Fetch feeds in parallel with a timeout
+        console.log(`📥 Loading ${feeds.length} feeds...`);
+
+        // Fetch feeds in parallel - no timeout wrapper here since fetch has its own timeout
         const fetchPromises = feeds.map(async (feed) => {
           try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-            
             // Use client-side parsing with Web Worker
             const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
-            clearTimeout(timeoutId);
             
             if (data && data.items.length > 0) {
               console.log(`✓ Loaded ${data.items.length} articles from ${feed.url}`);
-              return data.items;
+              return { success: true, items: data.items, url: feed.url };
             } else {
               console.warn(`⚠ No articles from ${feed.url}`);
-              return [];
+              return { success: false, items: [], url: feed.url };
             }
           } catch (error) {
             console.error(`✗ Error fetching feed ${feed.url}:`, error);
-            return [];
+            return { success: false, items: [], url: feed.url };
           }
         });
 
-        const allArticles = await Promise.all(fetchPromises);
-        const sorted = allArticles.flat().sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        const results = await Promise.all(fetchPromises);
+        const successCount = results.filter(r => r.success).length;
+        const failCount = results.filter(r => !r.success).length;
+        const allArticles = results.flatMap(r => r.items);
+        const sorted = allArticles.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        console.log(`✅ Load complete: ${successCount}/${feeds.length} feeds successful, ${failCount} failed, ${sorted.length} total articles`);
         setArticles(sorted);
+        setFeedStats({ total: feeds.length, successful: successCount, failed: failCount });
       } catch (error) {
         console.error("Error loading feeds:", error);
       } finally {
@@ -252,7 +262,15 @@ export default function HomePage() {
           <>
             <div className="flex items-center justify-between mb-8 glass-card p-5 rounded-[32px] animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl transition-all duration-400">
               <div className="text-sm font-semibold text-[var(--text-secondary)]">
-                {unreadCount} unread articles
+                {unreadCount} unread articles ({articles.length} total)
+                {feedStats.total > 0 && (
+                  <span className="ml-3 text-xs opacity-75">
+                    • {feedStats.successful}/{feedStats.total} feeds loaded
+                    {feedStats.failed > 0 && (
+                      <span className="text-orange-500"> ({feedStats.failed} failed)</span>
+                    )}
+                  </span>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button
@@ -331,10 +349,10 @@ export default function HomePage() {
               <div ref={loadMoreRef} className="h-10 flex justify-center animate-[fadeIn_0.5s_ease-out] col-span-full">
                 <Button 
                   variant="default" 
-                  onClick={() => setVisibleCount(prev => Math.min(prev + 20, filteredArticles.length))}
+                  onClick={() => setVisibleCount(prev => Math.min(prev + 50, filteredArticles.length))}
                   className="w-full max-w-md"
                 >
-                  Load More
+                  Load More ({filteredArticles.length - visibleCount} remaining)
                 </Button>
               </div>
             )}

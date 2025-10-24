@@ -14,12 +14,35 @@ export interface ParsedRSSFeed {
  */
 export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlText: string, feedUrl: string) => Promise<ParsedRSSFeed | null>): Promise<ParsedRSSFeed | null> {
   try {
-    // Fetch XML text from proxy
+    console.log(`📥 Fetching feed: ${url}`);
+    // Fetch XML text from proxy with a 30 second timeout
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    const response = await fetch(proxyUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
-      console.warn(`Feed fetch failed: ${url} (HTTP ${response.status})`);
+      // Try to get error details from response
+      try {
+        const errorData = await response.json();
+        
+        // Log different error types at appropriate levels
+        if (response.status === 404) {
+          console.debug(`Feed not found: ${url}`);
+        } else if (response.status === 429) {
+          console.warn(`Rate limited: ${url} - ${errorData.suggestion || 'Too many requests'}`);
+        } else if (response.status === 408 || response.status === 504) {
+          console.warn(`Timeout: ${url} - Server took too long to respond`);
+        } else if (response.status >= 500) {
+          console.warn(`Server error (${response.status}): ${url} - ${errorData.error || 'Server is experiencing issues'}`);
+        } else {
+          console.warn(`Feed fetch failed: ${url} (HTTP ${response.status}): ${errorData.error || 'Unknown error'}`);
+        }
+      } catch {
+        console.warn(`Feed fetch failed: ${url} (HTTP ${response.status})`);
+      }
       return null;
     }
 
@@ -39,19 +62,30 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
       try {
         const result = await parseRSSWorker(xmlText, url);
         if (result) {
+          console.log(`✅ Worker parsed ${result.items.length} items from ${url}`);
           return result;
+        } else {
+          console.warn(`Worker returned null for: ${url} - falling back to inline parsing`);
         }
-      } catch (workerError) {
-        console.warn(`Error: ${workerError.message}. Worker parsing failed for: ${url} - falling back to inline parsing`);
+      } catch (workerError: any) {
+        console.warn(`Worker parsing error for ${url}: ${workerError?.message || workerError} - falling back to inline parsing`);
       }
     }
 
     // Fallback to inline parsing (same logic as worker, but runs in main thread)
-    return parseRSSInline(xmlText, url);
+    const inlineResult = parseRSSInline(xmlText, url);
+    if (!inlineResult) {
+      console.warn(`Inline parsing also failed for: ${url}`);
+    }
+    return inlineResult;
   } catch (error) {
-    // Only log unexpected errors
-    if (error instanceof Error && error.name !== 'AbortError') {
-      console.error(`Unexpected error parsing feed ${url}:`, error.message);
+    // Only log unexpected errors (not timeouts)
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        console.warn(`Feed timeout (30s): ${url}`);
+      } else {
+        console.error(`Unexpected error parsing feed ${url}:`, error.message);
+      }
     }
     return null;
   }
@@ -156,25 +190,46 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
         return null;
       }
       
-      console.warn(`XML parsing issue for ${feedUrl}:`, errorText.substring(0, 200));
+      // Common RSS parsing errors - try to fix automatically
+      let fallbackText = text;
+      let attemptedFixes: string[] = [];
       
-      // Try aggressive fallback: strip CDATA markers and ignore namespaces
-      const fallbackText = text
-        .replace(/\]\]/g, '] ]')
-        .replace(/<!\[CDATA\[/g, '')
-        .replace(/] ]>/g, '] ] ')
-        // Remove namespace prefixes that are causing issues
-        .replace(/<(\/?)(media|content|dc|itunes):(\w+)/g, '<$1$3');
+      // Fix 1: Handle self-closing link tags (most common issue)
+      if (errorText.includes('Opening and ending tag mismatch') && errorText.includes('link')) {
+        fallbackText = fallbackText.replace(/<link([^>]*?)\/>/gi, '<link$1></link>');
+        attemptedFixes.push('fixed self-closing links');
+      }
       
+      // Fix 2: Handle CDATA sequence issues
+      if (errorText.includes("Sequence ']]>' not allowed in content")) {
+        // Escape ]]> sequences that aren't part of CDATA sections
+        fallbackText = fallbackText.replace(/\]\]>(?!<)/g, ']] >');
+        attemptedFixes.push('escaped ]]> sequences');
+      }
+      
+      // Fix 3: More aggressive CDATA cleanup if still failing
+      if (attemptedFixes.length === 0) {
+        fallbackText = fallbackText
+          .replace(/\]\]/g, '] ]')
+          .replace(/<!\[CDATA\[/g, '')
+          .replace(/] ]>/g, '] ] ')
+          // Remove namespace prefixes that are causing issues
+          .replace(/<(\/?)(media|content|dc|itunes):(\w+)/g, '<$1$3');
+        attemptedFixes.push('stripped CDATA and namespaces');
+      }
+      
+      // Try parsing again with fixes
       xmlDoc = parser.parseFromString(fallbackText, "text/xml");
       parseError = xmlDoc.querySelector("parsererror");
       
       if (parseError) {
-        console.warn(`Failed to parse ${feedUrl} even with fallback`);
+        // Still failing - log and return null
+        console.warn(`Failed to parse ${feedUrl} after trying: ${attemptedFixes.join(', ')}`);
         return null;
       }
       
-      console.log(`Successfully parsed ${feedUrl} using fallback method`);
+      // Success with fallback
+      // console.log(`✓ Parsed ${feedUrl} with fixes: ${attemptedFixes.join(', ')}`);
     }
 
     const channelTitle = xmlDoc.querySelector("channel > title")?.textContent || 
@@ -184,10 +239,17 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
     let items: Element[];
     if (xmlDoc.querySelector("item")) {
       items = Array.from(xmlDoc.querySelectorAll("item"));
+      console.log(`Found ${items.length} items in RSS feed: ${feedUrl}`);
     } else if (xmlDoc.querySelector("entry")) {
       items = Array.from(xmlDoc.querySelectorAll("entry"));
+      console.log(`Found ${items.length} entries in Atom feed: ${feedUrl}`);
     } else {
-      console.debug(`No items found in feed: ${feedUrl}`);
+      console.warn(`No items or entries found in feed: ${feedUrl} - feed may be empty or have an unsupported format`);
+      return null;
+    }
+    
+    if (items.length === 0) {
+      console.warn(`Feed ${feedUrl} parsed but has 0 items`);
       return null;
     }
 
@@ -305,6 +367,7 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       };
     });
 
+    console.log(`✅ Successfully parsed ${parsedItems.length} items from ${feedUrl}`);
     return {
       title: channelTitle,
       items: parsedItems

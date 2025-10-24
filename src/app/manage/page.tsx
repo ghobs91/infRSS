@@ -19,7 +19,8 @@ import {
   saveUserPreferences,
   discoverFeedUrlWithFallbacks,
 } from "@/lib/rssUtils";
-import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
+import { fetchAndParseRSSClient, type ParsedRSSFeed } from "@/lib/rssUtilsClient";
+import { discoverFeed, getDiscoveryResultDescription, type FeedDiscoveryResult } from "@/lib/feedDiscovery";
 import type { FeedData } from "@/lib/types";
 import { useTransformerWorker } from "@/lib/useTransformerWorker";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
@@ -360,6 +361,7 @@ export default function ManagePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [discoveryStatus, setDiscoveryStatus] = useState<string>("");
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -388,42 +390,70 @@ export default function ManagePage() {
 
     setIsLoading(true);
     setError(null);
+    setDiscoveryStatus("Starting intelligent feed discovery...");
 
     try {
       // Check if the URL is already in the saved feeds
       if (savedFeeds.some(feed => feed.url === feedUrlInput.trim())) {
         setError("This feed is already added");
         setIsLoading(false);
+        setDiscoveryStatus("");
         return;
       }
 
-      // Try to parse the feed directly first
-      let feedData = await fetchAndParseRSSClient(feedUrlInput.trim(), parseRSSWithWorker);
+      console.log('🔍 Starting intelligent feed discovery...');
+      setDiscoveryStatus("🔍 Searching for RSS feeds...");
       
-      // If that fails, try to extract the feed URL from the HTML
-      let discoveredFeedUrl: string | null = null;
-      if (!feedData) {
-        discoveredFeedUrl = await getFeedUrlFromHtml(feedUrlInput.trim());
-        if (discoveredFeedUrl) {
-          feedData = await fetchAndParseRSSClient(discoveredFeedUrl, parseRSSWithWorker);
-        }
+      // Use intelligent feed discovery
+      const discoveredFeeds = await discoverFeed(feedUrlInput.trim());
+      
+      if (discoveredFeeds.length === 0) {
+        setError("Could not find any RSS feeds at this URL. Please try a different URL or check if the site has an RSS feed.");
+        setIsLoading(false);
+        setDiscoveryStatus("");
+        return;
       }
-      // If still no feed, try advanced discovery
-      if (!feedData) {
-        discoveredFeedUrl = await discoverFeedUrlWithFallbacks(feedUrlInput.trim());
-        if (discoveredFeedUrl) {
-          feedData = await fetchAndParseRSSClient(discoveredFeedUrl, parseRSSWithWorker);
+
+      console.log(`✅ Found ${discoveredFeeds.length} potential feeds`);
+      setDiscoveryStatus(`✅ Found ${discoveredFeeds.length} potential feed(s)! Testing...`);
+      
+      // Try each discovered feed in order of confidence
+      let successfulFeed: FeedDiscoveryResult | null = null;
+      let feedData: ParsedRSSFeed | null = null;
+      
+      for (let i = 0; i < discoveredFeeds.length; i++) {
+        const discovered = discoveredFeeds[i];
+        setDiscoveryStatus(`Testing feed ${i + 1}/${discoveredFeeds.length}: ${discovered.source}...`);
+        console.log(`Testing feed: ${discovered.url} (${discovered.source})`);
+        
+        // Check if already saved
+        if (savedFeeds.some(feed => feed.url === discovered.url)) {
+          console.log(`Skipping ${discovered.url} - already saved`);
+          continue;
+        }
+        
+        try {
+          feedData = await fetchAndParseRSSClient(discovered.url, parseRSSWithWorker);
+          
+          if (feedData && feedData.items && feedData.items.length > 0) {
+            successfulFeed = discovered;
+            console.log(`✅ Successfully parsed feed: ${discovered.url}`);
+            setDiscoveryStatus(`✅ Successfully found working feed!`);
+            break;
+          }
+        } catch (err) {
+          console.warn(`Failed to parse ${discovered.url}:`, err);
         }
       }
 
-      if (feedData && feedData.items && feedData.items.length > 0) {
-        // Get the feed title from the feed data or use the hostname
-        const feedTitle = feedData.title || new URL(feedUrlInput.trim()).hostname;
+      if (successfulFeed && feedData) {
+        // Get the feed title from the feed data or the discovered title
+        const feedTitle = feedData.title || successfulFeed.title || new URL(successfulFeed.url).hostname;
         
         const newFeed: FeedData = {
           id: `feed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           title: feedTitle,
-          url: discoveredFeedUrl || feedUrlInput.trim(),
+          url: successfulFeed.url,
           category: 'Uncategorized',
           tags: [],
           isActive: true
@@ -432,14 +462,46 @@ export default function ManagePage() {
         saveFeedToStorage(newFeed);
         setSavedFeeds(prev => [...prev, newFeed]);
         setFeedUrlInput("");
+        
+        // Show success message with discovery info
+        const description = getDiscoveryResultDescription(successfulFeed);
+        setError(`✅ Successfully added "${feedTitle}"! ${description}`);
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => setError(null), 5000);
+      } else if (discoveredFeeds.length > 0) {
+        // If we found feeds but couldn't parse any, default to the first (highest confidence) one
+        const firstFeed = discoveredFeeds[0];
+        const feedTitle = firstFeed.title || new URL(firstFeed.url).hostname;
+        
+        const newFeed: FeedData = {
+          id: `feed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          title: feedTitle,
+          url: firstFeed.url,
+          category: 'Uncategorized',
+          tags: [],
+          isActive: true
+        };
+        
+        saveFeedToStorage(newFeed);
+        setSavedFeeds(prev => [...prev, newFeed]);
+        setFeedUrlInput("");
+        
+        // Show success message with warning
+        const description = getDiscoveryResultDescription(firstFeed);
+        setError(`✅ Added "${feedTitle}" (${description}). Note: The feed couldn't be validated initially but has been added. It may work when refreshed.`);
+        
+        // Clear message after 7 seconds (longer for the warning)
+        setTimeout(() => setError(null), 7000);
       } else {
-        setError("Could not find a valid RSS feed at this URL");
+        setError(`Could not find any RSS feeds at this URL. Please try a different URL or check if the site has an RSS feed.`);
       }
     } catch (error) {
       console.error("Error adding feed:", error);
-      setError("Error adding feed. Please check the URL and try again.");
+      setError("Error during feed discovery. Please check the URL and try again.");
     } finally {
       setIsLoading(false);
+      setDiscoveryStatus("");
     }
   }, [feedUrlInput, savedFeeds, parseRSSWithWorker]);
 
@@ -668,14 +730,19 @@ export default function ManagePage() {
           <div className="space-y-3">
             <div className="glass-card p-5 rounded-[28px] shadow-md">
               <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Feed</h2>
-              <p className="text-sm text-[var(--text-secondary)] mt-2">Enter a feed URL or import from OPML file</p>
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Enter any website URL - we'll intelligently find the RSS feed for you!</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
                 type="url"
-                placeholder="Enter RSS feed URL"
+                placeholder="Enter any website URL (e.g., https://blog.example.com)"
                 value={feedUrlInput}
                 onChange={(e) => setFeedUrlInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoading) {
+                    handleAddFeed();
+                  }
+                }}
                 className="flex-1"
               />
               <Button 
@@ -687,7 +754,13 @@ export default function ManagePage() {
                 {isLoading ? <Spinner size="sm" /> : "Add Feed"}
               </Button>
             </div>
-            {isLoading && !error && (
+            {discoveryStatus && (
+              <div className="flex items-center gap-3 mt-2 p-4 glass-card rounded-[24px] shadow-md animate-[fadeIn_0.3s_ease-out]">
+                <Spinner size="sm" />
+                <span className="text-sm font-medium text-[var(--text-secondary)]">{discoveryStatus}</span>
+              </div>
+            )}
+            {isLoading && !error && !discoveryStatus && (
               <div className="flex items-center gap-3 mt-2 p-4 glass-card rounded-[24px] shadow-md animate-[fadeIn_0.3s_ease-out]">
                 <Spinner size="sm" />
                 <span className="text-sm font-medium text-[var(--text-secondary)]">Searching for feeds...</span>

@@ -448,10 +448,12 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
     let items: Element[];
     if (xmlDoc.querySelector("item")) {
       items = Array.from(xmlDoc.querySelectorAll("item"));
+      console.log(`🔧 Worker found ${items.length} RSS items in: ${feedUrl}`);
     } else if (xmlDoc.querySelector("entry")) {
       items = Array.from(xmlDoc.querySelectorAll("entry"));
+      console.log(`🔧 Worker found ${items.length} Atom entries in: ${feedUrl}`);
     } else {
-      console.error('No items found in feed');
+      console.error(`❌ Worker found no items/entries in feed: ${feedUrl}`);
       return null;
     }
 
@@ -557,6 +559,7 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
       };
     });
 
+    console.log(`✅ Worker successfully parsed ${parsedItems.length} items from ${feedUrl}`);
     return {
       title: channelTitle,
       items: parsedItems
