@@ -67,7 +67,7 @@ const CategoryManager = ({
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5 rounded-[28px] shadow-md">
+      <div className="glass-card p-5 rounded-[12px] shadow-md">
         <h3 className="text-xl font-bold text-[var(--text-primary)]">Manage Categories</h3>
       </div>
       
@@ -104,7 +104,7 @@ const CategoryManager = ({
 
       <div className="grid gap-3">
         {categories.map((category) => (
-          <div key={category.id} className="flex items-center justify-between p-5 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-400">
+          <div key={category.id} className="flex items-center justify-between p-5 glass-card rounded-[24px] shadow-md hover:shadow-lg transition-all duration-400">
             <div className="flex items-center gap-3">
               <div 
                 className="w-4 h-4 rounded-full border border-[var(--card-border)]" 
@@ -179,13 +179,13 @@ const VibesFilterSettings = ({
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5 rounded-[28px] shadow-md">
+      <div className="glass-card p-5 rounded-[12px] shadow-md">
         <h3 className="text-xl font-bold text-[var(--text-primary)]">Vibes Filtering</h3>
         <p className="text-sm text-[var(--text-secondary)] mt-2">Filter out low-quality content from your feed</p>
       </div>
       
       <div className="space-y-4">
-        <label className="flex items-center gap-3 p-4 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer">
+        <label className="flex items-center gap-3 p-4 glass-card rounded-[12px] shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer">
           <input
             type="checkbox"
             checked={preferences.vibesFilter.hideClickbait}
@@ -195,7 +195,7 @@ const VibesFilterSettings = ({
           <span className="font-semibold text-[var(--text-primary)]">Hide clickbait articles</span>
         </label>
 
-        <label className="flex items-center gap-3 p-4 glass-card rounded-[24px] shadow-md hover:shadow-lg hover:scale-[1.01] transition-all duration-300 cursor-pointer">
+        <label className="flex items-center gap-3 p-4 glass-card rounded-[24px] shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer">
           <input
             type="checkbox"
             checked={preferences.vibesFilter.hideRagebait}
@@ -684,38 +684,38 @@ export default function ManagePage() {
   return (
     <main className="space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6">
       {/* Page Header */}
-      <div className="glass-card p-6 rounded-[32px] shadow-lg animate-[fadeIn_0.5s_ease-out]">
+      <div className="glass-card p-6 rounded-[12px] shadow-lg animate-[fadeIn_0.5s_ease-out]">
         <h1 className="text-3xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
         <p className="text-[var(--text-secondary)] mt-2 text-base">Add, organize, and monitor your RSS feeds</p>
       </div>
       {/* Tab Navigation */}
-      <div className="flex gap-2 glass-card p-2 rounded-[28px] shadow-md">
+      <div className="flex gap-2 glass-card p-2 rounded-[12px] shadow-md">
         <button
           onClick={() => setActiveTab('feeds')}
-          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
+          className={`px-6 py-3.5 rounded-xl transition-all duration-400 font-semibold ${
             activeTab === 'feeds' 
               ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button'
           }`}
         >
           Feeds
         </button>
         <button
           onClick={() => setActiveTab('categories')}
-          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
+          className={`px-6 py-3.5 rounded-xl transition-all duration-400 font-semibold ${
             activeTab === 'categories' 
               ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button'
           }`}
         >
           Categories
         </button>
         <button
           onClick={() => setActiveTab('vibes')}
-          className={`px-6 py-3.5 rounded-3xl transition-all duration-400 font-semibold ${
+          className={`px-6 py-3.5 rounded-xl transition-all duration-400 font-semibold ${
             activeTab === 'vibes' 
               ? 'glass-card text-[var(--primary)] shadow-lg scale-105' 
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button hover:scale-[1.02]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:glass-button'
           }`}
         >
           Vibes
@@ -724,9 +724,10 @@ export default function ManagePage() {
 
       {/* Feeds Tab */}
       {activeTab === 'feeds' && (
-        <section className="space-y-6">
-          <div className="space-y-3">
-            <div className="glass-card p-5 rounded-[28px] shadow-md">
+        <section className="space-y-8">
+          {/* Add Feed Section */}
+          <div className="space-y-4 pb-8 border-b-2 border-[var(--border)]">
+            <div className="glass-card p-5 rounded-[12px] shadow-md border-l-4 border-[var(--primary)]">
               <h2 className="text-xl font-bold text-[var(--text-primary)]">Add Feed</h2>
               <p className="text-sm text-[var(--text-secondary)] mt-2">Enter any website URL - we'll intelligently find the RSS feed for you!</p>
             </div>
@@ -809,8 +810,51 @@ export default function ManagePage() {
             )}
           </div>
 
-          <div className="space-y-3">
-            <div className="glass-card p-5 rounded-[28px] shadow-md">
+          {/* Import/Export Section */}
+          <div className="space-y-4 pb-8 border-b-2 border-[var(--border)]">
+            <div className="glass-card p-5 rounded-[12px] shadow-md border-l-4 border-blue-500">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Import/Export</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Manage your feeds with OPML files</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Input
+                type="file"
+                accept=".opml,.xml"
+                onChange={handleImportOPML}
+                className="flex-1"
+                disabled={isImporting}
+              />
+              {isImporting && <Spinner size="sm" />}
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="default"
+                onClick={handleExportOPML}
+                disabled={savedFeeds.length === 0}
+                className="w-full"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
+                </svg>
+                Export to OPML
+              </Button>
+            </div>
+          </div>
+
+          {/* Suggest Feeds Section */}
+          <div className="space-y-4">
+            <div className="glass-card p-5 rounded-[12px] shadow-md border-l-4 border-orange-500">
               <h2 className="text-xl font-bold text-[var(--text-primary)]">Suggest Feeds</h2>
               <p className="text-sm text-[var(--text-secondary)] mt-2">Discover new feeds based on topics</p>
             </div>
@@ -834,9 +878,10 @@ export default function ManagePage() {
           </div>
 
           {suggestedFeeds.length > 0 && (
-            <div className="space-y-4">
-              <div className="glass-card p-5 rounded-[28px] shadow-md">
+            <div className="space-y-4 pt-6 border-t-2 border-[var(--border)]">
+              <div className="glass-card p-5 rounded-[12px] shadow-md border-l-4 border-purple-500">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">Suggested Feeds</h3>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">Click to subscribe to any feed below</p>
               </div>
               <div className="grid gap-3">
                 {suggestedFeeds.map((feed) => (
@@ -871,8 +916,8 @@ export default function ManagePage() {
       )}
 
       {/* Your Feeds Section */}
-      <section className="space-y-6 pt-8">
-        <div className="glass-card p-6 rounded-[32px] shadow-lg">
+      <section className="space-y-6 pt-8 border-t-4 border-[var(--border)] mt-8">
+        <div className="glass-card p-6 rounded-[12px] shadow-lg border-l-4 border-green-500">
           <h2 className="text-2xl font-bold text-[var(--text-primary)]">Your Feeds</h2>
           <p className="text-sm text-[var(--text-secondary)] mt-2">Manage and organize your subscribed feeds</p>
         </div>

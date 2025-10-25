@@ -123,8 +123,16 @@ export const ArticleCard = ({
     setMounted(true);
   }, []);
 
+  // Reset tracking refs when article changes or read status changes
+  useEffect(() => {
+    hasTriggeredRef.current = false;
+    wasVisibleRef.current = false;
+  }, [article.id, isRead]);
+
   useEffect(() => {
     if (!ref.current || !onScrollPast || isRead) return;
+    
+    const element = ref.current;
     
     const observer = new window.IntersectionObserver(
       (entries) => {
@@ -147,9 +155,11 @@ export const ArticleCard = ({
       }
     );
     
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [onScrollPast, isRead]); // Only depend on onScrollPast and isRead, not on state variables
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [onScrollPast, isRead, article.id]); // Include article.id to re-initialize when article changes
 
   const handleArchive = () => {
     if (onArchive) {
@@ -169,7 +179,7 @@ export const ArticleCard = ({
           filtered && "border-2"
         )}>
           {filtered && !showFiltered && (
-            <div className="absolute inset-0 z-10 bg-[var(--background)]/95 backdrop-blur-xl flex flex-col items-center justify-center gap-4 p-6 border-2 border-dashed border-[var(--border)] rounded-[32px]">
+            <div className="absolute inset-0 z-10 bg-[var(--background)]/95 backdrop-blur-xl flex flex-col items-center justify-center gap-4 p-6 border-2 border-dashed border-[var(--border)] rounded-[12px]">
               <div className="text-center space-y-3">
                 <div className="text-4xl">
                   {filterReason === 'Clickbait' ? '🚨' : '💥'}
@@ -247,7 +257,7 @@ export const ArticleCard = ({
               {/* Title */}
               <a
                 href={article.link}
-                className="text-base font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-3 mb-2 break-words transition-all duration-200 hover:scale-[1.01]"
+                className="text-base font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-3 mb-2 break-words transition-all duration-200"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -317,7 +327,7 @@ export const ArticleCard = ({
         filtered && "border-2"
       )}>
         {filtered && !showFiltered && (
-          <div className="absolute inset-0 z-10 bg-[var(--background)]/95 backdrop-blur-xl flex flex-col items-center justify-center gap-4 p-6 border-2 border-dashed border-[var(--border)] rounded-[32px]">
+          <div className="absolute inset-0 z-10 bg-[var(--background)]/95 backdrop-blur-xl flex flex-col items-center justify-center gap-4 p-6 border-2 border-dashed border-[var(--border)] rounded-[12px]">
             <div className="text-center space-y-3">
               <div className="text-4xl">
                 {filterReason === 'Clickbait' ? '🚨' : '💥'}
@@ -371,7 +381,7 @@ export const ArticleCard = ({
               <div className="flex items-start justify-between gap-2 w-full overflow-hidden">
                 <a
                   href={article.link}
-                  className="text-base sm:text-lg font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-2 flex-1 break-words overflow-hidden transition-all duration-200 hover:scale-[1.01]"
+                  className="text-base sm:text-lg font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-2 flex-1 break-words overflow-hidden transition-all duration-200"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

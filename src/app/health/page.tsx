@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { loadFeedsFromStorage, saveFeedsToStorage } from "@/lib/rssUtils";
@@ -237,36 +236,26 @@ export default function FeedHealthPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-[var(--text-secondary)]">Total Feeds</div>
-          </CardContent>
-        </Card>
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-green-700">{stats.success}</div>
-            <div className="text-sm text-green-600">Working</div>
-          </CardContent>
-        </Card>
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-red-700">{stats.failed}</div>
-            <div className="text-sm text-red-600">Failed</div>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-blue-700">{stats.checking}</div>
-            <div className="text-sm text-blue-600">Checking</div>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200 bg-gray-50">
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold text-gray-700">{stats.unknown}</div>
-            <div className="text-sm text-gray-600">Unknown</div>
-          </CardContent>
-        </Card>
+        <div className="glass-card rounded-[12px] p-6">
+          <div className="text-3xl font-bold">{stats.total}</div>
+          <div className="text-sm text-[var(--text-secondary)] mt-1">Total Feeds</div>
+        </div>
+        <div className="glass-card rounded-[12px] p-6 border-l-4 border-green-500">
+          <div className="text-3xl font-bold text-green-400">{stats.success}</div>
+          <div className="text-sm text-green-300 mt-1">Working</div>
+        </div>
+        <div className="glass-card rounded-[12px] p-6 border-l-4 border-red-500">
+          <div className="text-3xl font-bold text-red-400">{stats.failed}</div>
+          <div className="text-sm text-red-300 mt-1">Failed</div>
+        </div>
+        <div className="glass-card rounded-[12px] p-6 border-l-4 border-blue-500">
+          <div className="text-3xl font-bold text-blue-400">{stats.checking}</div>
+          <div className="text-sm text-blue-300 mt-1">Checking</div>
+        </div>
+        <div className="glass-card rounded-[12px] p-6">
+          <div className="text-3xl font-bold text-gray-400">{stats.unknown}</div>
+          <div className="text-sm text-gray-500 mt-1">Unknown</div>
+        </div>
       </div>
 
       {/* Controls */}
@@ -320,19 +309,17 @@ export default function FeedHealthPage() {
       {/* Feed List */}
       <div className="space-y-3">
         {filteredFeeds.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-[var(--text-secondary)]">
-                {feeds.length === 0 
-                  ? 'No feeds found. Add some feeds to get started.'
-                  : 'No feeds match the current filter.'}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="glass-card rounded-[12px] p-8 text-center">
+            <p className="text-[var(--text-secondary)]">
+              {feeds.length === 0 
+                ? 'No feeds found. Add some feeds to get started.'
+                : 'No feeds match the current filter.'}
+            </p>
+          </div>
         ) : (
           filteredFeeds.map((feed) => (
-            <Card key={feed.url} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
+            <div key={feed.url} className="glass-card rounded-[12px] p-5 transition-all">
+              <div className="">
                 <div className="flex items-start gap-4">
                   <div className="mt-1">
                     {getStatusIcon(feed.status)}
@@ -359,17 +346,17 @@ export default function FeedHealthPage() {
                     )}
 
                     {(feed.status === 'failed' || feed.status === 'timeout') && (
-                      <div className="bg-red-50 border border-red-200 rounded p-3 mb-2">
-                        <p className="text-sm text-red-800 font-medium mb-1">
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-[12px] p-3 mb-2">
+                        <p className="text-sm text-red-400 font-medium mb-1">
                           {feed.error}
                         </p>
                         {feed.suggestion && (
-                          <p className="text-xs text-red-600">
+                          <p className="text-xs text-red-300">
                             💡 {feed.suggestion}
                           </p>
                         )}
                         {getRSSHubAlternative(feed.url) && (
-                          <p className="text-xs text-blue-600 mt-1">
+                          <p className="text-xs text-blue-400 mt-1">
                             🔄 {getRSSHubAlternative(feed.url)}
                           </p>
                         )}
@@ -409,25 +396,28 @@ export default function FeedHealthPage() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))
         )}
       </div>
 
       {/* Help Section */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardHeader>
-          <CardTitle className="text-sm">Tips for Managing Feeds</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-blue-800 space-y-2">
-          <p>• <strong>Timeout errors:</strong> The feed server is too slow. Consider removing these feeds.</p>
-          <p>• <strong>RSSHub feeds:</strong> These may be rate-limited or unreliable. Look for native RSS feeds from the source.</p>
-          <p>• <strong>404 errors:</strong> The feed URL no longer exists. Remove these feeds.</p>
-          <p>• <strong>Failed feeds:</strong> Check if the website still provides an RSS feed, or look for alternatives.</p>
-          <p>• <strong>Slow response times:</strong> Feeds taking &gt;5s may slow down your app. Consider removing them.</p>
-        </CardContent>
-      </Card>
+      <div className="glass-card rounded-[12px] border-l-4 border-blue-500">
+        <div className="p-6">
+          <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-blue-400" />
+            Tips for Managing Feeds
+          </h3>
+          <div className="text-sm text-[var(--text-secondary)] space-y-3">
+            <p>• <strong className="text-[var(--text-primary)]">Timeout errors:</strong> The feed server is too slow. Consider removing these feeds.</p>
+            <p>• <strong className="text-[var(--text-primary)]">RSSHub feeds:</strong> These may be rate-limited or unreliable. Look for native RSS feeds from the source.</p>
+            <p>• <strong className="text-[var(--text-primary)]">404 errors:</strong> The feed URL no longer exists. Remove these feeds.</p>
+            <p>• <strong className="text-[var(--text-primary)]">Failed feeds:</strong> Check if the website still provides an RSS feed, or look for alternatives.</p>
+            <p>• <strong className="text-[var(--text-primary)]">Slow response times:</strong> Feeds taking &gt;5s may slow down your app. Consider removing them.</p>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

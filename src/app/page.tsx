@@ -257,7 +257,7 @@ export default function HomePage() {
       <section className="space-y-6 w-full overflow-hidden">
         {isClient && (
           <>
-            <div className="flex items-center justify-between mb-8 glass-card p-5 rounded-[32px] animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl transition-all duration-400">
+            <div className="flex items-center justify-between mb-8 glass-card p-5 rounded-[12px] animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl transition-all duration-400">
               <div className="text-sm font-semibold text-[var(--text-secondary)]">
                 {unreadCount} unread articles ({articles.length} total)
                 {feedStats.total > 0 && (
@@ -305,40 +305,45 @@ export default function HomePage() {
               // Show actual articles using ArticleCard component
               visibleArticles.map((article, idx) => {
                 const { filtered, reason } = shouldFilterArticle(article, preferences);
+                const articleLink = article.link;
+                
+                // Create stable callback per article to prevent observer resets
+                const handleScrollPast = () => {
+                  // Auto-mark as read when article is scrolled past
+                      
+                  // Skip if auto-mark is disabled, already read, or already being marked
+                  if (!autoMarkAsReadOnScroll || 
+                      readLinks.has(articleLink) || 
+                      markingAsReadRef.current.has(articleLink)) {
+                    return;
+                  }
+                      
+                  // Add to tracking and pending batch
+                  markingAsReadRef.current.add(articleLink);
+                  pendingMarksRef.current.add(articleLink);
+                      
+                  // Clear existing timeout and set a new one to batch updates
+                  if (batchTimeoutRef.current) {
+                    clearTimeout(batchTimeoutRef.current);
+                  }
+                      
+                  // Process batch after a short delay (300ms)
+                  batchTimeoutRef.current = setTimeout(() => {
+                    processPendingMarks();
+                    batchTimeoutRef.current = null;
+                  }, 300);
+                };
+                
                 return (
                   <ArticleCard
                     key={`${article.link}-${idx}`}
                     article={convertArticleForCard(article)}
-                    isRead={readLinks.has(article.link)}
+                    isRead={readLinks.has(articleLink)}
                     filtered={filtered}
                     filterReason={reason}
                     viewMode={viewMode}
-                    onScrollPast={() => {
-                      // Auto-mark as read when article is scrolled past
-                      const articleLink = article.link;
-                      
-                      // Skip if auto-mark is disabled, already read, or already being marked
-                      if (!autoMarkAsReadOnScroll || 
-                          readLinks.has(articleLink) || 
-                          markingAsReadRef.current.has(articleLink)) {
-                        return;
-                      }
-                      
-                      // Add to tracking and pending batch
-                      markingAsReadRef.current.add(articleLink);
-                      pendingMarksRef.current.add(articleLink);
-                      
-                      // Clear existing timeout and set a new one to batch updates
-                      if (batchTimeoutRef.current) {
-                        clearTimeout(batchTimeoutRef.current);
-                      }
-                      
-                      // Process batch after a short delay (300ms)
-                      batchTimeoutRef.current = setTimeout(() => {
-                        processPendingMarks();
-                        batchTimeoutRef.current = null;
-                      }, 300);
-                    }}                />
+                    onScrollPast={handleScrollPast}
+                  />
                 );
               })
             )}

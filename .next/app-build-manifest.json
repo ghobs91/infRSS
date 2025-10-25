@@ -19,9 +19,9 @@
       "static/chunks/4bd1b696-ddf5754b06f87566.js",
       "static/chunks/684-8c6f02c3a5c0817b.js",
       "static/chunks/main-app-974f5cdfa4554bc3.js",
-      "static/css/e79e52e12ab73913.css",
+      "static/css/984961b7930030f5.css",
       "static/chunks/244-c1037a8e38c2a8b6.js",
-      "static/chunks/app/layout-f7e36ae1953e0f8c.js"
+      "static/chunks/app/layout-ad80051fe460382d.js"
     ],
     "/health/page": [
       "static/chunks/webpack-e238d9db3069eb68.js",
@@ -29,8 +29,17 @@
       "static/chunks/684-8c6f02c3a5c0817b.js",
       "static/chunks/main-app-974f5cdfa4554bc3.js",
       "static/chunks/277-0e2bea38edafe8ba.js",
-      "static/chunks/267-6819503c683f7ec6.js",
-      "static/chunks/app/health/page-fa821b0af60ff38d.js"
+      "static/chunks/933-e7638e31e94ad1ae.js",
+      "static/chunks/app/health/page-e63841523e563832.js"
+    ],
+    "/manage/page": [
+      "static/chunks/webpack-e238d9db3069eb68.js",
+      "static/chunks/4bd1b696-ddf5754b06f87566.js",
+      "static/chunks/684-8c6f02c3a5c0817b.js",
+      "static/chunks/main-app-974f5cdfa4554bc3.js",
+      "static/chunks/766-3cdefb3cc351ada1.js",
+      "static/chunks/933-e7638e31e94ad1ae.js",
+      "static/chunks/app/manage/page-d17d452028c75586.js"
     ],
     "/page": [
       "static/chunks/webpack-e238d9db3069eb68.js",
@@ -39,17 +48,8 @@
       "static/chunks/main-app-974f5cdfa4554bc3.js",
       "static/chunks/277-0e2bea38edafe8ba.js",
       "static/chunks/766-3cdefb3cc351ada1.js",
-      "static/chunks/267-6819503c683f7ec6.js",
-      "static/chunks/app/page-e4c5a57203186b5e.js"
-    ],
-    "/manage/page": [
-      "static/chunks/webpack-e238d9db3069eb68.js",
-      "static/chunks/4bd1b696-ddf5754b06f87566.js",
-      "static/chunks/684-8c6f02c3a5c0817b.js",
-      "static/chunks/main-app-974f5cdfa4554bc3.js",
-      "static/chunks/766-3cdefb3cc351ada1.js",
-      "static/chunks/267-6819503c683f7ec6.js",
-      "static/chunks/app/manage/page-91feb97123552e58.js"
+      "static/chunks/933-e7638e31e94ad1ae.js",
+      "static/chunks/app/page-856af265dbff0eee.js"
     ],
     "/api/proxy/route": [
       "static/chunks/webpack-e238d9db3069eb68.js",

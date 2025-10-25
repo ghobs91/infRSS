@@ -8,12 +8,12 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "text-[var(--primary)] hover:scale-110",
+          "text-[var(--primary)]",
         secondary:
-          "text-[var(--text-secondary)] hover:scale-110",
+          "text-[var(--text-secondary)]",
         destructive:
-          "text-red-500 hover:scale-110",
-        outline: "border-2 border-[var(--border)] text-[var(--text-primary)] hover:scale-110 hover:border-[var(--primary)]",
+          "text-red-500",
+        outline: "border-2 border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--primary)]",
       },
     },
     defaultVariants: {

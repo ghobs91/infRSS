@@ -162,7 +162,6 @@ body {
 }
 
 .glass-card:hover {
-  transform: translateY(-4px) scale(1.01);
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(50px) saturate(220%) brightness(1.15);
   -webkit-backdrop-filter: blur(50px) saturate(220%) brightness(1.15);
@@ -289,14 +288,12 @@ body {
 
 .glass-button:hover {
   background: var(--accent-hover);
-  transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(40px) saturate(220%) brightness(1.15);
   -webkit-backdrop-filter: blur(40px) saturate(220%) brightness(1.15);
 }
 
 .glass-button:active {
-  transform: scale(0.95);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -307,7 +304,7 @@ body {
     transform: scale(1);
   }
   50% {
-    border-radius: 32px;
+    border-radius: 12px;
     transform: scale(1.02);
   }
 }
@@ -320,7 +317,7 @@ body {
 .read-article {
   opacity: 0.5;
   filter: grayscale(0.7);
-  pointer-events: none;
+  /* pointer-events: none; - removed so links are still clickable */
 }
 
 /* Prevent layout shifts during content updates */
@@ -357,7 +354,6 @@ body {
   
   input[type="file"]::-webkit-file-upload-button:hover {
     background: var(--accent-hover);
-    transform: scale(1.02);
   }
   
   select {
@@ -380,7 +376,7 @@ textarea {
   -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.1);
   border: 1px solid var(--input-border);
   color: var(--text-primary);
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 14px 20px;
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -394,7 +390,6 @@ textarea:focus {
   border-color: var(--input-focus);
   box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2), 0 4px 16px rgba(0, 0, 0, 0.08);
   outline: none;
-  transform: scale(1.02);
   backdrop-filter: blur(40px) saturate(220%) brightness(1.15);
   -webkit-backdrop-filter: blur(40px) saturate(220%) brightness(1.15);
 }
@@ -430,7 +425,6 @@ input[type="file"]::-webkit-file-upload-button {
 
 input[type="file"]::-webkit-file-upload-button:hover {
   background: var(--accent-hover);
-  transform: scale(1.02);
 }
 
 /* Select dropdown styling */
@@ -460,7 +454,7 @@ a:focus-visible {
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(52, 199, 89, 0.4);
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 8px 16px;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(52, 199, 89, 0.2);
@@ -468,7 +462,6 @@ a:focus-visible {
 }
 
 .status-healthy:hover {
-  transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(52, 199, 89, 0.3);
 }
 
@@ -478,7 +471,7 @@ a:focus-visible {
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(255, 59, 48, 0.4);
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 8px 16px;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(255, 59, 48, 0.2);
@@ -486,7 +479,6 @@ a:focus-visible {
 }
 
 .status-error:hover {
-  transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(255, 59, 48, 0.3);
 }
 
@@ -496,7 +488,7 @@ a:focus-visible {
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(255, 149, 0, 0.4);
-  border-radius: 20px;
+  border-radius: 12px;
   padding: 8px 16px;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(255, 149, 0, 0.2);
@@ -504,7 +496,6 @@ a:focus-visible {
 }
 
 .status-warning:hover {
-  transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(255, 149, 0, 0.3);
 }
 
@@ -518,7 +509,6 @@ a:focus-visible {
 .icon-secondary:hover {
   opacity: 1;
   color: var(--text-primary);
-  transform: scale(1.15) rotate(5deg);
 }
 
 /* Card variants */
@@ -533,7 +523,6 @@ a:focus-visible {
 .card-muted:hover {
   background: var(--muted-hover);
   border-color: var(--primary);
-  transform: translateY(-4px) scale(1.01);
   box-shadow: var(--shadow-lg);
   border-radius: 28px;
 }
