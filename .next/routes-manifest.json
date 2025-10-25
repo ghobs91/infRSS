@@ -34,6 +34,12 @@
       "namedRegex": "^/favicon\\.ico(?:/)?$"
     },
     {
+      "page": "/health",
+      "regex": "^/health(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/health(?:/)?$"
+    },
+    {
       "page": "/manage",
       "regex": "^/manage(?:/)?$",
       "routeKeys": {},

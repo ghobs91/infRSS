@@ -63,7 +63,7 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
         if (result) {
           return result;
         }
-      } catch (workerError: any) {
+      } catch {
         // Worker failed, fall back to inline parsing silently
       }
     }

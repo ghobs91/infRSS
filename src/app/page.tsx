@@ -209,7 +209,7 @@ export default function HomePage() {
             } else {
               return { success: false, items: [], url: feed.url };
             }
-          } catch (error) {
+          } catch {
             return { success: false, items: [], url: feed.url };
           }
         });

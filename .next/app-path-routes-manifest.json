@@ -2,8 +2,9 @@
   "/api/export-opml/route": "/api/export-opml",
   "/_not-found/page": "/_not-found",
   "/favicon.ico/route": "/favicon.ico",
-  "/manage/page": "/manage",
+  "/health/page": "/health",
   "/page": "/",
-  "/api/fetch-rss/route": "/api/fetch-rss",
-  "/api/proxy/route": "/api/proxy"
+  "/manage/page": "/manage",
+  "/api/proxy/route": "/api/proxy",
+  "/api/fetch-rss/route": "/api/fetch-rss"
 }
