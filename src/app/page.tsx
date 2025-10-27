@@ -108,10 +108,11 @@ export default function HomePage() {
   // Articles marked as read in the current session will be grayed out but still visible
   const filteredArticles = useMemo(() => {
     if (hideRead) {
-      return articles.filter(article => !previouslyReadLinks.has(article.link));
+      // Hide both previously read AND currently read articles
+      return articles.filter(article => !previouslyReadLinks.has(article.link) && !readLinks.has(article.link));
     }
     return articles;
-  }, [articles, previouslyReadLinks, hideRead]);
+  }, [articles, previouslyReadLinks, readLinks, hideRead]);
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
@@ -259,7 +260,7 @@ export default function HomePage() {
           <>
             <div className="flex items-center justify-between mb-8 glass-card p-5 rounded-[12px] animate-[fadeIn_0.5s_ease-out] shadow-lg hover:shadow-xl transition-all duration-400">
               <div className="text-sm font-semibold text-[var(--text-secondary)]">
-                {unreadCount} unread articles ({articles.length} total)
+                {filteredArticles.length} unread articles ({articles.length} total)
                 {feedStats.total > 0 && (
                   <span className="ml-3 text-xs opacity-75">
                     • {feedStats.successful}/{feedStats.total} feeds loaded
