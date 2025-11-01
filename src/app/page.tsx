@@ -68,7 +68,7 @@ export default function HomePage() {
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [feedStats, setFeedStats] = useState<{ total: number; successful: number; failed: number }>({ total: 0, successful: 0, failed: 0 });
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, unreadCount, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
+  const { toggleReadStatus, setTotalArticles, readLinks, previouslyReadLinks, autoMarkAsReadOnScroll, toggleAutoMarkAsRead } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
   const { viewMode } = useView();
   const markingAsReadRef = useRef<Set<string>>(new Set()); // Track articles currently being marked

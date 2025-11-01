@@ -1,0 +1,10 @@
+{
+  "/api/export-opml/route": "/api/export-opml",
+  "/favicon.ico/route": "/favicon.ico",
+  "/_not-found/page": "/_not-found",
+  "/health/page": "/health",
+  "/manage/page": "/manage",
+  "/page": "/",
+  "/api/fetch-rss/route": "/api/fetch-rss",
+  "/api/proxy/route": "/api/proxy"
+}
