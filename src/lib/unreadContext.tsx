@@ -38,18 +38,14 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const stored = localStorage.getItem(READ_KEY);
     const previouslyStored = localStorage.getItem(PREVIOUSLY_READ_KEY);
     
-    if (stored) {
-      const readLinksArray = JSON.parse(stored);
-      setReadLinks(new Set(readLinksArray));
-      
-      // On initial load, move current read links to previouslyReadLinks
-      if (previouslyStored) {
-        setPreviouslyReadLinks(new Set(JSON.parse(previouslyStored)));
-      } else {
-        // First time migration: existing read links become "previously read"
-        setPreviouslyReadLinks(new Set(readLinksArray));
-      }
+    // Load previously read links from last session
+    if (previouslyStored) {
+      setPreviouslyReadLinks(new Set(JSON.parse(previouslyStored)));
     }
+    
+    // Start with empty read links for new session
+    // Don't load old read links - they're now in previouslyReadLinks
+    setReadLinks(new Set());
 
     const prefs = localStorage.getItem(PREFERENCES_KEY);
     if (prefs) {
@@ -71,8 +67,10 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (isInitialLoad) return;
     
     localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks)));
-    setUnreadCount(Math.max(totalArticles - readLinks.size, 0));
-  }, [readLinks, totalArticles, isInitialLoad]);
+    // Calculate unread count by subtracting both current and previously read articles
+    const allReadLinks = new Set([...Array.from(readLinks), ...Array.from(previouslyReadLinks)]);
+    setUnreadCount(Math.max(totalArticles - allReadLinks.size, 0));
+  }, [readLinks, previouslyReadLinks, totalArticles, isInitialLoad]);
 
   // Before the app unloads, save current read links as previously read for next session
   useEffect(() => {

@@ -108,11 +108,11 @@ export default function HomePage() {
   // Articles marked as read in the current session will be grayed out but still visible
   const filteredArticles = useMemo(() => {
     if (hideRead) {
-      // Hide both previously read AND currently read articles
-      return articles.filter(article => !previouslyReadLinks.has(article.link) && !readLinks.has(article.link));
+      // Only hide previously read articles (from past sessions), not current session reads
+      return articles.filter(article => !previouslyReadLinks.has(article.link));
     }
     return articles;
-  }, [articles, previouslyReadLinks, readLinks, hideRead]);
+  }, [articles, previouslyReadLinks, hideRead]);
 
   // Memoize visible articles to prevent unnecessary re-renders
   const visibleArticles = useMemo(() => {
@@ -163,7 +163,7 @@ export default function HomePage() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !isLoading) {
-          setVisibleCount((prev) => Math.min(prev + 50, articles.length)); // Load 50 articles at a time instead of 20
+          setVisibleCount((prev) => Math.min(prev + 50, filteredArticles.length)); // Load 50 articles at a time instead of 20
         }
       },
       { threshold: 0.5 }
@@ -184,7 +184,7 @@ export default function HomePage() {
         observer.unobserve(currentRef);
       }
     };
-  }, [isLoading, articles.length, handleRefresh]);
+  }, [isLoading, filteredArticles.length, handleRefresh]);
 
   // Load saved feeds on initial render
   useEffect(() => {

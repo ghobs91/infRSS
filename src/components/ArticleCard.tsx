@@ -139,19 +139,19 @@ export const ArticleCard = ({
         const entry = entries[0];
         if (!entry) return;
         
-        // Article is now visible - mark it as "seen"
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+        // Article is now visible - mark it as "seen" only when most of it is visible
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.8) {
           wasVisibleRef.current = true;
         }
-        // Article has scrolled out of view AND was previously seen AND hasn't been triggered yet
-        else if (!entry.isIntersecting && wasVisibleRef.current && !hasTriggeredRef.current) {
+        // Article has scrolled completely out of view AND was previously seen AND hasn't been triggered yet
+        else if (!entry.isIntersecting && entry.intersectionRatio === 0 && wasVisibleRef.current && !hasTriggeredRef.current) {
           hasTriggeredRef.current = true;
           onScrollPast();
         }
       },
       { 
-        threshold: [0, 0.6],
-        rootMargin: '-80px 0px' // Top margin to ensure article is well in viewport
+        threshold: [0, 0.8],
+        rootMargin: '-100px 0px -100px 0px' // Require more of article to be in viewport
       }
     );
     
