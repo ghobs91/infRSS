@@ -35,7 +35,6 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Load read links and preferences from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(READ_KEY);
     const previouslyStored = localStorage.getItem(PREVIOUSLY_READ_KEY);
     
     // Load previously read links from last session
