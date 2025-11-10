@@ -1,6 +1,8 @@
 "use client";
 
 // app/manage/page.tsx
+// Force client-side only rendering to prevent Netlify SSR issues
+export const dynamic = 'force-dynamic';
 
 import { useState, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";

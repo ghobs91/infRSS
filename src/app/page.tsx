@@ -1,6 +1,9 @@
 // app/page.tsx
 "use client";
 
+// Force client-side only rendering to prevent Netlify SSR issues
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

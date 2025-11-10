@@ -1,5 +1,8 @@
 "use client";
 
+// Force client-side only rendering to prevent Netlify SSR issues
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";

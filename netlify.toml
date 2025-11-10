@@ -9,8 +9,6 @@
   # Ensure proper Next.js build
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "20"
-  # Enable experimental Edge Runtime support
-  NEXT_PRIVATE_STANDALONE = "true"
 
 [[headers]]
   for = "/api/*"
@@ -18,6 +16,7 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
+    Cache-Control = "no-cache, no-store, must-revalidate"
 
 [[headers]]
   for = "/*"
@@ -25,3 +24,14 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+# Increase timeout for all functions (max 26 seconds for Netlify free tier)
+[functions]
+  node_bundler = "esbuild"
+  
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+  conditions = {Role = ["public"]}
