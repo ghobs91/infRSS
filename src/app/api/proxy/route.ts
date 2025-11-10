@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkRateLimit, fetchWithRetry } from '@/lib/rateLimit';
 
-// Use Edge Runtime for minimal proxying without server instance
-export const runtime = 'edge';
+// Use Node.js runtime for better Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

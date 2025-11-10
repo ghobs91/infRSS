@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateOPMLFromFeeds } from '@/lib/rssUtils';
 import type { FeedData, Category } from '@/lib/types';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { feeds, categories } = await request.json();

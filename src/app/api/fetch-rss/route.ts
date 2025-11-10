@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
-// Use Edge Runtime for minimal proxying without server instance
-export const runtime = 'edge';
+// Use Node.js runtime for better Netlify compatibility
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
