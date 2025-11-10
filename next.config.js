@@ -15,24 +15,7 @@ const withPWA = require("next-pwa")({
           pathname: '/s2/favicons/**',
         },
       ],
-      unoptimized: true, // Disable image optimization for better Netlify compatibility
-    },
-    // Configure Turbopack
-    experimental: {
-      turbo: {
-        rules: {
-          // Add any custom Turbopack rules here if needed
-        }
-      }
-    },
-    // Add proper rewrites if needed
-    async rewrites() {
-      return [
-        {
-          source: '/api/:path*',
-          destination: '/api/:path*',
-        },
-      ];
+      unoptimized: true,
     },
   });
   

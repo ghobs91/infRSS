@@ -1,12 +1,7 @@
-[build]
-  command = "npm run build"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# Netlify will automatically detect Next.js and use Essential Next.js
+# No need for explicit plugin configuration for Next.js 15+
 
 [build.environment]
-  # Ensure proper Next.js build
-  NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "20"
 
 [[headers]]
@@ -15,22 +10,3 @@
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type"
-    Cache-Control = "no-cache, no-store, must-revalidate"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-
-# Increase timeout for all functions (max 26 seconds for Netlify free tier)
-[functions]
-  node_bundler = "esbuild"
-  
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
-  conditions = {Role = ["public"]}
