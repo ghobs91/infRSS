@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback, useState, useEffect } from 'react';
 import Image from 'next/image';
 
 interface Article {
@@ -21,14 +21,46 @@ interface ArticleListColumnProps {
   subtitle?: string;
 }
 
-export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
+const INITIAL_BATCH_SIZE = 50;
+const LOAD_MORE_THRESHOLD = 500; // pixels from bottom
+
+const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   articles,
   selectedArticle,
   onSelectArticle,
   title = 'Today',
   subtitle,
 }) => {
-  const formatDate = (dateString: string) => {
+  const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
+
+  // Reset display count when articles change
+  useEffect(() => {
+    setDisplayCount(INITIAL_BATCH_SIZE);
+  }, [articles]);
+
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target || !target.classList.contains('article-list-items')) return;
+
+      const scrollTop = target.scrollTop;
+      const scrollHeight = target.scrollHeight;
+      const clientHeight = target.clientHeight;
+
+      if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
+        setDisplayCount(prev => Math.min(prev + 20, articles.length));
+      }
+    };
+
+    const listElement = document.querySelector('.article-list-items');
+    if (listElement) {
+      listElement.addEventListener('scroll', handleScroll);
+      return () => listElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [articles.length]);
+
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -46,16 +78,18 @@ export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
         year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
       });
     }
-  };
+  }, []);
 
-  const getExcerpt = (article: Article) => {
+  const getExcerpt = useCallback((article: Article) => {
     if (article.summary) return article.summary;
     if (article.content) {
       const text = article.content.replace(/<[^>]*>/g, '').substring(0, 150);
       return text + (article.content.length > 150 ? '...' : '');
     }
     return '';
-  };
+  }, []);
+
+  const displayedArticles = articles.slice(0, displayCount);
 
   return (
     <div className="article-list">
@@ -76,7 +110,7 @@ export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
             </p>
           </div>
         ) : (
-          articles.map((article) => (
+          displayedArticles.map((article) => (
             <div
               key={article.id}
               className={`article-list-item ${
@@ -94,6 +128,7 @@ export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
                         width={16}
                         height={16}
                         unoptimized
+                        loading="lazy"
                       />
                       <span>{article.sourceDomain}</span>
                     </div>
@@ -119,6 +154,7 @@ export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
                     width={80}
                     height={80}
                     unoptimized
+                    loading="lazy"
                     className="article-list-item-thumbnail"
                   />
                 )}
@@ -130,3 +166,5 @@ export const ArticleListColumn: React.FC<ArticleListColumnProps> = ({
     </div>
   );
 };
+
+export const ArticleListColumn = memo(ArticleListColumnComponent);

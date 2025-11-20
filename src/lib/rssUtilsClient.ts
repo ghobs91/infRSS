@@ -8,12 +8,22 @@ export interface ParsedRSSFeed {
   items: Article[];
 }
 
+// Cache for parsed feeds to avoid re-parsing
+const feedCache = new Map<string, { data: ParsedRSSFeed; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Fetch XML from proxy and parse using Web Worker
  * This function is designed to work on the client-side only
  */
 export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlText: string, feedUrl: string) => Promise<ParsedRSSFeed | null>): Promise<ParsedRSSFeed | null> {
   try {
+    // Check cache first
+    const cached = feedCache.get(url);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+
     // Fetch XML text from proxy with a 30 second timeout
     const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
     const controller = new AbortController();
@@ -69,7 +79,14 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
     }
 
     // Fallback to inline parsing (same logic as worker, but runs in main thread)
-    return parseRSSInline(xmlText, url);
+    const result = parseRSSInline(xmlText, url);
+    
+    // Cache successful result
+    if (result) {
+      feedCache.set(url, { data: result, timestamp: Date.now() });
+    }
+    
+    return result;
   } catch (error) {
     // Only log unexpected errors (not timeouts)
     if (error instanceof Error) {

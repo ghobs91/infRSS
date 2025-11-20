@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import Image from 'next/image';
 
 interface Article {
@@ -17,7 +17,18 @@ interface ArticleViewerProps {
   article: Article | null;
 }
 
-export const ArticleViewer: React.FC<ArticleViewerProps> = ({ article }) => {
+const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
+  const formatDate = useCallback((dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, []);
+
   if (!article) {
     return (
       <div className="article-viewer">
@@ -30,17 +41,6 @@ export const ArticleViewer: React.FC<ArticleViewerProps> = ({ article }) => {
       </div>
     );
   }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <div className="article-viewer">
@@ -69,6 +69,7 @@ export const ArticleViewer: React.FC<ArticleViewerProps> = ({ article }) => {
             width={800}
             height={500}
             unoptimized
+            priority
             className="article-viewer-image"
           />
         )}
@@ -146,3 +147,7 @@ export const ArticleViewer: React.FC<ArticleViewerProps> = ({ article }) => {
     </div>
   );
 };
+
+export const ArticleViewer = memo(ArticleViewerComponent, (prevProps, nextProps) => {
+  return prevProps.article?.id === nextProps.article?.id;
+});

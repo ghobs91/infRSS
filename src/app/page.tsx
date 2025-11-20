@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { FeedSidebar } from "@/components/FeedSidebar";
 import { ArticleListColumn } from "@/components/ArticleListColumn";
@@ -39,10 +39,10 @@ export default function HomePage() {
   const { readLinks, toggleReadStatus, setTotalArticles } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
 
-  // Load feeds and articles
+  // Load feeds and articles with progressive loading
   useEffect(() => {
     // Convert article to proper format
-    const convertArticle = (article: any): ArticleData => {
+    const convertArticle = (article: any, feedUrl: string, index: number): ArticleData => {
       const sourceDomain = (() => {
         try {
           return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
@@ -51,8 +51,11 @@ export default function HomePage() {
         }
       })();
 
+      // Create unique ID combining feed URL, article link, and index to prevent duplicates
+      const uniqueId = `${feedUrl}::${article.link}::${index}`;
+
       return {
-        id: article.link,
+        id: uniqueId,
         title: article.title,
         link: article.link,
         pubDate: article.pubDate,
@@ -63,6 +66,7 @@ export default function HomePage() {
         readStatus: readLinks.has(article.link) ? 'read' : 'unread',
       };
     };
+    
     const loadData = async () => {
       setIsLoading(true);
       try {
@@ -73,43 +77,63 @@ export default function HomePage() {
           return;
         }
 
-        // Convert feeds to proper format
-        const feedsData: FeedData[] = savedFeeds.map((feed, idx) => ({
-          id: feed.url,
+        // Filter out invalid feeds and ensure unique IDs
+        const validFeeds = savedFeeds.filter(feed => feed.url && feed.url.trim());
+        const uniqueUrls = new Set<string>();
+        const deduplicatedFeeds = validFeeds.filter(feed => {
+          if (uniqueUrls.has(feed.url)) {
+            console.warn('Duplicate feed URL detected:', feed.url);
+            return false;
+          }
+          uniqueUrls.add(feed.url);
+          return true;
+        });
+
+        // Convert feeds to proper format with guaranteed unique IDs
+        const feedsData: FeedData[] = deduplicatedFeeds.map((feed, idx) => ({
+          id: `${feed.url}-${idx}`, // Ensure unique ID
           name: (feed as any).name || feed.title || `Feed ${idx + 1}`,
           url: feed.url,
           unreadCount: 0,
         }));
         setFeeds(feedsData);
+        
+        // Show loading state but allow UI to be interactive
+        setIsLoading(false);
 
-        // Fetch all feeds in parallel
-        const fetchPromises = savedFeeds.map(async (feed) => {
+        // Progressive loading: fetch feeds and update UI as each completes
+        const allArticles: ArticleData[] = [];
+
+        // Fetch feeds with progressive updates
+        const fetchPromises = deduplicatedFeeds.map(async (feed) => {
           try {
             const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
             if (data?.items && data.items.length > 0) {
+              const newArticles = data.items.map((item: any, itemIdx: number) => 
+                convertArticle(item, feed.url, itemIdx)
+              );
+              
+              // Update articles progressively
+              setArticles(prev => {
+                const combined = [...prev, ...newArticles];
+                // Sort by date
+                combined.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+                return combined;
+              });
+              
+              allArticles.push(...newArticles);
+              
               return { success: true, items: data.items, url: feed.url };
             }
             return { success: false, items: [], url: feed.url };
-          } catch {
+          } catch (error) {
+            console.error('Failed to fetch feed:', feed.url, error);
             return { success: false, items: [], url: feed.url };
           }
         });
 
-        const results = await Promise.all(fetchPromises);
-        const allArticles: ArticleData[] = [];
-
-        results.forEach((result) => {
-          if (result.success) {
-            result.items.forEach((item: any) => {
-              allArticles.push(convertArticle(item));
-            });
-          }
-        });
-
-        // Sort by date
-        allArticles.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        await Promise.all(fetchPromises);
         
-        setArticles(allArticles);
         setTotalArticles(allArticles.length);
 
         // Update feed unread counts
@@ -130,7 +154,6 @@ export default function HomePage() {
 
       } catch (error) {
         console.error("Error loading data:", error);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -138,32 +161,46 @@ export default function HomePage() {
     loadData();
   }, [parseRSSWithWorker, setTotalArticles, readLinks]);
 
-  // Filter articles based on selected feed
-  const filteredArticles = selectedFeed 
-    ? articles.filter(a => {
-        try {
-          return a.link.includes(new URL(selectedFeed).hostname);
-        } catch {
-          return false;
-        }
-      })
-    : articles;
+  // Filter articles based on selected feed - memoized to prevent recalculation on every render
+  const filteredArticles = useMemo(() => {
+    if (!selectedFeed) return articles;
+    
+    return articles.filter(a => {
+      try {
+        // Find the feed by ID to get its URL
+        const feed = feeds.find(f => f.id === selectedFeed);
+        if (!feed) return false;
+        
+        const selectedFeedHostname = new URL(feed.url).hostname;
+        const articleHostname = new URL(a.link).hostname;
+        return selectedFeedHostname === articleHostname;
+      } catch {
+        return false;
+      }
+    });
+  }, [articles, selectedFeed, feeds]);
 
-  // Get selected article
-  const selectedArticle = selectedArticleId 
-    ? articles.find(a => a.id === selectedArticleId) || null
-    : null;
+  // Get selected article - memoized
+  const selectedArticle = useMemo(() => {
+    return selectedArticleId 
+      ? articles.find(a => a.id === selectedArticleId) || null
+      : null;
+  }, [articles, selectedArticleId]);
 
-  // Handle article selection
-  const handleSelectArticle = (articleId: string) => {
+  // Handle article selection - memoized callback
+  const handleSelectArticle = useCallback((articleId: string) => {
     setSelectedArticleId(articleId);
-    if (!readLinks.has(articleId)) {
-      toggleReadStatus(articleId);
+    // Find the article to get its actual link for read status tracking
+    const article = articles.find(a => a.id === articleId);
+    if (article && !readLinks.has(article.link)) {
+      toggleReadStatus(article.link);
     }
-  };
+  }, [articles, readLinks, toggleReadStatus]);
 
-  // Calculate total unread count
-  const totalUnreadCount = articles.filter(a => a.readStatus === 'unread').length;
+  // Calculate total unread count - memoized
+  const totalUnreadCount = useMemo(() => {
+    return articles.filter(a => a.readStatus === 'unread').length;
+  }, [articles]);
 
   if (isLoading) {
     return (

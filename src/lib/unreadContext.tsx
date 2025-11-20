@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 
 interface UnreadContextType {
   unreadCount: number;
@@ -129,17 +129,29 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAutoMarkAsReadOnScroll(prev => !prev);
   }, []);
 
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo(() => ({
+    unreadCount, 
+    readLinks, 
+    previouslyReadLinks,
+    markAsRead, 
+    toggleReadStatus, 
+    setTotalArticles,
+    autoMarkAsReadOnScroll,
+    toggleAutoMarkAsRead
+  }), [
+    unreadCount, 
+    readLinks, 
+    previouslyReadLinks,
+    markAsRead, 
+    toggleReadStatus, 
+    setTotalArticles,
+    autoMarkAsReadOnScroll,
+    toggleAutoMarkAsRead
+  ]);
+
   return (
-    <UnreadContext.Provider value={{ 
-      unreadCount, 
-      readLinks, 
-      previouslyReadLinks,
-      markAsRead, 
-      toggleReadStatus, 
-      setTotalArticles,
-      autoMarkAsReadOnScroll,
-      toggleAutoMarkAsRead
-    }}>
+    <UnreadContext.Provider value={contextValue}>
       {children}
     </UnreadContext.Provider>
   );

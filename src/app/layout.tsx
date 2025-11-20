@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <title>Folo - RSS Reader</title>
+        <title>InfRSS - RSS Reader</title>
         <meta name="description" content="An intelligent, offline-friendly RSS reader" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#ff6b35" />

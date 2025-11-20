@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import Image from 'next/image';
 
 interface Feed {
@@ -16,7 +16,7 @@ interface FeedSidebarProps {
   unreadCount: number;
 }
 
-export const FeedSidebar: React.FC<FeedSidebarProps> = ({
+const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
   feeds,
   selectedFeed,
   onSelectFeed,
@@ -27,7 +27,7 @@ export const FeedSidebar: React.FC<FeedSidebarProps> = ({
       <div className="sidebar-header">
         <div className="sidebar-logo">
           <span className="text-2xl">📰</span>
-          <span>Folo</span>
+          <span>InfRSS</span>
         </div>
       </div>
 
@@ -92,6 +92,7 @@ export const FeedSidebar: React.FC<FeedSidebarProps> = ({
                       width={20}
                       height={20}
                       unoptimized
+                      loading="lazy"
                       className="rounded"
                     />
                   ) : (
@@ -112,3 +113,15 @@ export const FeedSidebar: React.FC<FeedSidebarProps> = ({
     </div>
   );
 };
+
+export const FeedSidebar = memo(FeedSidebarComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.selectedFeed === nextProps.selectedFeed &&
+    prevProps.unreadCount === nextProps.unreadCount &&
+    prevProps.feeds.length === nextProps.feeds.length &&
+    prevProps.feeds.every((feed, idx) => 
+      feed.id === nextProps.feeds[idx]?.id &&
+      feed.unreadCount === nextProps.feeds[idx]?.unreadCount
+    )
+  );
+});

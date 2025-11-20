@@ -765,8 +765,23 @@ export function loadFeedsFromStorage(): FeedData[] {
     const feeds = localStorage.getItem("feeds");
     if (feeds) {
       const parsedFeeds = JSON.parse(feeds);
-      // Ensure all feeds have IDs for backward compatibility
-      return parsedFeeds.map((feed: any, index: number) => ({
+      
+      // Filter out invalid feeds and deduplicate
+      const validFeeds = parsedFeeds.filter((feed: any) => feed && feed.url && typeof feed.url === 'string' && feed.url.trim());
+      
+      // Deduplicate by URL
+      const seenUrls = new Set<string>();
+      const uniqueFeeds = validFeeds.filter((feed: any) => {
+        if (seenUrls.has(feed.url)) {
+          console.warn('Removing duplicate feed:', feed.url);
+          return false;
+        }
+        seenUrls.add(feed.url);
+        return true;
+      });
+      
+      // Ensure all feeds have proper structure
+      const cleanedFeeds = uniqueFeeds.map((feed: any, index: number) => ({
         ...feed,
         id: feed.id || `feed-${index}`,
         category: feed.category || 'Uncategorized',
@@ -774,6 +789,14 @@ export function loadFeedsFromStorage(): FeedData[] {
         lastFetched: feed.lastFetched || 0,
         isActive: feed.isActive !== false
       }));
+      
+      // Save cleaned feeds back if we removed any
+      if (cleanedFeeds.length !== parsedFeeds.length) {
+        console.log(`Cleaned up feeds: ${parsedFeeds.length} -> ${cleanedFeeds.length}`);
+        localStorage.setItem("feeds", JSON.stringify(cleanedFeeds));
+      }
+      
+      return cleanedFeeds;
     }
     return [];
   } catch (error) {
