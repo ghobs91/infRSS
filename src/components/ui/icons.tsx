@@ -127,4 +127,54 @@ export const ListIcon = () => (
     <line x1="3" y1="12" x2="3.01" y2="12"></line>
     <line x1="3" y1="18" x2="3.01" y2="18"></line>
   </svg>
+);
+
+export const SearchIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <circle cx="11" cy="11" r="8"></circle>
+    <path d="m21 21-4.35-4.35"></path>
+  </svg>
+);
+
+export const SettingsIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="3"></circle>
+    <path d="M12 1v6m0 6v6m5.66-13.66l-4.242 4.242m-2.828 2.828l-4.242 4.242M23 12h-6m-6 0H1m18.66 5.66l-4.242-4.242m-2.828-2.828l-4.242-4.242"></path>
+  </svg>
+);
+
+export const CheckIcon = () => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    width="24" 
+    height="24" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
 ); 

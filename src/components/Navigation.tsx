@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Drawer } from '@/components/ui/drawer';
 import { IconButton } from '@/components/ui/icon-button';
-import { MenuIcon, CloseIcon, HomeIcon, PlusIcon, RssIcon, GridIcon, ListIcon } from '@/components/ui/icons';
+import { MenuIcon, CloseIcon, HomeIcon, PlusIcon, RssIcon, GridIcon, ListIcon, SearchIcon, SettingsIcon } from '@/components/ui/icons';
 import { useUnread } from '@/lib/unreadContext';
 import { useView } from '@/lib/viewContext';
 
@@ -72,15 +72,13 @@ export const Navigation = () => {
         }`}>
         <div className="h-full flex items-center px-4 justify-between">
           <div className="flex items-center">
-            {!isMobile && (
-              <IconButton
-                icon={<MenuIcon />}
-                label="Menu"
-                variant="ghost"
-                onClick={toggleDrawer}
-              />
-            )}
-            <h1 className={`text-xl font-semibold text-[var(--text-primary)] ${!isMobile ? 'ml-2' : ''}`}>
+            <IconButton
+              icon={<MenuIcon />}
+              label="Menu"
+              variant="ghost"
+              onClick={toggleDrawer}
+            />
+            <h1 className="text-xl font-semibold text-[var(--text-primary)] ml-2">
               {getPageTitle()}
             </h1>
           </div>
@@ -196,9 +194,17 @@ export const Navigation = () => {
                   : 'text-[var(--text-secondary)]'
               }`}
             >
-              <PlusIcon />
-              <span className="text-[11px] font-semibold">Feeds</span>
+              <RssIcon />
+              <span className="text-[11px] font-semibold">Subscriptions</span>
             </Link>
+            
+            <button 
+              className="liquid-glass-tab flex flex-col items-center justify-center gap-1 px-5 py-2 text-[var(--text-secondary)]"
+              onClick={() => {/* TODO: implement search */}}
+            >
+              <SearchIcon />
+              <span className="text-[11px] font-semibold">Discover</span>
+            </button>
             
             <Link 
               href="/health" 
@@ -208,8 +214,8 @@ export const Navigation = () => {
                   : 'text-[var(--text-secondary)]'
               }`}
             >
-              <RssIcon />
-              <span className="text-[11px] font-semibold">Health</span>
+              <SettingsIcon />
+              <span className="text-[11px] font-semibold">Settings</span>
             </Link>
           </div>
         </nav>

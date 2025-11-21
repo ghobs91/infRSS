@@ -36,7 +36,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFeed, setSelectedFeed] = useState<string | null>(null);
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  const { readLinks, toggleReadStatus, setTotalArticles } = useUnread();
+  const { readArticleIds, toggleReadStatus, setTotalArticles } = useUnread();
   const { parseRSSWithWorker } = useRSSParserWorker();
 
   // Load feeds and articles with progressive loading
@@ -63,7 +63,7 @@ export default function HomePage() {
         content: article.content,
         summary: article.summary,
         sourceDomain,
-        readStatus: readLinks.has(article.link) ? 'read' : 'unread',
+        readStatus: readArticleIds.has(uniqueId) ? 'read' : 'unread',
       };
     };
     
@@ -102,7 +102,9 @@ export default function HomePage() {
         setIsLoading(false);
 
         // Progressive loading: fetch feeds and update UI as each completes
+        // Use shared array to track all articles for final limiting
         const allArticles: ArticleData[] = [];
+        const ARTICLE_LIMIT = 4000;
 
         // Fetch feeds with progressive updates
         const fetchPromises = deduplicatedFeeds.map(async (feed) => {
@@ -113,15 +115,23 @@ export default function HomePage() {
                 convertArticle(item, feed.url, itemIdx)
               );
               
-              // Update articles progressively
+              // Add to shared array
+              allArticles.push(...newArticles);
+              
+              // Update articles progressively with limit applied
               setArticles(prev => {
                 const combined = [...prev, ...newArticles];
                 // Sort by date
-                combined.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-                return combined;
+                combined.sort((a, b) => {
+                  try {
+                    return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
+                  } catch {
+                    return 0;
+                  }
+                });
+                // Apply limit during progressive updates
+                return combined.slice(0, ARTICLE_LIMIT);
               });
-              
-              allArticles.push(...newArticles);
               
               return { success: true, items: data.items, url: feed.url };
             }
@@ -134,11 +144,26 @@ export default function HomePage() {
 
         await Promise.all(fetchPromises);
         
-        setTotalArticles(allArticles.length);
+        // Final sort and limit to ensure consistency
+        const sortedArticles = allArticles.sort((a, b) => {
+          try {
+            return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
+          } catch {
+            return 0;
+          }
+        });
+        
+        const limitedArticles = sortedArticles.slice(0, ARTICLE_LIMIT);
+        
+        // Final update to articles state
+        setArticles(limitedArticles);
+        setTotalArticles(limitedArticles.length);
+        
+        console.log(`📊 Total articles fetched: ${allArticles.length}, displaying: ${limitedArticles.length}`);
 
-        // Update feed unread counts
+        // Update feed unread counts based on limited articles
         const updatedFeeds = feedsData.map(feed => {
-          const feedArticles = allArticles.filter(a => {
+          const feedArticles = limitedArticles.filter(a => {
             try {
               return a.link.includes(new URL(feed.url).hostname);
             } catch {
@@ -159,7 +184,7 @@ export default function HomePage() {
     };
 
     loadData();
-  }, [parseRSSWithWorker, setTotalArticles, readLinks]);
+  }, [parseRSSWithWorker, setTotalArticles, readArticleIds]);
 
   // Filter articles based on selected feed - memoized to prevent recalculation on every render
   const filteredArticles = useMemo(() => {
@@ -190,12 +215,11 @@ export default function HomePage() {
   // Handle article selection - memoized callback
   const handleSelectArticle = useCallback((articleId: string) => {
     setSelectedArticleId(articleId);
-    // Find the article to get its actual link for read status tracking
-    const article = articles.find(a => a.id === articleId);
-    if (article && !readLinks.has(article.link)) {
-      toggleReadStatus(article.link);
+    // Mark article as read using its unique ID
+    if (!readArticleIds.has(articleId)) {
+      toggleReadStatus(articleId);
     }
-  }, [articles, readLinks, toggleReadStatus]);
+  }, [readArticleIds, toggleReadStatus]);
 
   // Calculate total unread count - memoized
   const totalUnreadCount = useMemo(() => {

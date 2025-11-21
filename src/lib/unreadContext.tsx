@@ -2,10 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 
 interface UnreadContextType {
   unreadCount: number;
-  readLinks: Set<string>;
-  previouslyReadLinks: Set<string>; // Articles that were read in a previous session
-  markAsRead: (link: string) => void;
-  toggleReadStatus: (link: string) => void;
+  readArticleIds: Set<string>;
+  previouslyReadArticleIds: Set<string>; // Articles that were read in a previous session
+  markAsRead: (articleId: string) => void;
+  toggleReadStatus: (articleId: string) => void;
   setTotalArticles: (count: number) => void;
   autoMarkAsReadOnScroll: boolean;
   toggleAutoMarkAsRead: () => void;
@@ -21,30 +21,30 @@ export const useUnread = () => {
   return ctx;
 };
 
-const READ_KEY = 'infrss_read_links';
-const PREVIOUSLY_READ_KEY = 'infrss_previously_read_links';
+const READ_KEY = 'infrss_read_article_ids';
+const PREVIOUSLY_READ_KEY = 'infrss_previously_read_article_ids';
 const PREFERENCES_KEY = 'userPreferences';
 
 export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [readLinks, setReadLinks] = useState<Set<string>>(new Set());
-  const [previouslyReadLinks, setPreviouslyReadLinks] = useState<Set<string>>(new Set());
+  const [readArticleIds, setReadArticleIds] = useState<Set<string>>(new Set());
+  const [previouslyReadArticleIds, setPreviouslyReadArticleIds] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
   const [totalArticles, setTotalArticles] = useState(0);
   const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // Load read links and preferences from localStorage
+  // Load read article IDs and preferences from localStorage
   useEffect(() => {
     const previouslyStored = localStorage.getItem(PREVIOUSLY_READ_KEY);
     
-    // Load previously read links from last session
+    // Load previously read article IDs from last session
     if (previouslyStored) {
-      setPreviouslyReadLinks(new Set(JSON.parse(previouslyStored)));
+      setPreviouslyReadArticleIds(new Set(JSON.parse(previouslyStored)));
     }
     
-    // Start with empty read links for new session
-    // Don't load old read links - they're now in previouslyReadLinks
-    setReadLinks(new Set());
+    // Start with empty read article IDs for new session
+    // Don't load old read IDs - they're now in previouslyReadArticleIds
+    setReadArticleIds(new Set());
 
     const prefs = localStorage.getItem(PREFERENCES_KEY);
     if (prefs) {
@@ -61,27 +61,27 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsInitialLoad(false);
   }, []);
 
-  // Save read links to localStorage and update previously read on app close/reload
+  // Save read article IDs to localStorage and update previously read on app close/reload
   useEffect(() => {
     if (isInitialLoad) return;
     
-    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks)));
+    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readArticleIds)));
     // Calculate unread count by subtracting both current and previously read articles
-    const allReadLinks = new Set([...Array.from(readLinks), ...Array.from(previouslyReadLinks)]);
-    setUnreadCount(Math.max(totalArticles - allReadLinks.size, 0));
-  }, [readLinks, previouslyReadLinks, totalArticles, isInitialLoad]);
+    const allReadArticleIds = new Set([...Array.from(readArticleIds), ...Array.from(previouslyReadArticleIds)]);
+    setUnreadCount(Math.max(totalArticles - allReadArticleIds.size, 0));
+  }, [readArticleIds, previouslyReadArticleIds, totalArticles, isInitialLoad]);
 
-  // Before the app unloads, save current read links as previously read for next session
+  // Before the app unloads, save current read article IDs as previously read for next session
   useEffect(() => {
     const handleBeforeUnload = () => {
-      localStorage.setItem(PREVIOUSLY_READ_KEY, JSON.stringify(Array.from(readLinks)));
+      localStorage.setItem(PREVIOUSLY_READ_KEY, JSON.stringify(Array.from(readArticleIds)));
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [readLinks]);
+  }, [readArticleIds]);
 
   // Save preferences to localStorage
   useEffect(() => {
@@ -103,23 +103,23 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updatedPrefs));
   }, [autoMarkAsReadOnScroll]);
 
-  const markAsRead = useCallback((link: string) => {
-    setReadLinks(prev => {
-      if (prev.has(link)) return prev; // No change needed
+  const markAsRead = useCallback((articleId: string) => {
+    setReadArticleIds(prev => {
+      if (prev.has(articleId)) return prev; // No change needed
       const next = new Set(prev);
-      next.add(link);
+      next.add(articleId);
       return next;
     });
   }, []);
 
-  const toggleReadStatus = useCallback((link: string) => {
-    setReadLinks(prev => {
+  const toggleReadStatus = useCallback((articleId: string) => {
+    setReadArticleIds(prev => {
       const next = new Set(prev);
-      if (next.has(link)) {
-        next.delete(link);
+      if (next.has(articleId)) {
+        next.delete(articleId);
         return next;
       } else {
-        next.add(link);
+        next.add(articleId);
         return next;
       }
     });
@@ -132,8 +132,8 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({
     unreadCount, 
-    readLinks, 
-    previouslyReadLinks,
+    readArticleIds, 
+    previouslyReadArticleIds,
     markAsRead, 
     toggleReadStatus, 
     setTotalArticles,
@@ -141,8 +141,8 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     toggleAutoMarkAsRead
   }), [
     unreadCount, 
-    readLinks, 
-    previouslyReadLinks,
+    readArticleIds, 
+    previouslyReadArticleIds,
     markAsRead, 
     toggleReadStatus, 
     setTotalArticles,

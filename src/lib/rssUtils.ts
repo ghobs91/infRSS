@@ -7,6 +7,103 @@ import type { FeedData, Article, Category } from './types';
 // Re-export client-side utilities
 export { fetchAndParseRSSClient } from './rssUtilsClient';
 
+/**
+ * Robust date parsing function that handles multiple RSS date formats
+ * Returns ISO 8601 string or current date as fallback
+ */
+function parseRSSDate(dateString: string | undefined | null): string {
+  if (!dateString || typeof dateString !== 'string') {
+    return new Date().toISOString();
+  }
+
+  const trimmed = dateString.trim();
+  if (!trimmed) {
+    return new Date().toISOString();
+  }
+
+  try {
+    // Try parsing as-is first (handles ISO 8601 and most standard formats)
+    const directParse = new Date(trimmed);
+    if (!isNaN(directParse.getTime())) {
+      return directParse.toISOString();
+    }
+
+    // Handle RFC 2822 format (e.g., "Wed, 02 Oct 2002 13:00:00 GMT")
+    // This is the most common RSS date format
+    const rfc2822Pattern = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s+(?:[+-]\d{4}|[A-Z]{3,4}))?/i;
+    if (rfc2822Pattern.test(trimmed)) {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle ISO 8601 variants
+    // Pattern: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DD HH:mm:ss
+    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?$/;
+    if (iso8601Pattern.test(trimmed)) {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle Unix timestamp (seconds or milliseconds)
+    const timestampPattern = /^\d{10,13}$/;
+    if (timestampPattern.test(trimmed)) {
+      const timestamp = parseInt(trimmed, 10);
+      // If it's in seconds (10 digits), convert to milliseconds
+      const ms = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+      const parsed = new Date(ms);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle date with timezone names (e.g., "2023-01-15 12:00:00 EST")
+    const tzNamePattern = /^(.+)\s+([A-Z]{2,4})$/;
+    const tzMatch = trimmed.match(tzNamePattern);
+    if (tzMatch) {
+      const parsed = new Date(tzMatch[1]);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle format: "YYYY-MM-DD" without time
+    const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (dateOnlyPattern.test(trimmed)) {
+      const parsed = new Date(trimmed + 'T00:00:00Z');
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle format: "DD/MM/YYYY" or "MM/DD/YYYY"
+    const slashDatePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const slashMatch = trimmed.match(slashDatePattern);
+    if (slashMatch) {
+      // Try MM/DD/YYYY first (US format)
+      let parsed = new Date(`${slashMatch[3]}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}T00:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+      // Try DD/MM/YYYY (European format)
+      parsed = new Date(`${slashMatch[3]}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}T00:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // If all parsing attempts fail, log and return current date
+    console.warn(`Could not parse date string: "${trimmed}", using current date`);
+    return new Date().toISOString();
+  } catch (error) {
+    console.error(`Error parsing date "${trimmed}":`, error);
+    return new Date().toISOString();
+  }
+}
+
 // ... (Keep existing interfaces and other functions like getFeedUrlFromHtml, extractThumbnail, etc.)
 
 // Import fetchWithCors if it's not already implicitly available in the scope
@@ -618,15 +715,46 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
         }
       }
       
-      const link = item.querySelector("link")?.textContent?.trim() || 
-                  item.querySelector("link")?.getAttribute("href") ||
-                  item.querySelector("id")?.textContent?.trim() || 
-                  "";
+      // Enhanced link extraction for both RSS and Atom feeds
+      let link = "";
+      const linkElement = item.querySelector("link");
+      if (linkElement) {
+        // First try href attribute (Atom feeds)
+        link = linkElement.getAttribute("href")?.trim() || "";
+        // If no href, try text content (RSS feeds)
+        if (!link) {
+          link = linkElement.textContent?.trim() || "";
+        }
+        // If still no link, try alternate link
+        if (!link) {
+          const altLink = item.querySelector("link[rel='alternate']");
+          if (altLink) {
+            link = altLink.getAttribute("href")?.trim() || "";
+          }
+        }
+      }
+      // Fallback to id element if link is still empty
+      if (!link) {
+        link = item.querySelector("id")?.textContent?.trim() || "";
+      }
       
-      const pubDate = item.querySelector("pubDate")?.textContent?.trim() || 
-                     item.querySelector("published")?.textContent?.trim() || 
-                     item.querySelector("updated")?.textContent?.trim() || 
-                     new Date().toISOString();
+      // Ensure link is absolute URL
+      if (link && !link.startsWith('http://') && !link.startsWith('https://')) {
+        try {
+          // If it's a relative URL, make it absolute using the feed URL
+          link = new URL(link, url).toString();
+        } catch (e) {
+          console.warn(`Failed to normalize relative URL: ${link}`, e);
+        }
+      }
+      
+      // Extract date from multiple possible fields with robust parsing
+      const pubDateRaw = item.querySelector("pubDate")?.textContent?.trim() || 
+                        item.querySelector("published")?.textContent?.trim() || 
+                        item.querySelector("updated")?.textContent?.trim() ||
+                        item.querySelector("dc\\:date")?.textContent?.trim() ||
+                        item.querySelector("date")?.textContent?.trim();
+      const pubDate = parseRSSDate(pubDateRaw);
       
       let content = item.querySelector("description")?.textContent?.trim() || 
                    item.querySelector("content")?.textContent?.trim() || 

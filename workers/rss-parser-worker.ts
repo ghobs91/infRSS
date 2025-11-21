@@ -16,6 +16,103 @@ interface Article {
 }
 
 /**
+ * Robust date parsing function that handles multiple RSS date formats
+ * Returns ISO 8601 string or current date as fallback
+ */
+function parseRSSDate(dateString: string | undefined | null): string {
+  if (!dateString || typeof dateString !== 'string') {
+    return new Date().toISOString();
+  }
+
+  const trimmed = dateString.trim();
+  if (!trimmed) {
+    return new Date().toISOString();
+  }
+
+  try {
+    // Try parsing as-is first (handles ISO 8601 and most standard formats)
+    const directParse = new Date(trimmed);
+    if (!isNaN(directParse.getTime())) {
+      return directParse.toISOString();
+    }
+
+    // Handle RFC 2822 format (e.g., "Wed, 02 Oct 2002 13:00:00 GMT")
+    // This is the most common RSS date format
+    const rfc2822Pattern = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s+(?:[+-]\d{4}|[A-Z]{3,4}))?/i;
+    if (rfc2822Pattern.test(trimmed)) {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle ISO 8601 variants
+    // Pattern: YYYY-MM-DDTHH:mm:ss.sssZ or YYYY-MM-DD HH:mm:ss
+    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?$/;
+    if (iso8601Pattern.test(trimmed)) {
+      const parsed = new Date(trimmed);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle Unix timestamp (seconds or milliseconds)
+    const timestampPattern = /^\d{10,13}$/;
+    if (timestampPattern.test(trimmed)) {
+      const timestamp = parseInt(trimmed, 10);
+      // If it's in seconds (10 digits), convert to milliseconds
+      const ms = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
+      const parsed = new Date(ms);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle date with timezone names (e.g., "2023-01-15 12:00:00 EST")
+    const tzNamePattern = /^(.+)\s+([A-Z]{2,4})$/;
+    const tzMatch = trimmed.match(tzNamePattern);
+    if (tzMatch) {
+      const parsed = new Date(tzMatch[1]);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle format: "YYYY-MM-DD" without time
+    const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (dateOnlyPattern.test(trimmed)) {
+      const parsed = new Date(trimmed + 'T00:00:00Z');
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // Handle format: "DD/MM/YYYY" or "MM/DD/YYYY"
+    const slashDatePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const slashMatch = trimmed.match(slashDatePattern);
+    if (slashMatch) {
+      // Try MM/DD/YYYY first (US format)
+      let parsed = new Date(`${slashMatch[3]}-${slashMatch[1].padStart(2, '0')}-${slashMatch[2].padStart(2, '0')}T00:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+      // Try DD/MM/YYYY (European format)
+      parsed = new Date(`${slashMatch[3]}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}T00:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    }
+
+    // If all parsing attempts fail, log and return current date
+    console.warn(`Could not parse date string: "${trimmed}", using current date`);
+    return new Date().toISOString();
+  } catch (error) {
+    console.error(`Error parsing date "${trimmed}":`, error);
+    return new Date().toISOString();
+  }
+}
+
+/**
  * Helper function to clean XML content before parsing.
  * Handles malformed CDATA patterns and other common XML issues.
  */
@@ -189,7 +286,7 @@ function cleanText(text: string): string {
  */
 function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items: Article[] } | null {
   try {
-    let text = xmlText;
+    const text = xmlText;
 
     // Extract feed title using regex
     const titleMatch = text.match(/<(?:channel|feed)>[\s\S]*?<title[^>]*?>([\s\S]*?)<\/title>/i);
@@ -237,12 +334,10 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
         }
       }
       
-      // Extract pubDate
-      let pubDate = new Date().toISOString();
-      const pubDateMatch = itemXml.match(/<(?:pubDate|published|updated|dc:date)[^>]*?>([\s\S]*?)<\/(?:pubDate|published|updated|dc:date)>/i);
-      if (pubDateMatch) {
-        pubDate = cleanText(pubDateMatch[1]);
-      }
+      // Extract pubDate with robust parsing
+      const pubDateMatch = itemXml.match(/<(?:pubDate|published|updated|dc:date|date)[^>]*?>([\s\S]*?)<\/(?:pubDate|published|updated|dc:date|date)>/i);
+      const pubDateRaw = pubDateMatch ? cleanText(pubDateMatch[1]) : null;
+      const pubDate = parseRSSDate(pubDateRaw);
       
       // Extract content
       let content = '';

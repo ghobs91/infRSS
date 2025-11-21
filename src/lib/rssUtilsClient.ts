@@ -296,9 +296,34 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
         title = title.substring(0, 200) + '...';
       }
       
-      const link = item.querySelector("link")?.textContent?.trim() || 
-                  item.querySelector("link")?.getAttribute("href") ||
-                  "";
+      // Enhanced link extraction for both RSS and Atom feeds
+      let link = "";
+      const linkElement = item.querySelector("link");
+      if (linkElement) {
+        // First try href attribute (Atom feeds)
+        link = linkElement.getAttribute("href")?.trim() || "";
+        // If no href, try text content (RSS feeds)
+        if (!link) {
+          link = linkElement.textContent?.trim() || "";
+        }
+        // If still no link, try alternate link
+        if (!link) {
+          const altLink = item.querySelector("link[rel='alternate']");
+          if (altLink) {
+            link = altLink.getAttribute("href")?.trim() || "";
+          }
+        }
+      }
+      
+      // Ensure link is absolute URL
+      if (link && !link.startsWith('http://') && !link.startsWith('https://')) {
+        try {
+          // If it's a relative URL, make it absolute using the feed URL
+          link = new URL(link, feedUrl).toString();
+        } catch (e) {
+          console.warn(`Failed to normalize relative URL: ${link}`, e);
+        }
+      }
       
       const pubDate = item.querySelector("pubDate")?.textContent?.trim() || 
                      item.querySelector("published")?.textContent?.trim() || 

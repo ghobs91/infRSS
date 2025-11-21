@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useState, useEffect } from 'react';
 import Image from 'next/image';
+import { SearchIcon, CheckIcon } from '@/components/ui/icons';
 
 interface Article {
   id: string;
@@ -21,8 +22,9 @@ interface ArticleListColumnProps {
   subtitle?: string;
 }
 
-const INITIAL_BATCH_SIZE = 50;
-const LOAD_MORE_THRESHOLD = 500; // pixels from bottom
+const INITIAL_BATCH_SIZE = 100;
+const LOAD_MORE_BATCH_SIZE = 50;
+const LOAD_MORE_THRESHOLD = 1000; // pixels from bottom
 
 const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   articles,
@@ -49,7 +51,13 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
       const clientHeight = target.clientHeight;
 
       if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
-        setDisplayCount(prev => Math.min(prev + 20, articles.length));
+        setDisplayCount(prev => {
+          const newCount = Math.min(prev + LOAD_MORE_BATCH_SIZE, articles.length);
+          if (newCount > prev) {
+            console.log(`Loading more articles: ${prev} -> ${newCount} of ${articles.length}`);
+          }
+          return newCount;
+        });
       }
     };
 
@@ -94,10 +102,53 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   return (
     <div className="article-list">
       <div className="article-list-header">
-        <h1 className="article-list-title">{title}</h1>
-        {subtitle && (
-          <p className="article-list-subtitle">{subtitle}</p>
-        )}
+        <div className="hidden md:block">
+          <h1 className="article-list-title">{title}</h1>
+          {subtitle && (
+            <p className="article-list-subtitle">{subtitle}</p>
+          )}
+        </div>
+        
+        {/* Mobile Header */}
+        <div className="md:hidden">
+          <div className="flex items-center justify-between w-full mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+                PP
+              </div>
+              <h1 className="article-list-title text-2xl">{title}</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="w-9 h-9 rounded-full bg-[var(--card-bg)] flex items-center justify-center border border-[var(--card-border)] shadow-sm">
+                <SearchIcon />
+              </button>
+              <button className="w-9 h-9 rounded-full bg-[var(--card-bg)] flex items-center justify-center border border-[var(--card-border)] shadow-sm">
+                <CheckIcon />
+              </button>
+            </div>
+          </div>
+          
+          {/* Category Filter Buttons */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <button className="px-5 py-2 rounded-full bg-[var(--primary)] text-white font-semibold text-sm shadow-md whitespace-nowrap flex items-center gap-2">
+              <span className="text-base">📰</span>
+              Articles
+              <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">•</span>
+            </button>
+            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
+              <span className="text-base">💬</span>
+              Social
+            </button>
+            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
+              <span className="text-base">🖼️</span>
+              Images
+            </button>
+            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
+              <span className="text-base">🎬</span>
+              Videos
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="article-list-items">
@@ -115,7 +166,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
               key={article.id}
               className={`article-list-item ${
                 selectedArticle === article.id ? 'active' : ''
-              } ${article.readStatus === 'read' ? 'read' : ''}`}
+              } ${article.readStatus === 'read' ? 'read' : 'unread'}`}
               onClick={() => onSelectArticle(article.id)}
             >
               <div className="flex gap-3">
