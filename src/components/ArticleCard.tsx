@@ -266,11 +266,18 @@ export const ArticleCard = ({
 
               {/* Date */}
               <p className="text-xs text-[var(--text-secondary)] mb-2">
-                {new Date(article.pubDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
+                {(() => {
+                  const date = new Date(article.pubDate);
+                  // Check if date is epoch time (Jan 1, 1970) which indicates unavailable date
+                  if (date.getTime() === 0) {
+                    return 'Date unavailable';
+                  }
+                  return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+                })()}
               </p>
 
               {/* Vibes - Compact */}
@@ -440,11 +447,18 @@ export const ArticleCard = ({
               </div>
 
               <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-2 truncate">
-                {new Date(article.pubDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
+                {(() => {
+                  const date = new Date(article.pubDate);
+                  // Check if date is epoch time (Jan 1, 1970) which indicates unavailable date
+                  if (date.getTime() === 0) {
+                    return 'Date unavailable';
+                  }
+                  return date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  });
+                })()}
               </p>
 
               {/* Vibes Analysis */}

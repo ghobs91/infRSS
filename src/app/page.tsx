@@ -51,8 +51,9 @@ export default function HomePage() {
         }
       })();
 
-      // Create unique ID combining feed URL, article link, and index to prevent duplicates
-      const uniqueId = `${feedUrl}::${article.link}::${index}`;
+      // Create unique ID based primarily on article link to prevent duplicates across feeds
+      // Fall back to feed+index if no link available
+      const uniqueId = article.link || `${feedUrl}::${index}`;
 
       return {
         id: uniqueId,
@@ -90,23 +91,24 @@ export default function HomePage() {
         });
 
         // Convert feeds to proper format with guaranteed unique IDs
-        const feedsData: FeedData[] = deduplicatedFeeds.map((feed, idx) => ({
-          id: `${feed.url}-${idx}`, // Ensure unique ID
-          name: (feed as any).name || feed.title || `Feed ${idx + 1}`,
-          url: feed.url,
-          unreadCount: 0,
-        }));
+        const feedsData: FeedData[] = deduplicatedFeeds.map((feed, idx) => {
+          const name = ('name' in feed && typeof feed.name === 'string' ? feed.name : undefined) || feed.title || `Feed ${idx + 1}`;
+          return {
+            id: `${feed.url}-${idx}`, // Ensure unique ID
+            name,
+            url: feed.url,
+            unreadCount: 0,
+          };
+        });
         setFeeds(feedsData);
         
         // Show loading state but allow UI to be interactive
         setIsLoading(false);
 
-        // Progressive loading: fetch feeds and update UI as each completes
-        // Use shared array to track all articles for final limiting
-        const allArticles: ArticleData[] = [];
+        // Fetch all feeds without progressive updates to avoid race conditions
         const ARTICLE_LIMIT = 4000;
 
-        // Fetch feeds with progressive updates
+        // Fetch feeds using Promise.allSettled to handle failures gracefully
         const fetchPromises = deduplicatedFeeds.map(async (feed) => {
           try {
             const data = await fetchAndParseRSSClient(feed.url, parseRSSWithWorker);
@@ -114,26 +116,7 @@ export default function HomePage() {
               const newArticles = data.items.map((item: any, itemIdx: number) => 
                 convertArticle(item, feed.url, itemIdx)
               );
-              
-              // Add to shared array
-              allArticles.push(...newArticles);
-              
-              // Update articles progressively with limit applied
-              setArticles(prev => {
-                const combined = [...prev, ...newArticles];
-                // Sort by date
-                combined.sort((a, b) => {
-                  try {
-                    return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
-                  } catch {
-                    return 0;
-                  }
-                });
-                // Apply limit during progressive updates
-                return combined.slice(0, ARTICLE_LIMIT);
-              });
-              
-              return { success: true, items: data.items, url: feed.url };
+              return { success: true, items: newArticles, url: feed.url };
             }
             return { success: false, items: [], url: feed.url };
           } catch (error) {
@@ -142,7 +125,15 @@ export default function HomePage() {
           }
         });
 
-        await Promise.all(fetchPromises);
+        const results = await Promise.allSettled(fetchPromises);
+        
+        // Collect all articles from successful fetches
+        const allArticles: ArticleData[] = [];
+        results.forEach(result => {
+          if (result.status === 'fulfilled' && result.value.success) {
+            allArticles.push(...result.value.items);
+          }
+        });
         
         // Final sort and limit to ensure consistency
         const sortedArticles = allArticles.sort((a, b) => {
@@ -186,24 +177,31 @@ export default function HomePage() {
     loadData();
   }, [parseRSSWithWorker, setTotalArticles, readArticleIds]);
 
+  // Pre-compute feed hostname for selected feed to avoid repeated URL parsing
+  const selectedFeedHostname = useMemo(() => {
+    if (!selectedFeed) return null;
+    const feed = feeds.find(f => f.id === selectedFeed);
+    if (!feed) return null;
+    try {
+      return new URL(feed.url).hostname;
+    } catch {
+      return null;
+    }
+  }, [selectedFeed, feeds]);
+
   // Filter articles based on selected feed - memoized to prevent recalculation on every render
   const filteredArticles = useMemo(() => {
-    if (!selectedFeed) return articles;
+    if (!selectedFeed || !selectedFeedHostname) return articles;
     
     return articles.filter(a => {
       try {
-        // Find the feed by ID to get its URL
-        const feed = feeds.find(f => f.id === selectedFeed);
-        if (!feed) return false;
-        
-        const selectedFeedHostname = new URL(feed.url).hostname;
         const articleHostname = new URL(a.link).hostname;
         return selectedFeedHostname === articleHostname;
       } catch {
         return false;
       }
     });
-  }, [articles, selectedFeed, feeds]);
+  }, [articles, selectedFeed, selectedFeedHostname]);
 
   // Get selected article - memoized
   const selectedArticle = useMemo(() => {

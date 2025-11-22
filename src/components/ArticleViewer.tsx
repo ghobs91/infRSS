@@ -1,5 +1,6 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import Image from 'next/image';
+import DOMPurify from 'dompurify';
 
 interface Article {
   id: string;
@@ -20,6 +21,10 @@ interface ArticleViewerProps {
 const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString);
+    // Check if date is epoch time (Jan 1, 1970) which indicates unavailable date
+    if (date.getTime() === 0) {
+      return 'Date unavailable';
+    }
     return date.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
@@ -83,10 +88,7 @@ const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
         )}
 
         {article.content ? (
-          <div
-            dangerouslySetInnerHTML={{ __html: article.content }}
-            className="prose prose-lg max-w-none"
-          />
+          <SanitizedContent content={article.content} />
         ) : (
           <div className="text-center py-12">
             <p className="text-[var(--text-secondary)] mb-6">
@@ -151,3 +153,23 @@ const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
 export const ArticleViewer = memo(ArticleViewerComponent, (prevProps, nextProps) => {
   return prevProps.article?.id === nextProps.article?.id;
 });
+
+// Separate component for sanitized content rendering
+const SanitizedContent: React.FC<{ content: string }> = ({ content }) => {
+  const sanitizedContent = useMemo(() => {
+    if (typeof window === 'undefined') return content;
+    
+    return DOMPurify.sanitize(content, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'img', 'div', 'span'],
+      ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel'],
+      ALLOW_DATA_ATTR: false,
+    });
+  }, [content]);
+
+  return (
+    <div
+      dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+      className="prose prose-lg max-w-none"
+    />
+  );
+};

@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useState, useEffect } from 'react';
+import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { SearchIcon, CheckIcon } from '@/components/ui/icons';
 
@@ -34,11 +34,27 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   subtitle,
 }) => {
   const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
+  const scrollPositionRef = useRef<number>(0);
 
-  // Reset display count when articles change
+  // Save scroll position before articles change and restore after
   useEffect(() => {
-    setDisplayCount(INITIAL_BATCH_SIZE);
-  }, [articles]);
+    const listElement = document.querySelector('.article-list-items') as HTMLElement;
+    if (!listElement) return;
+
+    // Save current scroll position
+    const savedScrollPosition = scrollPositionRef.current;
+
+    // Reset display count when articles change significantly (new feed or refresh)
+    // But keep higher display count if we already loaded more
+    setDisplayCount(prev => Math.max(prev, INITIAL_BATCH_SIZE));
+
+    // Restore scroll position after DOM updates
+    requestAnimationFrame(() => {
+      if (savedScrollPosition > 0 && listElement) {
+        listElement.scrollTop = savedScrollPosition;
+      }
+    });
+  }, [articles.length]);
 
   // Infinite scroll handler
   useEffect(() => {
@@ -49,6 +65,9 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
       const scrollTop = target.scrollTop;
       const scrollHeight = target.scrollHeight;
       const clientHeight = target.clientHeight;
+
+      // Save scroll position
+      scrollPositionRef.current = scrollTop;
 
       if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
         setDisplayCount(prev => {
@@ -180,6 +199,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
                         height={16}
                         unoptimized
                         loading="lazy"
+                        sizes="16px"
                       />
                       <span>{article.sourceDomain}</span>
                     </div>
@@ -206,6 +226,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
                     height={80}
                     unoptimized
                     loading="lazy"
+                    sizes="80px"
                     className="article-list-item-thumbnail"
                   />
                 )}

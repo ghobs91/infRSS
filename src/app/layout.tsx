@@ -4,6 +4,7 @@ import "../styles/scroll-fix.css";
 import { UnreadProvider } from "@/lib/unreadContext";
 import { ViewProvider } from "@/lib/viewContext";
 import { Navigation } from "@/components/Navigation";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,12 +19,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <link rel="icon" href="/icons/favicon.ico" />
       </head>
       <body className="bg-[var(--background)] text-[var(--foreground)]">
-        <UnreadProvider>
-          <ViewProvider>
-            <Navigation />
-            {children}
-          </ViewProvider>
-        </UnreadProvider>
+        <ErrorBoundary>
+          <UnreadProvider>
+            <ViewProvider>
+              <Navigation />
+              {children}
+            </ViewProvider>
+          </UnreadProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

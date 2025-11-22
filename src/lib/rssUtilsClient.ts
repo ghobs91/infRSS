@@ -325,9 +325,9 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
         }
       }
       
-      const pubDate = item.querySelector("pubDate")?.textContent?.trim() || 
-                     item.querySelector("published")?.textContent?.trim() || 
-                     new Date().toISOString();
+      const pubDateRaw = item.querySelector("pubDate")?.textContent?.trim() || 
+                     item.querySelector("published")?.textContent?.trim();
+      const pubDate = pubDateRaw || new Date(0).toISOString(); // Use epoch time for unavailable dates
       
       let content = item.querySelector("description")?.textContent?.trim() || 
                    item.querySelector("content")?.textContent?.trim() || 

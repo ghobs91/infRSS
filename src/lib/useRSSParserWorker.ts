@@ -64,10 +64,6 @@ export function useRSSParserWorker() {
       setError(null);
 
       return await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error('Worker timeout'));
-        }, 20000); // 20 second timeout for worker parsing
-
         const handleMessage = (event: MessageEvent) => {
           clearTimeout(timeoutId);
           
@@ -77,6 +73,12 @@ export function useRSSParserWorker() {
             reject(new Error(event.data.error));
           }
         };
+
+        const timeoutId = setTimeout(() => {
+          // Remove listener to prevent memory leak
+          workerRef.current?.removeEventListener('message', handleMessage);
+          reject(new Error('Worker timeout'));
+        }, 20000); // 20 second timeout for worker parsing
 
         workerRef.current!.addEventListener('message', handleMessage, { once: true });
         

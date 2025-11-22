@@ -10,6 +10,26 @@ interface RateLimitWindow {
 
 const rateLimit = new Map<string, RateLimitWindow>();
 
+// Periodic cleanup to prevent memory leaks
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    
+    rateLimit.forEach((window, hostname) => {
+      if (now - window.timestamp > WINDOW_MS) {
+        keysToDelete.push(hostname);
+      }
+    });
+    
+    keysToDelete.forEach(key => rateLimit.delete(key));
+    
+    if (keysToDelete.length > 0) {
+      console.debug(`Cleaned up ${keysToDelete.length} expired rate limit entries`);
+    }
+  }, WINDOW_MS); // Run cleanup every minute
+}
+
 export function checkRateLimit(hostname: string): { isLimited: boolean; retryAfter?: string } {
   const now = Date.now();
   const window = rateLimit.get(hostname);

@@ -9,16 +9,16 @@ export { fetchAndParseRSSClient } from './rssUtilsClient';
 
 /**
  * Robust date parsing function that handles multiple RSS date formats
- * Returns ISO 8601 string or current date as fallback
+ * Returns ISO 8601 string or null if parsing fails
  */
-function parseRSSDate(dateString: string | undefined | null): string {
+function parseRSSDate(dateString: string | undefined | null): string | null {
   if (!dateString || typeof dateString !== 'string') {
-    return new Date().toISOString();
+    return null;
   }
 
   const trimmed = dateString.trim();
   if (!trimmed) {
-    return new Date().toISOString();
+    return null;
   }
 
   try {
@@ -95,12 +95,12 @@ function parseRSSDate(dateString: string | undefined | null): string {
       }
     }
 
-    // If all parsing attempts fail, log and return current date
-    console.warn(`Could not parse date string: "${trimmed}", using current date`);
-    return new Date().toISOString();
+    // If all parsing attempts fail, return null
+    console.warn(`Could not parse date string: "${trimmed}", date unavailable`);
+    return null;
   } catch (error) {
     console.error(`Error parsing date "${trimmed}":`, error);
-    return new Date().toISOString();
+    return null;
   }
 }
 
@@ -754,7 +754,7 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
                         item.querySelector("updated")?.textContent?.trim() ||
                         item.querySelector("dc\\:date")?.textContent?.trim() ||
                         item.querySelector("date")?.textContent?.trim();
-      const pubDate = parseRSSDate(pubDateRaw);
+      const pubDate = parseRSSDate(pubDateRaw) || new Date(0).toISOString(); // Use epoch time for unavailable dates
       
       let content = item.querySelector("description")?.textContent?.trim() || 
                    item.querySelector("content")?.textContent?.trim() || 

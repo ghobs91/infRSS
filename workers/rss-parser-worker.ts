@@ -17,16 +17,16 @@ interface Article {
 
 /**
  * Robust date parsing function that handles multiple RSS date formats
- * Returns ISO 8601 string or current date as fallback
+ * Returns ISO 8601 string or null if parsing fails
  */
-function parseRSSDate(dateString: string | undefined | null): string {
+function parseRSSDate(dateString: string | undefined | null): string | null {
   if (!dateString || typeof dateString !== 'string') {
-    return new Date().toISOString();
+    return null;
   }
 
   const trimmed = dateString.trim();
   if (!trimmed) {
-    return new Date().toISOString();
+    return null;
   }
 
   try {
@@ -103,12 +103,12 @@ function parseRSSDate(dateString: string | undefined | null): string {
       }
     }
 
-    // If all parsing attempts fail, log and return current date
-    console.warn(`Could not parse date string: "${trimmed}", using current date`);
-    return new Date().toISOString();
+    // If all parsing attempts fail, return null
+    console.warn(`Could not parse date string: "${trimmed}", date unavailable`);
+    return null;
   } catch (error) {
     console.error(`Error parsing date "${trimmed}":`, error);
-    return new Date().toISOString();
+    return null;
   }
 }
 
@@ -337,7 +337,7 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
       // Extract pubDate with robust parsing
       const pubDateMatch = itemXml.match(/<(?:pubDate|published|updated|dc:date|date)[^>]*?>([\s\S]*?)<\/(?:pubDate|published|updated|dc:date|date)>/i);
       const pubDateRaw = pubDateMatch ? cleanText(pubDateMatch[1]) : null;
-      const pubDate = parseRSSDate(pubDateRaw);
+      const pubDate = parseRSSDate(pubDateRaw) || new Date(0).toISOString(); // Use epoch time for unavailable dates
       
       // Extract content
       let content = '';

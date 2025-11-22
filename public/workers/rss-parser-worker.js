@@ -1,5 +1,75 @@
 (() => {
   // workers/rss-parser-worker.ts
+  function parseRSSDate(dateString) {
+    if (!dateString || typeof dateString !== "string") {
+      return (/* @__PURE__ */ new Date()).toISOString();
+    }
+    const trimmed = dateString.trim();
+    if (!trimmed) {
+      return (/* @__PURE__ */ new Date()).toISOString();
+    }
+    try {
+      const directParse = new Date(trimmed);
+      if (!isNaN(directParse.getTime())) {
+        return directParse.toISOString();
+      }
+      const rfc2822Pattern = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{2,4}\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s+(?:[+-]\d{4}|[A-Z]{3,4}))?/i;
+      if (rfc2822Pattern.test(trimmed)) {
+        const parsed = new Date(trimmed);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      const iso8601Pattern = /^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:?\d{2})?$/;
+      if (iso8601Pattern.test(trimmed)) {
+        const parsed = new Date(trimmed);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      const timestampPattern = /^\d{10,13}$/;
+      if (timestampPattern.test(trimmed)) {
+        const timestamp = parseInt(trimmed, 10);
+        const ms = timestamp < 1e10 ? timestamp * 1e3 : timestamp;
+        const parsed = new Date(ms);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      const tzNamePattern = /^(.+)\s+([A-Z]{2,4})$/;
+      const tzMatch = trimmed.match(tzNamePattern);
+      if (tzMatch) {
+        const parsed = new Date(tzMatch[1]);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      const dateOnlyPattern = /^\d{4}-\d{2}-\d{2}$/;
+      if (dateOnlyPattern.test(trimmed)) {
+        const parsed = /* @__PURE__ */ new Date(trimmed + "T00:00:00Z");
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      const slashDatePattern = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+      const slashMatch = trimmed.match(slashDatePattern);
+      if (slashMatch) {
+        let parsed = /* @__PURE__ */ new Date(`${slashMatch[3]}-${slashMatch[1].padStart(2, "0")}-${slashMatch[2].padStart(2, "0")}T00:00:00Z`);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+        parsed = /* @__PURE__ */ new Date(`${slashMatch[3]}-${slashMatch[2].padStart(2, "0")}-${slashMatch[1].padStart(2, "0")}T00:00:00Z`);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString();
+        }
+      }
+      console.warn(`Could not parse date string: "${trimmed}", using current date`);
+      return (/* @__PURE__ */ new Date()).toISOString();
+    } catch (error) {
+      console.error(`Error parsing date "${trimmed}":`, error);
+      return (/* @__PURE__ */ new Date()).toISOString();
+    }
+  }
   function extractItems(xml) {
     const items = [];
     const itemRegex = /<item[^>]*?>([\s\S]*?)<\/item>/gi;
@@ -41,7 +111,7 @@
   }
   function parseRSSFeed(xmlText, feedUrl) {
     try {
-      let text = xmlText;
+      const text = xmlText;
       const titleMatch = text.match(/<(?:channel|feed)>[\s\S]*?<title[^>]*?>([\s\S]*?)<\/title>/i);
       let channelTitle = "Unknown Feed";
       if (titleMatch) {
@@ -78,11 +148,9 @@
             if (idMatch) link = cleanText(idMatch[1]);
           }
         }
-        let pubDate = (/* @__PURE__ */ new Date()).toISOString();
-        const pubDateMatch = itemXml.match(/<(?:pubDate|published|updated|dc:date)[^>]*?>([\s\S]*?)<\/(?:pubDate|published|updated|dc:date)>/i);
-        if (pubDateMatch) {
-          pubDate = cleanText(pubDateMatch[1]);
-        }
+        const pubDateMatch = itemXml.match(/<(?:pubDate|published|updated|dc:date|date)[^>]*?>([\s\S]*?)<\/(?:pubDate|published|updated|dc:date|date)>/i);
+        const pubDateRaw = pubDateMatch ? cleanText(pubDateMatch[1]) : null;
+        const pubDate = parseRSSDate(pubDateRaw);
         let content = "";
         const contentMatch = itemXml.match(/<(?:description|content:encoded|content|summary)[^>]*?>([\s\S]*?)<\/(?:description|content:encoded|content|summary)>/i);
         if (contentMatch) {

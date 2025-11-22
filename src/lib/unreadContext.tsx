@@ -28,10 +28,15 @@ const PREFERENCES_KEY = 'userPreferences';
 export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [readArticleIds, setReadArticleIds] = useState<Set<string>>(new Set());
   const [previouslyReadArticleIds, setPreviouslyReadArticleIds] = useState<Set<string>>(new Set());
-  const [unreadCount, setUnreadCount] = useState(0);
   const [totalArticles, setTotalArticles] = useState(0);
   const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Calculate unread count as derived state using useMemo
+  const unreadCount = useMemo(() => {
+    const allReadArticleIds = new Set([...Array.from(readArticleIds), ...Array.from(previouslyReadArticleIds)]);
+    return Math.max(totalArticles - allReadArticleIds.size, 0);
+  }, [readArticleIds, previouslyReadArticleIds, totalArticles]);
 
   // Load read article IDs and preferences from localStorage
   useEffect(() => {
@@ -61,15 +66,16 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsInitialLoad(false);
   }, []);
 
-  // Save read article IDs to localStorage and update previously read on app close/reload
+  // Save read article IDs to localStorage (debounced to prevent excessive writes)
   useEffect(() => {
     if (isInitialLoad) return;
     
-    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readArticleIds)));
-    // Calculate unread count by subtracting both current and previously read articles
-    const allReadArticleIds = new Set([...Array.from(readArticleIds), ...Array.from(previouslyReadArticleIds)]);
-    setUnreadCount(Math.max(totalArticles - allReadArticleIds.size, 0));
-  }, [readArticleIds, previouslyReadArticleIds, totalArticles, isInitialLoad]);
+    const timeoutId = setTimeout(() => {
+      localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readArticleIds)));
+    }, 500); // Debounce by 500ms
+    
+    return () => clearTimeout(timeoutId);
+  }, [readArticleIds, isInitialLoad]);
 
   // Before the app unloads, save current read article IDs as previously read for next session
   useEffect(() => {
