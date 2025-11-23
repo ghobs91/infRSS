@@ -84,11 +84,6 @@ const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
       </div>
 
       <div className="article-viewer-content">
-        {article.summary && (
-          <div className="mb-8 p-6 bg-[var(--accent)] rounded-xl">
-            <p className="text-lg font-medium leading-relaxed">{article.summary}</p>
-          </div>
-        )}
 
         {article.content ? (
           <SanitizedContent content={article.content} />

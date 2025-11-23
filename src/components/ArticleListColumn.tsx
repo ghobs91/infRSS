@@ -136,6 +136,12 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
   const listRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
+  const articlesLengthRef = useRef(articles.length);
+
+  // Keep articles length in ref for scroll handler
+  useEffect(() => {
+    articlesLengthRef.current = articles.length;
+  }, [articles.length]);
 
   // Reset display count when articles array changes (e.g. feed change)
   // We use the article ID of the first article as a proxy for list changes
@@ -148,7 +154,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
     if (listRef.current) {
       listRef.current.scrollTop = 0;
     }
-  }, [firstArticleId]);
+  }, [firstArticleId, articles.length]);
 
   // Infinite scroll handler
   useEffect(() => {
@@ -162,13 +168,14 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
       // Load more when within threshold and not already loading
       if (distanceFromBottom < LOAD_MORE_THRESHOLD && !isLoadingMoreRef.current) {
         setDisplayCount(prev => {
-          if (prev >= articles.length) {
+          const totalArticles = articlesLengthRef.current;
+          if (prev >= totalArticles) {
             return prev;
           }
           
           isLoadingMoreRef.current = true;
-          const newCount = Math.min(prev + LOAD_MORE_BATCH_SIZE, articles.length);
-          console.log(`📜 Loading more articles: ${prev} -> ${newCount} of ${articles.length}`);
+          const newCount = Math.min(prev + LOAD_MORE_BATCH_SIZE, totalArticles);
+          console.log(`📜 Loading more articles: ${prev} -> ${newCount} of ${totalArticles}`);
           
           // Reset the loading flag after a short delay
           setTimeout(() => {
@@ -185,7 +192,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
       listElement.addEventListener('scroll', handleScroll, { passive: true });
       return () => listElement.removeEventListener('scroll', handleScroll);
     }
-  }, [articles.length]); // Use length to avoid recreating the handler unnecessarily
+  }, []); // Empty dependency array - handler uses refs for current values
 
   const getExcerpt = useCallback((article: Article) => {
     if (article.summary) return article.summary;
@@ -244,15 +251,25 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
             </p>
           </div>
         ) : (
-          displayedArticles.map((article) => (
-            <ArticleListItem
-              key={article.id}
-              article={article}
-              selectedArticle={selectedArticle}
-              onSelectArticle={onSelectArticle}
-              getExcerpt={getExcerpt}
-            />
-          ))
+          <>
+            {displayedArticles.map((article) => (
+              <ArticleListItem
+                key={article.id}
+                article={article}
+                selectedArticle={selectedArticle}
+                onSelectArticle={onSelectArticle}
+                getExcerpt={getExcerpt}
+              />
+            ))}
+            {displayCount < articles.length && (
+              <div className="flex items-center justify-center py-8 text-[var(--text-secondary)]">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-[var(--primary)] border-t-transparent"></div>
+                  <span className="text-sm">Loading more articles...</span>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
