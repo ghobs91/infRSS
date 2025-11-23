@@ -3,12 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #1d1d1f;
-  --sidebar-bg: #1a1a1a;
-  --sidebar-text: #ffffff;
-  --sidebar-text-secondary: #8e8e93;
-  --sidebar-hover: #2a2a2a;
-  --sidebar-active: #3a3a3a;
-  --article-list-bg: #f5f5f7;
+  --sidebar-bg: #f5f5f7;
+  --sidebar-text: #1d1d1f;
+  --sidebar-text-secondary: #86868b;
+  --sidebar-hover: rgba(0, 0, 0, 0.05);
+  --sidebar-active: rgba(0, 0, 0, 0.1);
+  --article-list-bg: #1a1a1a;
+  --article-list-text: #ffffff;
+  --article-list-text-secondary: #8e8e93;
   --article-viewer-bg: #ffffff;
   --card-bg: rgba(255, 255, 255, 0.95);
   --card-border: rgba(0, 0, 0, 0.08);
@@ -39,12 +41,14 @@
   :root {
     --background: #000000;
     --foreground: #f5f5f7;
-    --sidebar-bg: #0a0a0a;
+    --sidebar-bg: #1c1c1e;
     --sidebar-text: #ffffff;
     --sidebar-text-secondary: #8e8e93;
-    --sidebar-hover: #1a1a1a;
-    --sidebar-active: #2a2a2a;
-    --article-list-bg: #1c1c1e;
+    --sidebar-hover: #2c2c2e;
+    --sidebar-active: #3a3a3c;
+    --article-list-bg: #000000;
+    --article-list-text: #f5f5f7;
+    --article-list-text-secondary: #8e8e93;
     --article-viewer-bg: #000000;
     --card-bg: rgba(44, 44, 46, 0.9);
     --card-border: rgba(255, 255, 255, 0.08);
@@ -535,7 +539,7 @@ a:focus-visible {
 /* Three-Column Layout Styles */
 .app-layout {
   display: grid;
-  grid-template-columns: 240px 420px 1fr;
+  grid-template-columns: 300px 420px 1fr;
   height: 100vh;
   overflow: hidden;
   padding-top: 64px; /* Account for fixed navbar on desktop */
@@ -543,7 +547,7 @@ a:focus-visible {
 
 @media (max-width: 1280px) {
   .app-layout {
-    grid-template-columns: 200px 360px 1fr;
+    grid-template-columns: 260px 360px 1fr;
   }
 }
 
@@ -576,11 +580,6 @@ a:focus-visible {
   .sidebar {
     display: none; /* Hidden on mobile */
   }
-}
-
-.sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-logo {
@@ -688,7 +687,7 @@ a:focus-visible {
 .article-list-title {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--article-list-text);
   margin-bottom: 8px;
 }
 
@@ -701,7 +700,7 @@ a:focus-visible {
 
 .article-list-subtitle {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--article-list-text-secondary);
 }
 
 .article-list-items {
@@ -772,7 +771,7 @@ a:focus-visible {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--article-list-text-secondary);
 }
 
 @media (max-width: 768px) {
@@ -800,7 +799,7 @@ a:focus-visible {
 .article-list-item-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--article-list-text);
   line-height: 1.4;
   margin-bottom: 4px;
   overflow: hidden;
@@ -823,7 +822,7 @@ a:focus-visible {
 
 .article-list-item-excerpt {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--article-list-text-secondary);
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;
@@ -848,7 +847,7 @@ a:focus-visible {
   gap: 8px;
   margin-top: 8px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--article-list-text-secondary);
 }
 
 .article-list-item-thumbnail {

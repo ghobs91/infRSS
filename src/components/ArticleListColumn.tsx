@@ -50,7 +50,7 @@ const ArticleListItem = memo(({
 
   return (
     <div
-      className={`article-list-item border-b border-white/10 py-4 px-4 active:bg-white/5 transition-colors ${
+      className={`article-list-item border-b border-[var(--border)] py-4 px-4 active:bg-white/5 transition-colors ${
         selectedArticle === article.id ? 'bg-white/5' : ''
       } ${article.readStatus === 'read' ? 'opacity-70' : ''}`}
       onClick={() => onSelectArticle(article.id)}
@@ -70,16 +70,16 @@ const ArticleListItem = memo(({
                   onError={() => setFaviconError(true)}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-[10px] text-[#8E8E93]">
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-[var(--article-list-text-secondary)]">
                   R
                 </div>
               )}
             </div>
-            <span className="text-[13px] text-[#8E8E93] font-medium truncate">
+            <span className="text-[13px] text-[var(--article-list-text-secondary)] font-medium truncate">
               {article.sourceDomain}
             </span>
-            <span className="text-[13px] text-[#8E8E93]">·</span>
-            <span className="text-[13px] text-[#8E8E93]">
+            <span className="text-[13px] text-[var(--article-list-text-secondary)]">·</span>
+            <span className="text-[13px] text-[var(--article-list-text-secondary)]">
               {(() => {
                 const date = new Date(article.pubDate);
                 const now = new Date();
@@ -93,13 +93,13 @@ const ArticleListItem = memo(({
           </div>
 
           {/* Title */}
-          <h3 className="text-[17px] font-bold text-white leading-tight mb-1 line-clamp-3">
+          <h3 className="text-[17px] font-bold text-[var(--article-list-text)] leading-tight mb-1 line-clamp-3">
             {article.title}
           </h3>
 
           {/* Summary */}
           {getExcerpt(article) && (
-            <p className="text-[15px] text-[#8E8E93] leading-snug line-clamp-2">
+            <p className="text-[15px] text-[var(--article-list-text-secondary)] leading-snug line-clamp-2">
               {getExcerpt(article)}
             </p>
           )}
@@ -134,60 +134,58 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   subtitle,
 }) => {
   const [displayCount, setDisplayCount] = useState(INITIAL_BATCH_SIZE);
-  const scrollPositionRef = useRef<number>(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const isLoadingMoreRef = useRef(false);
 
-  // Save scroll position before articles change and restore after
+  // Reset display count when articles array changes (e.g. feed change)
+  // We use the article ID of the first article as a proxy for list changes
+  // to avoid resetting on simple read status updates
+  const firstArticleId = articles.length > 0 ? articles[0].id : '';
+  
   useEffect(() => {
-    const listElement = document.querySelector('.article-list-items') as HTMLElement;
-    if (!listElement) return;
-
-    // Save current scroll position
-    const savedScrollPosition = scrollPositionRef.current;
-
-    // Reset display count when articles change significantly (new feed or refresh)
-    // But keep higher display count if we already loaded more
-    setDisplayCount(prev => Math.max(prev, INITIAL_BATCH_SIZE));
-
-    // Restore scroll position after DOM updates
-    requestAnimationFrame(() => {
-      if (savedScrollPosition > 0 && listElement) {
-        listElement.scrollTop = savedScrollPosition;
-      }
-    });
-  }, [articles.length]);
+    console.log('🔄 Articles changed, resetting display count. Total articles:', articles.length);
+    setDisplayCount(INITIAL_BATCH_SIZE);
+    if (listRef.current) {
+      listRef.current.scrollTop = 0;
+    }
+  }, [firstArticleId]);
 
   // Infinite scroll handler
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (!target || !target.classList.contains('article-list-items')) return;
+    const handleScroll = () => {
+      const target = listRef.current;
+      if (!target) return;
 
-      const scrollTop = target.scrollTop;
-      const scrollHeight = target.scrollHeight;
-      const clientHeight = target.clientHeight;
-
-      // Save scroll position
-      scrollPositionRef.current = scrollTop;
-
-      if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
+      const { scrollTop, scrollHeight, clientHeight } = target;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      
+      // Load more when within threshold and not already loading
+      if (distanceFromBottom < LOAD_MORE_THRESHOLD && !isLoadingMoreRef.current) {
         setDisplayCount(prev => {
-          const newCount = Math.min(prev + LOAD_MORE_BATCH_SIZE, articles.length);
-          if (newCount > prev) {
-            console.log(`Loading more articles: ${prev} -> ${newCount} of ${articles.length}`);
+          if (prev >= articles.length) {
+            return prev;
           }
+          
+          isLoadingMoreRef.current = true;
+          const newCount = Math.min(prev + LOAD_MORE_BATCH_SIZE, articles.length);
+          console.log(`📜 Loading more articles: ${prev} -> ${newCount} of ${articles.length}`);
+          
+          // Reset the loading flag after a short delay
+          setTimeout(() => {
+            isLoadingMoreRef.current = false;
+          }, 100);
+          
           return newCount;
         });
       }
     };
 
-    const listElement = document.querySelector('.article-list-items');
+    const listElement = listRef.current;
     if (listElement) {
-      listElement.addEventListener('scroll', handleScroll);
+      listElement.addEventListener('scroll', handleScroll, { passive: true });
       return () => listElement.removeEventListener('scroll', handleScroll);
     }
-  }, [articles.length]);
-
-
+  }, [articles.length]); // Use length to avoid recreating the handler unnecessarily
 
   const getExcerpt = useCallback((article: Article) => {
     if (article.summary) return article.summary;
@@ -199,6 +197,11 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   }, []);
 
   const displayedArticles = articles.slice(0, displayCount);
+
+  // Debug logging
+  useEffect(() => {
+    console.log(`📊 ArticleListColumn: Displaying ${displayedArticles.length} of ${articles.length} articles`);
+  }, [displayedArticles.length, articles.length]);
 
   return (
     <div className="article-list">
@@ -228,7 +231,10 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
         </div>
       </div>
 
-      <div className="article-list-items bg-black">
+      <div 
+        className="article-list-items"
+        ref={listRef}
+      >
         {articles.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <div className="text-6xl mb-4 opacity-50">📰</div>

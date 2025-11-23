@@ -31,6 +31,70 @@ export const Navigation = () => {
 
   return (
     <>
+      {/* Desktop Navbar */}
+      {!isMobile && (
+        <nav className="fixed top-0 left-0 right-0 h-16 glass-nav z-50 flex items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-[var(--primary)] p-1.5 rounded-lg text-white">
+              <RssIcon />
+            </div>
+            <span className="text-lg font-bold text-[var(--text-primary)]">InfRSS</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Link 
+              href="/" 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                pathname === '/' 
+                  ? 'bg-[var(--accent)] text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]'
+              }`}
+            >
+              Home
+            </Link>
+            <Link 
+              href="/manage" 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                pathname === '/manage' 
+                  ? 'bg-[var(--accent)] text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]'
+              }`}
+            >
+              Manage
+            </Link>
+            <Link 
+              href="/discover" 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                pathname === '/discover' 
+                  ? 'bg-[var(--accent)] text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]'
+              }`}
+            >
+              Discover
+            </Link>
+            <Link 
+              href="/health" 
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                pathname === '/health' 
+                  ? 'bg-[var(--accent)] text-[var(--primary)]' 
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent)]'
+              }`}
+            >
+              Health
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <IconButton
+              icon={<SettingsIcon />}
+              label="Settings"
+              variant="ghost"
+              onClick={() => setIsDrawerOpen(true)}
+            />
+          </div>
+        </nav>
+      )}
+
       {/* Navigation Drawer - Desktop only */}
       {!isMobile && (
         <Drawer isOpen={isDrawerOpen} onClose={closeDrawer}>

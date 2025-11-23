@@ -16,6 +16,7 @@ export interface ArticleData {
   summary?: string;
   sourceDomain: string;
   readStatus: 'read' | 'unread';
+  feedUrl: string;
 }
 
 export interface FeedData {
@@ -74,6 +75,7 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
       summary: article.summary,
       sourceDomain,
       readStatus: readArticleIds.has(uniqueId) ? 'read' : 'unread',
+      feedUrl,
     };
   }, [readArticleIds]);
 
@@ -145,6 +147,7 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
            const items = result.value.items.map((item: any, itemIdx: number) => 
              convertArticle(item, feedUrl, itemIdx)
            );
+           console.log(`📥 Fetched ${items.length} articles from ${feedUrl}`);
            allArticles.push(...items);
         }
       });
@@ -165,26 +168,19 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       console.log(`📊 Total articles fetched: ${allArticles.length}, displaying: ${limitedArticles.length}`);
 
+      // Debug: show unique feedUrls in articles
+      const uniqueFeedUrls = new Set(limitedArticles.map(a => a.feedUrl));
+      console.log(`🔍 Unique feed URLs in articles (${uniqueFeedUrls.size}):`, Array.from(uniqueFeedUrls));
+      console.log(`🔍 Feed URLs in feedsData (${feedsData.length}):`, feedsData.map(f => f.url));
+      
       // Update feed unread counts based on limited articles
       const updatedFeeds = feedsData.map(feed => {
-        let feedHostname: string;
-        try {
-          feedHostname = new URL(feed.url).hostname;
-        } catch {
-          return { ...feed, unreadCount: 0 };
-        }
-        
-        const feedArticles = limitedArticles.filter(a => {
-          try {
-            const articleHostname = new URL(a.link).hostname;
-            return articleHostname === feedHostname;
-          } catch {
-            return false;
-          }
-        });
+        const feedArticles = limitedArticles.filter(a => a.feedUrl === feed.url);
+        const unreadCount = feedArticles.filter(a => a.readStatus === 'unread').length;
+        console.log(`📊 Feed "${feed.name}":\n   Feed URL: ${feed.url}\n   Articles: ${feedArticles.length}, Unread: ${unreadCount}`);
         return {
           ...feed,
-          unreadCount: feedArticles.filter(a => a.readStatus === 'unread').length,
+          unreadCount,
         };
       });
       setFeeds(updatedFeeds);
@@ -206,48 +202,38 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Update read status when readArticleIds changes, without re-fetching
   useEffect(() => {
-    if (articles.length === 0) return;
+    setArticles(prevArticles => {
+      if (prevArticles.length === 0) return prevArticles;
 
-    let hasChanges = false;
-    const updatedArticles = articles.map(article => {
-      const isRead = readArticleIds.has(article.id);
-      if ((isRead && article.readStatus === 'unread') || (!isRead && article.readStatus === 'read')) {
-        hasChanges = true;
-        return { ...article, readStatus: isRead ? 'read' : 'unread' } as ArticleData;
-      }
-      return article;
-    });
-
-    if (hasChanges) {
-      setArticles(updatedArticles);
-      
-      // Also update feed unread counts
-      const updatedFeeds = feeds.map(feed => {
-        let feedHostname: string;
-        try {
-          feedHostname = new URL(feed.url).hostname;
-        } catch {
-          return feed;
+      let hasChanges = false;
+      const updatedArticles = prevArticles.map(article => {
+        const isRead = readArticleIds.has(article.id);
+        if ((isRead && article.readStatus === 'unread') || (!isRead && article.readStatus === 'read')) {
+          hasChanges = true;
+          return { ...article, readStatus: isRead ? 'read' : 'unread' } as ArticleData;
         }
-        
-        const feedArticles = updatedArticles.filter(a => {
-          try {
-            const articleHostname = new URL(a.link).hostname;
-            return articleHostname === feedHostname;
-          } catch {
-            return false;
-          }
-        });
-        
-        const newUnreadCount = feedArticles.filter(a => a.readStatus === 'unread').length;
-        if (newUnreadCount !== feed.unreadCount) {
-           return { ...feed, unreadCount: newUnreadCount };
-        }
-        return feed;
+        return article;
       });
-      setFeeds(updatedFeeds);
-    }
-  }, [readArticleIds, articles, feeds]);
+
+      if (hasChanges) {
+        // Also update feed unread counts
+        setFeeds(prevFeeds => prevFeeds.map(feed => {
+          const feedArticles = updatedArticles.filter(a => a.feedUrl === feed.url);
+          
+          const newUnreadCount = feedArticles.filter(a => a.readStatus === 'unread').length;
+          if (newUnreadCount !== feed.unreadCount) {
+            console.log(`📊 Feed "${feed.name}" unread count changed: ${feed.unreadCount} -> ${newUnreadCount}`);
+            return { ...feed, unreadCount: newUnreadCount };
+          }
+          return feed;
+        }));
+        
+        return updatedArticles;
+      }
+      
+      return prevArticles;
+    });
+  }, [readArticleIds]);
 
   return (
     <FeedContext.Provider value={{ articles, feeds, isLoading, refreshFeeds, selectedFeed, setSelectedFeed }}>

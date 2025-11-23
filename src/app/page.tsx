@@ -14,31 +14,15 @@ export default function HomePage() {
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const { readArticleIds, toggleReadStatus } = useUnread();
 
-  // Pre-compute feed hostname for selected feed to avoid repeated URL parsing
-  const selectedFeedHostname = useMemo(() => {
-    if (!selectedFeed) return null;
-    const feed = feeds.find(f => f.id === selectedFeed);
-    if (!feed) return null;
-    try {
-      return new URL(feed.url).hostname;
-    } catch {
-      return null;
-    }
-  }, [selectedFeed, feeds]);
-
   // Filter articles based on selected feed - memoized to prevent recalculation on every render
   const filteredArticles = useMemo(() => {
-    if (!selectedFeed || !selectedFeedHostname) return articles;
+    if (!selectedFeed) return articles;
     
-    return articles.filter(a => {
-      try {
-        const articleHostname = new URL(a.link).hostname;
-        return selectedFeedHostname === articleHostname;
-      } catch {
-        return false;
-      }
-    });
-  }, [articles, selectedFeed, selectedFeedHostname]);
+    const feed = feeds.find(f => f.id === selectedFeed);
+    if (!feed) return articles;
+
+    return articles.filter(a => a.feedUrl === feed.url);
+  }, [articles, selectedFeed, feeds]);
 
   // Get selected article - memoized
   const selectedArticle = useMemo(() => {

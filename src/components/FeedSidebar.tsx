@@ -24,12 +24,6 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
 }) => {
   return (
     <div className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-logo">
-          <span className="text-2xl">📰</span>
-          <span>InfRSS</span>
-        </div>
-      </div>
 
       <div className="sidebar-nav">
         {/* Main Navigation */}
