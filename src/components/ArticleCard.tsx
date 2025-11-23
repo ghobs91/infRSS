@@ -70,36 +70,6 @@ const VibesIndicator = ({ vibes }: { vibes: VibesAnalysis }) => {
   );
 };
 
-// Article summary component
-const ArticleSummary = ({ summary, isExpanded, onToggle }: { 
-  summary: string; 
-  isExpanded: boolean; 
-  onToggle: () => void;
-}) => {
-  const maxLength = 150;
-  const shouldTruncate = summary.length > maxLength;
-  
-  if (!shouldTruncate) {
-    return <p className="text-sm text-[var(--text-secondary)] mt-2 break-words">{summary}</p>;
-  }
-
-  return (
-    <div className="mt-2 w-full overflow-hidden">
-      <p className="text-sm text-[var(--text-secondary)] break-words">
-        {isExpanded ? summary : `${summary.substring(0, maxLength)}...`}
-      </p>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onToggle}
-        className="text-xs p-2 h-auto mt-2 flex-shrink-0 hover:scale-105"
-      >
-        {isExpanded ? 'Show less' : 'Read more'}
-      </Button>
-    </div>
-  );
-};
-
 export const ArticleCard = ({ 
   article, 
   isRead, 
@@ -113,7 +83,6 @@ export const ArticleCard = ({
 }: ArticleCardProps) => {
   const [mounted, setMounted] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [showFiltered, setShowFiltered] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const hasTriggeredRef = useRef(false);
@@ -240,6 +209,9 @@ export const ArticleCard = ({
                       fill
                       unoptimized
                       className="object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}
@@ -323,14 +295,14 @@ export const ArticleCard = ({
     );
   }
 
-  // Magazine view - original horizontal layout
+  // Magazine view - updated list layout
   return (
     <div ref={ref} className="animate-[fadeIn_0.5s_ease-out]">
       <Card className={cn(
-        "overflow-hidden transition-all duration-300 max-w-full relative",
+        "overflow-hidden transition-all duration-300 max-w-full relative border-0 border-b border-white/10 bg-transparent rounded-none shadow-none",
         isRead && "opacity-60 saturate-50",
-        article.vibes?.isClickbait && "border-orange-300",
-        article.vibes?.isRagebait && "border-red-300",
+        article.vibes?.isClickbait && "bg-orange-500/5",
+        article.vibes?.isRagebait && "bg-red-500/5",
         filtered && "border-2"
       )}>
         {filtered && !showFiltered && (
@@ -369,10 +341,98 @@ export const ArticleCard = ({
             </Button>
           </div>
         )}
-        <CardContent className={cn("p-0 transition-all duration-300", filtered && !showFiltered && "blur-md")}>
-          <div className="flex flex-col sm:flex-row w-full overflow-hidden">
+        <CardContent className={cn("p-4 transition-all duration-300", filtered && !showFiltered && "blur-md")}>
+          
+          {/* Meta Header */}
+          <div className="flex items-center gap-2 mb-3 text-xs text-[var(--text-secondary)]">
+            {mounted && (
+              <div className="w-4 h-4 relative flex-shrink-0 rounded-sm overflow-hidden">
+                <Image
+                  src={`https://www.google.com/s2/favicons?sz=32&domain_url=${article.link}`}
+                  alt="favicon"
+                  fill
+                  unoptimized
+                  className="object-contain"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <span className="font-medium text-[var(--text-primary)]">
+              {(() => {
+                try {
+                  return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
+                } catch {
+                  return "Unknown Source";
+                }
+              })()}
+            </span>
+            <span>·</span>
+            <span>
+              {(() => {
+                const date = new Date(article.pubDate);
+                if (date.getTime() === 0) return '';
+                
+                const now = new Date();
+                const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+                
+                if (diffInSeconds < 60) return 'just now';
+                if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+                if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+                if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+                
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              })()}
+            </span>
+          </div>
+
+          <div className="flex gap-4 justify-between items-start">
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <a
+                href={article.link}
+                className="text-base sm:text-lg font-bold text-[var(--text-primary)] leading-tight hover:text-[var(--primary)] transition-colors line-clamp-3"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {article.title}
+              </a>
+              
+              {(!article.summary || showSummary === false) && article.content ? (
+                  <p className="text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+                      {article.content.replace(/<[^>]*>/g, '')}
+                  </p>
+              ) : article.summary ? (
+                  <p className="text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+                      {article.summary}
+                  </p>
+              ) : null}
+
+              {/* Vibes Analysis */}
+              {showVibes && article.vibes && (
+                <div className="mt-1 w-full overflow-hidden">
+                  <VibesIndicator vibes={article.vibes} />
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 mt-1">
+                 {onArchive && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleArchive}
+                      className="text-xs h-8 px-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                      title="Archive article"
+                    >
+                      📁 Archive
+                    </Button>
+                  )}
+              </div>
+            </div>
+
             {article.thumbnail && !imgError && (
-              <div className="w-full sm:w-40 h-40 sm:h-auto relative flex-shrink-0 overflow-hidden">
+              <div className="w-24 h-24 sm:w-32 sm:h-32 relative flex-shrink-0 overflow-hidden rounded-xl bg-white/5">
                 <Image 
                   src={article.thumbnail} 
                   alt={article.title}
@@ -383,111 +443,6 @@ export const ArticleCard = ({
                 />
               </div>
             )}
-            
-            <div className="flex-1 p-3 sm:p-4 min-w-0">
-              <div className="flex items-start justify-between gap-2 w-full overflow-hidden">
-                <a
-                  href={article.link}
-                  className="text-base sm:text-lg font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] line-clamp-2 flex-1 break-words overflow-hidden transition-all duration-200"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {article.title}
-                </a>
-                
-                <div className="flex gap-2 flex-shrink-0">
-                  {onArchive && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleArchive}
-                      className="text-sm p-2.5 h-auto whitespace-nowrap hover:scale-110 hover:rotate-6 transition-all duration-300"
-                      title="Archive article"
-                    >
-                      📁
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 my-1 w-full overflow-hidden">
-                {mounted && (
-                  <div className="w-4 h-4 relative flex-shrink-0">
-                    <Image
-                      src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                      alt="favicon"
-                      fill
-                      unoptimized
-                      className="object-contain"
-                    />
-                  </div>
-                )}
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] truncate flex-1">
-                  {(() => {
-                    try {
-                      return article.link ? new URL(article.link).hostname.replace("www.", "") : "Unknown Source";
-                    } catch {
-                      return "Unknown Source";
-                    }
-                  })()}
-                </p>
-                
-                {article.tags && article.tags.length > 0 && (
-                  <div className="flex gap-2 flex-shrink-0">
-                    {article.tags.slice(0, 3).map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-4 py-1.5 text-xs glass-card rounded-full whitespace-nowrap font-semibold shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mb-2 truncate">
-                {(() => {
-                  const date = new Date(article.pubDate);
-                  // Check if date is epoch time (Jan 1, 1970) which indicates unavailable date
-                  if (date.getTime() === 0) {
-                    return 'Date unavailable';
-                  }
-                  return date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  });
-                })()}
-              </p>
-
-              {/* Vibes Analysis */}
-              {showVibes && article.vibes && (
-                <div className="mb-2 w-full overflow-hidden">
-                  <VibesIndicator vibes={article.vibes} />
-                </div>
-              )}
-
-              {/* Article Summary */}
-              {showSummary && article.summary && (
-                <div className="w-full overflow-hidden">
-                  <ArticleSummary
-                    summary={article.summary}
-                    isExpanded={summaryExpanded}
-                    onToggle={() => setSummaryExpanded(!summaryExpanded)}
-                  />
-                </div>
-              )}
-
-              {/* Article Content Preview - show content if no summary, or as fallback */}
-              {(!article.summary || showSummary === false) && article.content && (
-                <div className="w-full overflow-hidden">
-                  <p className="text-sm text-[var(--text-secondary)] mt-2 line-clamp-3 break-words">
-                    {article.content.substring(0, 200)}...
-                  </p>
-                </div>
-              )}
-            </div>
           </div>
         </CardContent>
       </Card>

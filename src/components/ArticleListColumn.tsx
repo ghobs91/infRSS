@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { SearchIcon, CheckIcon } from '@/components/ui/icons';
+import { CheckIcon } from '@/components/ui/icons';
 
 interface Article {
   id: string;
@@ -25,6 +25,106 @@ interface ArticleListColumnProps {
 const INITIAL_BATCH_SIZE = 100;
 const LOAD_MORE_BATCH_SIZE = 50;
 const LOAD_MORE_THRESHOLD = 1000; // pixels from bottom
+
+const ArticleListItem = memo(({ 
+  article, 
+  selectedArticle, 
+  onSelectArticle,
+  getExcerpt 
+}: { 
+  article: Article; 
+  selectedArticle: string | null; 
+  onSelectArticle: (id: string) => void;
+  getExcerpt: (article: Article) => string;
+}) => {
+  const [faviconError, setFaviconError] = useState(false);
+
+  const getFaviconUrl = (url: string) => {
+    try {
+      const domain = new URL(url).hostname;
+      return `https://www.google.com/s2/favicons?sz=32&domain_url=${domain}`;
+    } catch {
+      return `https://www.google.com/s2/favicons?sz=32&domain_url=${url}`;
+    }
+  };
+
+  return (
+    <div
+      className={`article-list-item border-b border-white/10 py-4 px-4 active:bg-white/5 transition-colors ${
+        selectedArticle === article.id ? 'bg-white/5' : ''
+      } ${article.readStatus === 'read' ? 'opacity-70' : ''}`}
+      onClick={() => onSelectArticle(article.id)}
+    >
+      <div className="flex gap-4">
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
+          {/* Source Line */}
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-4 h-4 relative flex-shrink-0 rounded-sm overflow-hidden bg-[#2C2C2E]">
+              {!faviconError ? (
+                <Image
+                  src={getFaviconUrl(article.link)}
+                  alt=""
+                  fill
+                  unoptimized
+                  className="object-cover"
+                  onError={() => setFaviconError(true)}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[10px] text-[#8E8E93]">
+                  R
+                </div>
+              )}
+            </div>
+            <span className="text-[13px] text-[#8E8E93] font-medium truncate">
+              {article.sourceDomain}
+            </span>
+            <span className="text-[13px] text-[#8E8E93]">·</span>
+            <span className="text-[13px] text-[#8E8E93]">
+              {(() => {
+                const date = new Date(article.pubDate);
+                const now = new Date();
+                const diffMs = now.getTime() - date.getTime();
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                if (diffHours < 1) return 'Just now';
+                if (diffHours < 24) return `${diffHours} hours ago`;
+                return date.toLocaleDateString();
+              })()}
+            </span>
+          </div>
+
+          {/* Title */}
+          <h3 className="text-[17px] font-bold text-white leading-tight mb-1 line-clamp-3">
+            {article.title}
+          </h3>
+
+          {/* Summary */}
+          {getExcerpt(article) && (
+            <p className="text-[15px] text-[#8E8E93] leading-snug line-clamp-2">
+              {getExcerpt(article)}
+            </p>
+          )}
+        </div>
+
+        {/* Thumbnail */}
+        {article.thumbnail && (
+          <div className="flex-shrink-0 pt-1">
+            <Image
+              src={article.thumbnail}
+              alt=""
+              width={80}
+              height={80}
+              unoptimized
+              loading="lazy"
+              className="w-[80px] h-[80px] rounded-[12px] object-cover bg-[#2C2C2E]"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+ArticleListItem.displayName = 'ArticleListItem';
 
 const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
   articles,
@@ -87,25 +187,7 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
     }
   }, [articles.length]);
 
-  const formatDate = useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
-    if (diffHours < 1) {
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      return `${diffMins} minutes ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hours ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-      });
-    }
-  }, []);
+
 
   const getExcerpt = useCallback((article: Article) => {
     if (article.summary) return article.summary;
@@ -129,48 +211,24 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
         </div>
         
         {/* Mobile Header */}
-        <div className="md:hidden">
-          <div className="flex items-center justify-between w-full mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-                PP
-              </div>
-              <h1 className="article-list-title text-2xl">{title}</h1>
+        <div className="md:hidden sticky top-0 z-20 bg-black/80 backdrop-blur-xl border-b border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between w-full">
+            <div className="w-8 h-8 rounded-full bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] font-medium text-xs">
+              PP
             </div>
-            <div className="flex items-center gap-2">
-              <button className="w-9 h-9 rounded-full bg-[var(--card-bg)] flex items-center justify-center border border-[var(--card-border)] shadow-sm">
-                <SearchIcon />
+            <h1 className="text-[17px] font-semibold text-white absolute left-1/2 transform -translate-x-1/2">Articles</h1>
+            <div className="flex items-center gap-4">
+              <button className="w-6 h-6 rounded-full border-2 border-[#8E8E93] flex items-center justify-center">
               </button>
-              <button className="w-9 h-9 rounded-full bg-[var(--card-bg)] flex items-center justify-center border border-[var(--card-border)] shadow-sm">
+              <button className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white">
                 <CheckIcon />
               </button>
             </div>
           </div>
-          
-          {/* Category Filter Buttons */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            <button className="px-5 py-2 rounded-full bg-[var(--primary)] text-white font-semibold text-sm shadow-md whitespace-nowrap flex items-center gap-2">
-              <span className="text-base">📰</span>
-              Articles
-              <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">•</span>
-            </button>
-            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
-              <span className="text-base">💬</span>
-              Social
-            </button>
-            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
-              <span className="text-base">🖼️</span>
-              Images
-            </button>
-            <button className="px-5 py-2 rounded-full bg-[var(--card-bg)] text-[var(--text-secondary)] font-semibold text-sm border border-[var(--card-border)] shadow-sm whitespace-nowrap flex items-center gap-2">
-              <span className="text-base">🎬</span>
-              Videos
-            </button>
-          </div>
         </div>
       </div>
 
-      <div className="article-list-items">
+      <div className="article-list-items bg-black">
         {articles.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <div className="text-6xl mb-4 opacity-50">📰</div>
@@ -181,57 +239,13 @@ const ArticleListColumnComponent: React.FC<ArticleListColumnProps> = ({
           </div>
         ) : (
           displayedArticles.map((article) => (
-            <div
+            <ArticleListItem
               key={article.id}
-              className={`article-list-item ${
-                selectedArticle === article.id ? 'active' : ''
-              } ${article.readStatus === 'read' ? 'read' : 'unread'}`}
-              onClick={() => onSelectArticle(article.id)}
-            >
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="article-list-item-header">
-                    <div className="article-list-item-source">
-                      <Image
-                        src={`https://www.google.com/s2/favicons?sz=16&domain_url=${article.link}`}
-                        alt="favicon"
-                        width={16}
-                        height={16}
-                        unoptimized
-                        loading="lazy"
-                        sizes="16px"
-                      />
-                      <span>{article.sourceDomain}</span>
-                    </div>
-                    <span>•</span>
-                    <span className="text-xs text-[var(--text-secondary)]">
-                      {formatDate(article.pubDate)}
-                    </span>
-                  </div>
-
-                  <h3 className="article-list-item-title">{article.title}</h3>
-
-                  {getExcerpt(article) && (
-                    <p className="article-list-item-excerpt">
-                      {getExcerpt(article)}
-                    </p>
-                  )}
-                </div>
-
-                {article.thumbnail && (
-                  <Image
-                    src={article.thumbnail}
-                    alt={article.title}
-                    width={80}
-                    height={80}
-                    unoptimized
-                    loading="lazy"
-                    sizes="80px"
-                    className="article-list-item-thumbnail"
-                  />
-                )}
-              </div>
-            </div>
+              article={article}
+              selectedArticle={selectedArticle}
+              onSelectArticle={onSelectArticle}
+              getExcerpt={getExcerpt}
+            />
           ))
         )}
       </div>

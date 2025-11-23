@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { loadFeedsFromStorage, saveFeedsToStorage } from "@/lib/rssUtils";
 import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
+import { useFeed } from "@/lib/feedContext";
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Trash2, ExternalLink, Clock } from "lucide-react";
 
 interface FeedHealth {
@@ -26,6 +27,7 @@ export default function FeedHealthPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [filter, setFilter] = useState<'all' | 'success' | 'failed'>('all');
   const { parseRSSWithWorker } = useRSSParserWorker();
+  const { refreshFeeds } = useFeed();
 
   const checkFeedHealth = async (url: string): Promise<FeedHealth> => {
     const startTime = Date.now();
@@ -133,6 +135,7 @@ export default function FeedHealthPage() {
     const updated = savedFeeds.filter(f => f.url !== url);
     saveFeedsToStorage(updated);
     setFeeds(prev => prev.filter(f => f.url !== url));
+    refreshFeeds();
   };
 
   const removeAllFailed = () => {
@@ -141,6 +144,7 @@ export default function FeedHealthPage() {
     const updated = savedFeeds.filter(f => !failedUrls.includes(f.url));
     saveFeedsToStorage(updated);
     setFeeds(prev => prev.filter(f => f.status === 'success'));
+    refreshFeeds();
   };
 
   useEffect(() => {
@@ -226,7 +230,7 @@ export default function FeedHealthPage() {
   };
 
   return (
-    <main className="space-y-8 px-4 max-w-7xl mx-auto pt-8 pb-12 md:pb-12 pb-28">
+    <main className="space-y-8 px-4 max-w-7xl mx-auto pt-8 pb-28 md:pb-12">
       <div className="space-y-4">
         <h1 className="text-3xl font-bold">Feed Health Dashboard</h1>
         <p className="text-[var(--text-secondary)]">

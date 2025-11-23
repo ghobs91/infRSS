@@ -22,6 +22,7 @@ import { discoverFeed, getDiscoveryResultDescription, type FeedDiscoveryResult }
 import type { FeedData } from "@/lib/types";
 import { useTransformerWorker } from "@/lib/useTransformerWorker";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
+import { useFeed } from "@/lib/feedContext";
 import type { Category, UserPreferences } from "@/lib/types";
 
 // Category management component
@@ -230,6 +231,9 @@ const SuggestedFeed = ({ feed, onSubscribe }: { feed: FeedData, onSubscribe: (fe
                   alt="favicon"
                   fill
                   unoptimized
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
               </div>
             )}
@@ -294,6 +298,9 @@ const SavedFeed = ({
                   alt="favicon"
                   fill
                   unoptimized
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
               </div>
             )}
@@ -367,6 +374,7 @@ export default function ManagePage() {
 
   const { suggestFeedsWithWorker, isLoading: workerLoading } = useTransformerWorker();
   const { parseRSSWithWorker } = useRSSParserWorker();
+  const { refreshFeeds } = useFeed();
 
   // Load saved data on initial render
   useEffect(() => {
@@ -459,6 +467,7 @@ export default function ManagePage() {
         
         saveFeedToStorage(newFeed);
         setSavedFeeds(prev => [...prev, newFeed]);
+        refreshFeeds();
         setFeedUrlInput("");
         
         // Show success message with discovery info
@@ -483,6 +492,7 @@ export default function ManagePage() {
         
         saveFeedToStorage(newFeed);
         setSavedFeeds(prev => [...prev, newFeed]);
+        refreshFeeds();
         setFeedUrlInput("");
         
         // Show success message with warning
@@ -501,7 +511,7 @@ export default function ManagePage() {
       setIsLoading(false);
       setDiscoveryStatus("");
     }
-  }, [feedUrlInput, savedFeeds, parseRSSWithWorker]);
+  }, [feedUrlInput, savedFeeds, parseRSSWithWorker, refreshFeeds]);
 
   // Handle suggesting feeds
   const handleSuggestFeeds = useCallback(async () => {
@@ -542,14 +552,16 @@ export default function ManagePage() {
 
     saveFeedToStorage(newFeed);
     setSavedFeeds(prev => [...prev, newFeed]);
-  }, [savedFeeds]);
+    refreshFeeds();
+  }, [savedFeeds, refreshFeeds]);
 
   // Handle removing a feed
   const handleRemoveFeed = useCallback((url: string) => {
     const updatedFeeds = savedFeeds.filter(feed => feed.url !== url);
     localStorage.setItem("feeds", JSON.stringify(updatedFeeds));
     setSavedFeeds(updatedFeeds);
-  }, [savedFeeds]);
+    refreshFeeds();
+  }, [savedFeeds, refreshFeeds]);
 
   // Handle updating a feed
   const handleUpdateFeed = useCallback((url: string, updates: Partial<FeedData>) => {
@@ -627,6 +639,7 @@ export default function ManagePage() {
       
       // Update state with new feeds
       setSavedFeeds(prev => [...prev, ...newFeeds]);
+      refreshFeeds();
       
       // Clear the file input
       event.target.value = '';

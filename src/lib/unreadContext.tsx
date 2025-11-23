@@ -1,12 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 
 interface UnreadContextType {
-  unreadCount: number;
   readArticleIds: Set<string>;
   previouslyReadArticleIds: Set<string>; // Articles that were read in a previous session
   markAsRead: (articleId: string) => void;
   toggleReadStatus: (articleId: string) => void;
-  setTotalArticles: (count: number) => void;
   autoMarkAsReadOnScroll: boolean;
   toggleAutoMarkAsRead: () => void;
 }
@@ -28,15 +26,8 @@ const PREFERENCES_KEY = 'userPreferences';
 export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [readArticleIds, setReadArticleIds] = useState<Set<string>>(new Set());
   const [previouslyReadArticleIds, setPreviouslyReadArticleIds] = useState<Set<string>>(new Set());
-  const [totalArticles, setTotalArticles] = useState(0);
   const [autoMarkAsReadOnScroll, setAutoMarkAsReadOnScroll] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Calculate unread count as derived state using useMemo
-  const unreadCount = useMemo(() => {
-    const allReadArticleIds = new Set([...Array.from(readArticleIds), ...Array.from(previouslyReadArticleIds)]);
-    return Math.max(totalArticles - allReadArticleIds.size, 0);
-  }, [readArticleIds, previouslyReadArticleIds, totalArticles]);
 
   // Load read article IDs and preferences from localStorage
   useEffect(() => {
@@ -137,21 +128,17 @@ export const UnreadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo(() => ({
-    unreadCount, 
     readArticleIds, 
     previouslyReadArticleIds,
     markAsRead, 
-    toggleReadStatus, 
-    setTotalArticles,
+    toggleReadStatus,
     autoMarkAsReadOnScroll,
     toggleAutoMarkAsRead
   }), [
-    unreadCount, 
     readArticleIds, 
     previouslyReadArticleIds,
     markAsRead, 
-    toggleReadStatus, 
-    setTotalArticles,
+    toggleReadStatus,
     autoMarkAsReadOnScroll,
     toggleAutoMarkAsRead
   ]);

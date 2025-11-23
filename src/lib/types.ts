@@ -8,6 +8,7 @@ export interface FeedData {
   tags?: string[];
   lastFetched?: number;
   isActive?: boolean;
+  favicon?: string;
 }
 
 export interface Article {

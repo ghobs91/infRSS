@@ -57,16 +57,6 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
               <span className="sidebar-item-count">{unreadCount}</span>
             )}
           </div>
-
-          <div className="sidebar-item">
-            <div className="sidebar-item-icon">⭐</div>
-            <span className="sidebar-item-text">Starred</span>
-          </div>
-
-          <div className="sidebar-item">
-            <div className="sidebar-item-icon">📁</div>
-            <span className="sidebar-item-text">Archived</span>
-          </div>
         </div>
 
         {/* Articles Section */}
@@ -94,12 +84,16 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
                       unoptimized
                       loading="lazy"
                       className="rounded"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling;
+                        if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                      }}
                     />
-                  ) : (
-                    <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold">
-                      {feed.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  ) : null}
+                  <div className="w-5 h-5 rounded bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold" style={feed.favicon ? {display: 'none'} : {}}>
+                    {feed.name.charAt(0).toUpperCase()}
+                  </div>
                 </div>
                 <span className="sidebar-item-text">{feed.name}</span>
                 {feed.unreadCount && feed.unreadCount > 0 && (

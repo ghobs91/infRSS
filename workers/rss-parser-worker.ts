@@ -366,8 +366,10 @@ function parseRSSFeed(xmlText: string, feedUrl: string): { title: string; items:
       const thumbnail = extractThumbnailFromXML(itemXml);
       
       // Extract source domain
-      let sourceDomain = "Unknown Source";
-      if (link) {
+      // Use feed title as source domain for better display
+      // Fall back to hostname from link if feed title is not available
+      let sourceDomain = channelTitle || "Unknown Source";
+      if (!channelTitle && link) {
         try {
           sourceDomain = new URL(link).hostname.replace("www.", "");
         } catch {

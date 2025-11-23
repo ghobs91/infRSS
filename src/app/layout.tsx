@@ -3,12 +3,13 @@ import "./globals.css";
 import "../styles/scroll-fix.css";
 import { UnreadProvider } from "@/lib/unreadContext";
 import { ViewProvider } from "@/lib/viewContext";
+import { FeedProvider } from "@/lib/feedContext";
 import { Navigation } from "@/components/Navigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>InfRSS - RSS Reader</title>
         <meta name="description" content="An intelligent, offline-friendly RSS reader" />
@@ -18,13 +19,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <link rel="icon" href="/icons/favicon.ico" />
       </head>
-      <body className="bg-[var(--background)] text-[var(--foreground)]">
+      <body className="bg-[var(--background)] text-[var(--foreground)]" suppressHydrationWarning>
         <ErrorBoundary>
           <UnreadProvider>
-            <ViewProvider>
-              <Navigation />
-              {children}
-            </ViewProvider>
+            <FeedProvider>
+              <ViewProvider>
+                <Navigation />
+                {children}
+              </ViewProvider>
+            </FeedProvider>
           </UnreadProvider>
         </ErrorBoundary>
       </body>

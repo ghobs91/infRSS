@@ -84,8 +84,6 @@ export const RssIcon = () => (
     <path d="M4 11a9 9 0 0 1 9 9"></path>
     <path d="M4 4a16 16 0 0 1 16 16"></path>
     <circle cx="5" cy="19" r="1"></circle>
-    <circle cx="19" cy="19" r="1"></circle>
-    <path d="M11 19a8 8 0 0 0 8-8"></path>
   </svg>
 );
 

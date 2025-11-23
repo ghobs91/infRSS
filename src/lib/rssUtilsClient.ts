@@ -261,9 +261,23 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       }
     }
 
-    const channelTitle = xmlDoc.querySelector("channel > title")?.textContent || 
-                        xmlDoc.querySelector("feed > title")?.textContent ||
-                        new URL(feedUrl).hostname.replace("www.", "");
+    // Extract and clean channel title
+    let channelTitle = xmlDoc.querySelector("channel > title")?.textContent || 
+                       xmlDoc.querySelector("feed > title")?.textContent ||
+                       new URL(feedUrl).hostname.replace("www.", "");
+    
+    // Clean the channel title from CDATA and HTML
+    if (channelTitle) {
+      channelTitle = channelTitle.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '');
+      channelTitle = channelTitle.replace(/<[^>]*>/g, '');
+      channelTitle = channelTitle.replace(/&amp;/g, '&')
+                                .replace(/&lt;/g, '<')
+                                .replace(/&gt;/g, '>')
+                                .replace(/&quot;/g, '"')
+                                .replace(/&#39;/g, "'")
+                                .replace(/&nbsp;/g, ' ');
+      channelTitle = channelTitle.replace(/\s+/g, ' ').trim();
+    }
 
     let items: Element[];
     if (xmlDoc.querySelector("item")) {
@@ -394,12 +408,14 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
         thumbnail = undefined;
       }
       
-      let sourceDomain = "Unknown Source";
-      if (link) {
+      // Use feed title as source domain for better display
+      // Fall back to hostname from link if feed title is not available
+      let sourceDomain = channelTitle || "Unknown Source";
+      if (!channelTitle && link) {
         try {
           sourceDomain = new URL(link).hostname.replace("www.", "");
         } catch {
-          // ignore
+          sourceDomain = "Unknown Source";
         }
       }
 

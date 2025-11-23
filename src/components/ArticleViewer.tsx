@@ -58,6 +58,9 @@ const ArticleViewerComponent: React.FC<ArticleViewerProps> = ({ article }) => {
               width={16}
               height={16}
               unoptimized
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
             <span>{article.sourceDomain}</span>
           </div>
