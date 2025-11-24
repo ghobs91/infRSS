@@ -138,16 +138,28 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const results = await Promise.allSettled(fetchPromises);
       
+      // Calculate date threshold (1 week ago)
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
       // Collect all articles from successful fetches
       const allArticles: ArticleData[] = [];
       results.forEach((result) => {
         if (result.status === 'fulfilled' && result.value.success) {
-           // Convert items to ArticleData
+           // Convert items to ArticleData and filter out articles older than a week
            const feedUrl = result.value.url;
-           const items = result.value.items.map((item: any, itemIdx: number) => 
-             convertArticle(item, feedUrl, itemIdx)
-           );
-           console.log(`📥 Fetched ${items.length} articles from ${feedUrl}`);
+           const items = result.value.items
+             .map((item: any, itemIdx: number) => convertArticle(item, feedUrl, itemIdx))
+             .filter((article: ArticleData) => {
+               try {
+                 const articleDate = new Date(article.pubDate);
+                 return articleDate >= oneWeekAgo;
+               } catch {
+                 // If date parsing fails, include the article
+                 return true;
+               }
+             });
+           console.log(`📥 Fetched ${items.length} articles from ${feedUrl} (filtered by 1 week)`);
            allArticles.push(...items);
         }
       });
@@ -173,7 +185,7 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log(`🔍 Unique feed URLs in articles (${uniqueFeedUrls.size}):`, Array.from(uniqueFeedUrls));
       console.log(`🔍 Feed URLs in feedsData (${feedsData.length}):`, feedsData.map(f => f.url));
       
-      // Update feed unread counts based on limited articles
+      // Update feed unread counts based on limited articles and sort by name
       const updatedFeeds = feedsData.map(feed => {
         const feedArticles = limitedArticles.filter(a => a.feedUrl === feed.url);
         const unreadCount = feedArticles.filter(a => a.readStatus === 'unread').length;
@@ -182,7 +194,7 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ...feed,
           unreadCount,
         };
-      });
+      }).sort((a, b) => a.name.localeCompare(b.name));
       setFeeds(updatedFeeds);
       setIsLoading(false);
 

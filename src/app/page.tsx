@@ -1,7 +1,7 @@
 // app/page.tsx
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { FeedSidebar } from "@/components/FeedSidebar";
 import { ArticleListColumn } from "@/components/ArticleListColumn";
@@ -12,17 +12,32 @@ import { useFeed } from "@/lib/feedContext";
 export default function HomePage() {
   const { articles, feeds, isLoading, selectedFeed, setSelectedFeed } = useFeed();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
-  const { readArticleIds, toggleReadStatus } = useUnread();
+  const [isMobile, setIsMobile] = useState(false);
+  const { readArticleIds, previouslyReadArticleIds, toggleReadStatus } = useUnread();
 
-  // Filter articles based on selected feed - memoized to prevent recalculation on every render
+  // Detect mobile view
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Filter articles based on selected feed and exclude previously read articles
   const filteredArticles = useMemo(() => {
-    if (!selectedFeed) return articles;
+    // First filter out articles that were read in previous sessions
+    let filtered = articles.filter(a => !previouslyReadArticleIds.has(a.id));
     
-    const feed = feeds.find(f => f.id === selectedFeed);
-    if (!feed) return articles;
-
-    return articles.filter(a => a.feedUrl === feed.url);
-  }, [articles, selectedFeed, feeds]);
+    // Then filter by selected feed if applicable
+    if (selectedFeed) {
+      const feed = feeds.find(f => f.id === selectedFeed);
+      if (feed) {
+        filtered = filtered.filter(a => a.feedUrl === feed.url);
+      }
+    }
+    
+    return filtered;
+  }, [articles, selectedFeed, feeds, previouslyReadArticleIds]);
 
   // Get selected article - memoized
   const selectedArticle = useMemo(() => {
@@ -40,6 +55,20 @@ export default function HomePage() {
     }
   }, [readArticleIds, toggleReadStatus]);
 
+  // Close mobile article viewer
+  const closeMobileViewer = useCallback(() => {
+    setSelectedArticleId(null);
+  }, []);
+
+  // Mark all filtered articles as read - memoized callback
+  const handleMarkAllAsRead = useCallback(() => {
+    filteredArticles.forEach(article => {
+      if (!readArticleIds.has(article.id)) {
+        toggleReadStatus(article.id);
+      }
+    });
+  }, [filteredArticles, readArticleIds, toggleReadStatus]);
+
   // Calculate total unread count based on filtered articles - memoized
   const totalUnreadCount = useMemo(() => {
     return filteredArticles.filter(a => a.readStatus === 'unread').length;
@@ -54,21 +83,49 @@ export default function HomePage() {
   }
 
   return (
-    <div className="app-layout">
-      <FeedSidebar
-        feeds={feeds}
-        selectedFeed={selectedFeed}
-        onSelectFeed={setSelectedFeed}
-        unreadCount={totalUnreadCount}
-      />
-      <ArticleListColumn
-        articles={filteredArticles}
-        selectedArticle={selectedArticleId}
-        onSelectArticle={handleSelectArticle}
-        title={selectedFeed ? feeds.find(f => f.id === selectedFeed)?.name || 'Feed' : 'Today'}
-        subtitle={`${filteredArticles.length} article${filteredArticles.length !== 1 ? 's' : ''}`}
-      />
-      <ArticleViewer article={selectedArticle} />
-    </div>
+    <>
+      <div className="app-layout">
+        <FeedSidebar
+          feeds={feeds}
+          selectedFeed={selectedFeed}
+          onSelectFeed={setSelectedFeed}
+          unreadCount={totalUnreadCount}
+        />
+        <ArticleListColumn
+          articles={filteredArticles}
+          selectedArticle={selectedArticleId}
+          onSelectArticle={handleSelectArticle}
+          title={selectedFeed ? feeds.find(f => f.id === selectedFeed)?.name || 'Feed' : 'Today'}
+          subtitle={`${filteredArticles.length} article${filteredArticles.length !== 1 ? 's' : ''}`}
+          onMarkAllAsRead={handleMarkAllAsRead}
+          showMarkAllAsRead={selectedFeed !== null}
+          feeds={feeds}
+          selectedFeed={selectedFeed}
+          onSelectFeed={setSelectedFeed}
+          totalUnreadCount={totalUnreadCount}
+        />
+        <ArticleViewer article={selectedArticle} />
+      </div>
+
+      {/* Mobile Article Viewer Modal */}
+      {isMobile && selectedArticle && (
+        <div className="fixed inset-0 z-[100] bg-[var(--background)] overflow-y-auto">
+          <div className="sticky top-0 z-50 bg-[var(--background)]/95 backdrop-blur-xl border-b border-white/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={closeMobileViewer}
+                className="flex items-center gap-2 text-[var(--primary)] font-medium text-[15px]"
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 4l-8 8 8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Back</span>
+              </button>
+            </div>
+          </div>
+          <ArticleViewer article={selectedArticle} />
+        </div>
+      )}
+    </>
   );
 }
