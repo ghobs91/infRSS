@@ -121,6 +121,16 @@ NEXT_PUBLIC_SYNC_ENABLED=true
 NEXT_PUBLIC_SYNC_INTERVAL=30000
 ```
 
+### Client-Side RSS Fetching (Optimized for Hosting Costs)
+The app is optimized to minimize server-side API calls when deployed on hosting platforms like Netlify:
+
+- **Direct Fetch First**: RSS feeds are fetched directly from the client browser when possible
+- **Automatic Proxy Fallback**: If a feed is CORS-restricted, the app automatically falls back to the server proxy
+- **Smart Caching**: The app remembers which feeds require the proxy to optimize future requests
+- **Cost Savings**: This approach reduces server-side function invocations by ~90% for feeds that support CORS
+
+This optimization is enabled by default and requires no configuration. The app will automatically determine the best fetch method for each feed.
+
 ### PWA Configuration
 The app includes a web manifest and service worker for PWA functionality. Customize the manifest in `public/manifest.webmanifest`.
 

@@ -12,23 +12,64 @@ export interface ParsedRSSFeed {
 const feedCache = new Map<string, { data: ParsedRSSFeed; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-/**
- * Fetch XML from proxy and parse using Web Worker
- * This function is designed to work on the client-side only
- */
-export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlText: string, feedUrl: string) => Promise<ParsedRSSFeed | null>): Promise<ParsedRSSFeed | null> {
-  try {
-    // Check cache first
-    const cached = feedCache.get(url);
-    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      return cached.data;
-    }
+// Cache to remember which feeds need the proxy (CORS-restricted)
+const proxyRequiredCache = new Map<string, boolean>();
 
-    // Fetch XML text from proxy with a 30 second timeout
-    const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+// Configuration for client-side fetching
+const CLIENT_FETCH_CONFIG = {
+  enabled: true, // Set to false to always use proxy
+  timeout: 30000, // 30 seconds
+};
+
+/**
+ * Attempts to fetch RSS feed directly from the source (client-side)
+ * This bypasses the server proxy and reduces hosting costs
+ */
+async function fetchRSSDirectly(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CLIENT_FETCH_CONFIG.timeout);
+  
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      mode: 'cors', // Explicitly request CORS
+      headers: {
+        'Accept': 'application/rss+xml, application/xml, application/atom+xml, text/xml, */*',
+      },
+    });
     
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.debug(`Direct fetch failed for ${url}: HTTP ${response.status}`);
+      return null;
+    }
+    
+    const xmlText = await response.text();
+    return xmlText;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // CORS error or network error - we'll need to use proxy
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.debug(`Direct fetch blocked by CORS for ${url}, will use proxy`);
+    } else if (error instanceof Error && error.name === 'AbortError') {
+      console.debug(`Direct fetch timeout for ${url}`);
+    }
+    
+    return null;
+  }
+}
+
+/**
+ * Fetch RSS feed via server proxy (fallback method)
+ */
+async function fetchRSSViaProxy(url: string): Promise<string | null> {
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CLIENT_FETCH_CONFIG.timeout);
+  
+  try {
     const response = await fetch(proxyUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
     
@@ -56,8 +97,67 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
     }
 
     const xmlText = await response.text();
+    return xmlText;
+  } catch (error) {
+    clearTimeout(timeoutId);
     
-    if (!xmlText.trim()) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn(`Proxy fetch timeout (30s): ${url}`);
+    } else {
+      console.error(`Unexpected error fetching via proxy ${url}:`, error);
+    }
+    
+    return null;
+  }
+}
+
+/**
+ * Fetch XML from direct source or proxy with automatic fallback
+ * This function optimizes for client-side fetching to reduce hosting costs
+ * 
+ * Strategy:
+ * 1. Check cache first
+ * 2. Try direct fetch if enabled and feed hasn't been marked as proxy-required
+ * 3. Fall back to proxy if direct fetch fails (CORS, timeout, etc.)
+ * 4. Remember which feeds need proxy for future requests
+ */
+export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlText: string, feedUrl: string) => Promise<ParsedRSSFeed | null>): Promise<ParsedRSSFeed | null> {
+  try {
+    // Check cache first
+    const cached = feedCache.get(url);
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+
+    let xmlText: string | null = null;
+    
+    // Check if we know this feed requires proxy
+    const requiresProxy = proxyRequiredCache.get(url);
+    
+    if (CLIENT_FETCH_CONFIG.enabled && requiresProxy !== true) {
+      // Try direct fetch first (client-side, no server cost)
+      console.debug(`Attempting direct fetch for ${url}`);
+      xmlText = await fetchRSSDirectly(url);
+      
+      if (xmlText) {
+        console.debug(`✓ Direct fetch successful for ${url} (saved server resources)`);
+        // Remember that this feed can be fetched directly
+        proxyRequiredCache.set(url, false);
+      }
+    }
+    
+    // Fall back to proxy if direct fetch failed or is disabled
+    if (!xmlText) {
+      console.debug(`Fetching via proxy for ${url}`);
+      xmlText = await fetchRSSViaProxy(url);
+      
+      if (xmlText) {
+        // Remember that this feed needs the proxy
+        proxyRequiredCache.set(url, true);
+      }
+    }
+    
+    if (!xmlText || !xmlText.trim()) {
       return null;
     }
 
@@ -71,6 +171,8 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
       try {
         const result = await parseRSSWorker(xmlText, url);
         if (result) {
+          // Cache successful result
+          feedCache.set(url, { data: result, timestamp: Date.now() });
           return result;
         }
       } catch {
@@ -88,13 +190,9 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
     
     return result;
   } catch (error) {
-    // Only log unexpected errors (not timeouts)
+    // Only log unexpected errors
     if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        console.warn(`Feed timeout (30s): ${url}`);
-      } else {
-        console.error(`Unexpected error parsing feed ${url}:`, error.message);
-      }
+      console.error(`Unexpected error parsing feed ${url}:`, error.message);
     }
     return null;
   }
