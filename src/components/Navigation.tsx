@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LiquidGlass } from '@/components/ui/liquid-glass';
 import { Drawer } from '@/components/ui/drawer';
 import { IconButton } from '@/components/ui/icon-button';
 import { CloseIcon, HomeIcon, PlusIcon, RssIcon, SearchIcon, SettingsIcon } from '@/components/ui/icons';
@@ -168,7 +167,7 @@ export const Navigation = () => {
       {/* Bottom Tab Bar - Mobile only */}
       {isMobile && (
         <nav className="fixed bottom-6 left-6 right-6 z-50">
-          <LiquidGlass className="rounded-[32px] flex items-center justify-between px-2 py-2 shadow-2xl border border-white/10 bg-[#1C1C1E]/75">
+          <div className="glass-tab-bar rounded-[32px] flex items-center justify-between px-2 py-2">
             <Link 
               href="/" 
               className={`flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-[24px] transition-all duration-300 min-w-[70px] ${
@@ -216,7 +215,7 @@ export const Navigation = () => {
               <SettingsIcon />
               <span className="text-[10px] font-medium">Settings</span>
             </Link>
-          </LiquidGlass>
+          </div>
         </nav>
       )}
     </>
