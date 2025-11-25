@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LiquidGlass } from '@/components/ui/liquid-glass';
 import { Drawer } from '@/components/ui/drawer';
@@ -35,9 +36,7 @@ export const Navigation = () => {
       {!isMobile && (
         <nav className="fixed top-0 left-0 right-0 h-16 glass-nav z-50 flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
-            <div className="bg-[var(--primary)] p-1.5 rounded-lg text-white">
-              <RssIcon />
-            </div>
+            <Image src="/icons/icon-192.png" alt="InfRSS" width={32} height={32} className="rounded-lg" />
             <span className="text-lg font-bold text-[var(--text-primary)]">InfRSS</span>
           </div>
 
@@ -174,7 +173,7 @@ export const Navigation = () => {
               href="/" 
               className={`flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-[24px] transition-all duration-300 min-w-[70px] ${
                 pathname === '/' 
-                  ? 'bg-[#FF6B35] text-white shadow-lg translate-y-[-2px]' 
+                  ? 'bg-[var(--primary)] text-white shadow-lg translate-y-[-2px]' 
                   : 'text-[#8E8E93] hover:text-white'
               }`}
             >
@@ -186,7 +185,7 @@ export const Navigation = () => {
               href="/manage" 
               className={`flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-[24px] transition-all duration-300 min-w-[70px] ${
                 pathname === '/manage' 
-                  ? 'bg-[#FF6B35] text-white shadow-lg translate-y-[-2px]' 
+                  ? 'bg-[var(--primary)] text-white shadow-lg translate-y-[-2px]' 
                   : 'text-[#8E8E93] hover:text-white'
               }`}
             >
@@ -198,7 +197,7 @@ export const Navigation = () => {
               href="/discover" 
               className={`flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-[24px] transition-all duration-300 min-w-[70px] ${
                 pathname === '/discover' 
-                  ? 'bg-[#FF6B35] text-white shadow-lg translate-y-[-2px]' 
+                  ? 'bg-[var(--primary)] text-white shadow-lg translate-y-[-2px]' 
                   : 'text-[#8E8E93] hover:text-white'
               }`}
             >
@@ -210,7 +209,7 @@ export const Navigation = () => {
               href="/health" 
               className={`flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-[24px] transition-all duration-300 min-w-[70px] ${
                 pathname === '/health' 
-                  ? 'bg-[#FF6B35] text-white shadow-lg translate-y-[-2px]' 
+                  ? 'bg-[var(--primary)] text-white shadow-lg translate-y-[-2px]' 
                   : 'text-[#8E8E93] hover:text-white'
               }`}
             >

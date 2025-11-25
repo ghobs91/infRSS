@@ -69,10 +69,13 @@ export default function HomePage() {
     });
   }, [filteredArticles, readArticleIds, toggleReadStatus]);
 
-  // Calculate total unread count based on filtered articles - memoized
+  // Calculate total unread count across ALL articles (not just filtered) - memoized
+  // This ensures "Today" always shows the total count regardless of selected feed
   const totalUnreadCount = useMemo(() => {
-    return filteredArticles.filter(a => a.readStatus === 'unread').length;
-  }, [filteredArticles]);
+    return articles
+      .filter(a => !previouslyReadArticleIds.has(a.id))
+      .filter(a => a.readStatus === 'unread').length;
+  }, [articles, previouslyReadArticleIds]);
 
   if (isLoading) {
     return (

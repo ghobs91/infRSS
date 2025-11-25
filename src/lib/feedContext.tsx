@@ -164,8 +164,20 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
       
+      // Deduplicate articles by ID (link-based) to prevent duplicates across feeds
+      const uniqueArticlesMap = new Map<string, ArticleData>();
+      allArticles.forEach(article => {
+        if (!uniqueArticlesMap.has(article.id)) {
+          uniqueArticlesMap.set(article.id, article);
+        } else {
+          console.log(`🔄 Skipping duplicate article: "${article.title}" (ID: ${article.id})`);
+        }
+      });
+      const deduplicatedArticles = Array.from(uniqueArticlesMap.values());
+      console.log(`🗑️  Removed ${allArticles.length - deduplicatedArticles.length} duplicate articles`);
+      
       // Final sort and limit to ensure consistency
-      const sortedArticles = allArticles.sort((a, b) => {
+      const sortedArticles = deduplicatedArticles.sort((a, b) => {
         try {
           return new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime();
         } catch {
