@@ -4,6 +4,7 @@ An intelligent, offline-friendly RSS reader built with Next.js that combines mod
 
 ## 🚀 Features
 
+- **RSS Feed Directory**: Discover feeds from 768+ curated sources across 34 categories and 25 countries
 - **Smart RSS Aggregation**: Fetch and parse RSS feeds with intelligent error handling and content cleaning
 - **AI-Powered Content Analysis**: Sentiment analysis, clickbait detection, and toxicity scoring using local transformers
 - **Offline-First PWA**: Progressive Web App with service worker for offline reading
@@ -85,9 +86,17 @@ npm run dev:worker
 
 ## 📱 Usage
 
+### Discovering RSS Feeds
+1. Use the feed suggestion API to discover feeds:
+   - Browse 768+ curated feeds
+   - Search by category (tech, programming, food, etc.)
+   - Filter by country (news from 25 countries)
+   - Get intelligent suggestions based on topics
+2. See [RSS_FEED_IMPORT.md](docs/RSS_FEED_IMPORT.md) for the complete feed directory
+
 ### Adding RSS Feeds
 1. Navigate to the manage page (`/manage`)
-2. Enter RSS feed URLs
+2. Enter RSS feed URLs or use suggested feeds
 3. Organize feeds into categories
 4. Set content filtering preferences
 
