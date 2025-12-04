@@ -144,8 +144,4 @@ export async function POST(request: Request) {
 }
 
 // Increase the response size limit for RSS feeds
-export const config = {
-  api: {
-    responseLimit: '8mb',
-  },
-}; 
+export const maxDuration = 60; // Maximum execution time in seconds 
