@@ -8,7 +8,6 @@ const withPWA = require("next-pwa")({
   
   module.exports = withPWA({
     images: {
-      domains: ['www.google.com'],
       remotePatterns: [
         {
           protocol: 'https',
@@ -18,5 +17,7 @@ const withPWA = require("next-pwa")({
       ],
       unoptimized: true,
     },
+    // Add empty turbopack config to silence Next.js 16 warning
+    turbopack: {},
   });
   
