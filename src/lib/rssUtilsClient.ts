@@ -190,9 +190,9 @@ export async function fetchAndParseRSSClient(url: string, parseRSSWorker?: (xmlT
     
     return result;
   } catch (error) {
-    // Only log unexpected errors
+      // Only log unexpected errors at warning level
     if (error instanceof Error) {
-      console.error(`Unexpected error parsing feed ${url}:`, error.message);
+      console.warn(`Error parsing feed ${url}:`, error.message);
     }
     return null;
   }
@@ -208,11 +208,16 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
     const trimmedText = xmlText.trim();
     const looksLikeHTML = (trimmedText.startsWith('<!DOCTYPE html') || 
                           trimmedText.startsWith('<html') || 
-                          trimmedText.startsWith('<HTML')) &&
-                         !trimmedText.includes('<rss') && 
-                         !trimmedText.includes('<feed');
+                          trimmedText.startsWith('<HTML'));
     
-    if (looksLikeHTML) {
+    // Case-insensitive check for RSS/Atom content
+    const hasRSSContent = /<rss/i.test(xmlText) || 
+                         /<feed/i.test(xmlText) || 
+                         /<channel/i.test(xmlText) || 
+                         /<entry/i.test(xmlText) ||
+                         /<?xml/i.test(xmlText);
+    
+    if (looksLikeHTML && !hasRSSContent) {
       console.warn(`Received HTML instead of RSS/XML feed from ${feedUrl}`);
       return null;
     }
@@ -536,7 +541,7 @@ function parseRSSInline(xmlText: string, feedUrl: string): ParsedRSSFeed | null 
       items: parsedItems
     };
   } catch (error) {
-    console.error('Error parsing RSS inline:', error);
+    console.warn('Error parsing RSS inline:', error);
     return null;
   }
 }

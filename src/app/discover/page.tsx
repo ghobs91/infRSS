@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { SearchIcon } from "@/components/ui/icons";
+import { SettingsLayout } from "@/components/SettingsLayout";
 import { useFeed } from "@/lib/feedContext";
 
 interface FeedSuggestion {
@@ -265,27 +266,14 @@ export default function DiscoverPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--background)] pb-24 md:pb-0 md:pt-16">
-      {/* Mobile Back Button */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-20 bg-[var(--background)] border-b border-[var(--border)] safe-area-top">
-        <div className="flex items-center gap-3 px-4 py-4">
-          <button
-            onClick={() => router.back()}
-            className="w-9 h-9 rounded-full bg-[var(--card-bg)] flex items-center justify-center border border-[var(--card-border)] shadow-sm"
-          >
-            ←
-          </button>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">Discover Feeds</h1>
-        </div>
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 pt-20 md:pt-8">
+    <SettingsLayout>
+      <div className="space-y-6">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-[var(--text-primary)] mb-3">
-            Discover New Feeds
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">
+            Discover Feeds
           </h1>
-          <p className="text-[var(--text-secondary)] text-base md:text-lg">
+          <p className="text-[var(--text-secondary)] mt-2">
             Find RSS feeds based on your interests
           </p>
         </div>
@@ -653,6 +641,6 @@ export default function DiscoverPage() {
           </div>
         )}
       </div>
-    </div>
+    </SettingsLayout>
   );
 }

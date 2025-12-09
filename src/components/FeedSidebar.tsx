@@ -7,6 +7,12 @@ interface Feed {
   url: string;
   unreadCount?: number;
   favicon?: string;
+  owner?: string;
+  ownershipInfo?: {
+    owner?: string;
+    parentCompany?: string;
+    error?: string;
+  };
 }
 
 interface FeedSidebarProps {
@@ -67,6 +73,7 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
                 key={feed.id}
                 className={`sidebar-item ${selectedFeed === feed.id ? 'active' : ''}`}
                 onClick={() => onSelectFeed(feed.id)}
+                title={feed.owner ? `Owned by: ${feed.owner}` : undefined}
               >
                 <div className="sidebar-item-icon">
                   {feed.favicon ? (
@@ -89,7 +96,19 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
                     {feed.name.charAt(0).toUpperCase()}
                   </div>
                 </div>
-                <span className="sidebar-item-text">{feed.name}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="sidebar-item-text truncate">{feed.name}</div>
+                  {feed.owner && (
+                    <div className="text-xs truncate" style={{ 
+                      fontSize: '0.65rem', 
+                      marginTop: '2px',
+                      opacity: 0.5,
+                      fontWeight: 400
+                    }}>
+                      {feed.owner}
+                    </div>
+                  )}
+                </div>
                 {feed.unreadCount && feed.unreadCount > 0 && (
                   <span className="sidebar-item-count">{feed.unreadCount}</span>
                 )}

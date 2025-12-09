@@ -5,6 +5,7 @@ import { loadFeedsFromStorage } from "@/lib/rssUtils";
 import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
 import { useUnread } from "@/lib/unreadContext";
+import { batchGetOwnership } from "@/lib/wikipediaOwnership";
 
 export interface ArticleData {
   id: string;
@@ -25,6 +26,12 @@ export interface FeedData {
   url: string;
   unreadCount?: number;
   favicon?: string;
+  owner?: string;
+  ownershipInfo?: {
+    owner?: string;
+    parentCompany?: string;
+    error?: string;
+  };
 }
 
 interface FeedContextType {
@@ -113,6 +120,23 @@ export const FeedProvider: React.FC<{ children: React.ReactNode }> = ({ children
           unreadCount: 0,
           favicon: `https://www.google.com/s2/favicons?sz=32&domain_url=${encodeURIComponent(feed.url)}`,
         };
+      });
+      
+      // Fetch ownership information for all feeds
+      console.log('🔍 Fetching ownership information from Wikipedia...');
+      const feedNames = feedsData.map(f => f.name);
+      const ownershipData = await batchGetOwnership(feedNames);
+      
+      // Add ownership info to feeds
+      feedsData.forEach(feed => {
+        const ownershipInfo = ownershipData.get(feed.name);
+        if (ownershipInfo) {
+          feed.ownershipInfo = ownershipInfo;
+          if (ownershipInfo.owner) {
+            feed.owner = ownershipInfo.owner;
+            console.log(`📊 Found owner for "${feed.name}": ${ownershipInfo.owner}`);
+          }
+        }
       });
       
       // We don't set feeds here yet, we wait for articles to calculate unread counts

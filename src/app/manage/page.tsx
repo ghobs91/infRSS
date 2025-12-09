@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { SettingsLayout } from "@/components/SettingsLayout";
 import Image from "next/image";
 import {
   loadFeedsFromStorage,
@@ -652,7 +653,7 @@ export default function ManagePage() {
     } finally {
       setIsImporting(false);
     }
-  }, [savedFeeds]);
+  }, [savedFeeds, refreshFeeds]);
 
   // Handle exporting OPML file
   const handleExportOPML = useCallback(async () => {
@@ -695,12 +696,13 @@ export default function ManagePage() {
   }, [savedFeeds, categories]);
 
   return (
-    <main className="space-y-8 px-4 max-w-4xl mx-auto py-6 pb-28 md:pb-6">
-      {/* Page Header */}
-      <div className="glass-card p-6 rounded-[12px] shadow-lg animate-[fadeIn_0.5s_ease-out]">
-        <h1 className="text-3xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
-        <p className="text-[var(--text-secondary)] mt-2 text-base">Add, organize, and monitor your RSS feeds</p>
-      </div>
+    <SettingsLayout>
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Manage Feeds</h1>
+          <p className="text-[var(--text-secondary)] mt-2">Add, organize, and monitor your RSS feeds</p>
+        </div>
       {/* Tab Navigation */}
       <div className="flex gap-2 glass-card p-2 rounded-[12px] shadow-md">
         <button
@@ -954,6 +956,7 @@ export default function ManagePage() {
           )}
         </div>
       </section>
-    </main>
+      </div>
+    </SettingsLayout>
   );
 }

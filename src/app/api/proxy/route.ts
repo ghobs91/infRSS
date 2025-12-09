@@ -59,7 +59,12 @@ export async function GET(req: NextRequest) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.log('Target server error:', response.status, 'for URL:', validatedUrl.toString());
+      // Only log 404s as debug, other errors as warnings
+      if (response.status === 404) {
+        console.debug('Feed not found (404):', validatedUrl.toString());
+      } else {
+        console.log('Target server error:', response.status, 'for URL:', validatedUrl.toString());
+      }
       
       // Handle RSSHub-specific errors
       if (isRSSHub) {
@@ -104,11 +109,20 @@ export async function GET(req: NextRequest) {
 
     // Validate that we actually got RSS/XML content (not HTML)
     const trimmedData = data.trim();
-    const isHTML = (trimmedData.startsWith('<!DOCTYPE html') || 
-                   trimmedData.startsWith('<html') || 
-                   trimmedData.startsWith('<HTML')) &&
-                   !trimmedData.includes('<rss') && 
-                   !trimmedData.includes('<feed');
+    
+    // More lenient HTML detection - only reject if it's clearly an HTML document AND has no RSS/Atom content
+    const looksLikeHTML = (trimmedData.startsWith('<!DOCTYPE html') || 
+                          trimmedData.startsWith('<html') || 
+                          trimmedData.startsWith('<HTML'));
+    
+    // Case-insensitive check for RSS/Atom content
+    const hasRSSContent = /<rss/i.test(data) || 
+                         /<feed/i.test(data) || 
+                         /<channel/i.test(data) || 
+                         /<entry/i.test(data) ||
+                         /<?xml/i.test(data);
+    
+    const isHTML = looksLikeHTML && !hasRSSContent;
     
     if (isHTML) {
       console.warn('Server returned HTML instead of RSS/XML:', data.substring(0, 200));
@@ -120,8 +134,8 @@ export async function GET(req: NextRequest) {
       }, { status: 422 });
     }
     
-    // Additional validation for RSSHub feeds
-    if (isRSSHub && (!data.includes('<rss') && !data.includes('<feed'))) {
+    // Additional validation for RSSHub feeds - be more lenient
+    if (isRSSHub && !hasRSSContent) {
       console.warn('RSSHub returned non-RSS content:', data.substring(0, 200));
       return NextResponse.json({ 
         error: 'RSSHub returned invalid RSS content',

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
+import { SettingsLayout } from "@/components/SettingsLayout";
 import { loadFeedsFromStorage, saveFeedsToStorage } from "@/lib/rssUtils";
 import { fetchAndParseRSSClient } from "@/lib/rssUtilsClient";
 import { useRSSParserWorker } from "@/lib/useRSSParserWorker";
@@ -230,13 +231,14 @@ export default function FeedHealthPage() {
   };
 
   return (
-    <main className="space-y-8 px-4 max-w-7xl mx-auto pt-8 pb-28 md:pb-12">
-      <div className="space-y-4">
-        <h1 className="text-3xl font-bold">Feed Health Dashboard</h1>
-        <p className="text-[var(--text-secondary)]">
-          Check the status of all your RSS feeds and identify issues
-        </p>
-      </div>
+    <SettingsLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Feed Health</h1>
+          <p className="text-[var(--text-secondary)] mt-2">
+            Check the status of all your RSS feeds and identify issues
+          </p>
+        </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -422,6 +424,7 @@ export default function FeedHealthPage() {
           </div>
         </div>
       </div>
-    </main>
+      </div>
+    </SettingsLayout>
   );
 }

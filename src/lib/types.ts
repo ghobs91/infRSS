@@ -9,6 +9,12 @@ export interface FeedData {
   lastFetched?: number;
   isActive?: boolean;
   favicon?: string;
+  owner?: string;
+  ownershipInfo?: {
+    owner?: string;
+    parentCompany?: string;
+    error?: string;
+  };
 }
 
 export interface Article {

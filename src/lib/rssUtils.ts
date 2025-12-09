@@ -421,7 +421,7 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
     
     // Check if the response is empty
     if (!text.trim()) {
-      console.error(`Empty response from ${url}`);
+      console.debug(`Empty response from ${url}`);
       return null;
     }
 
@@ -437,13 +437,13 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
 
     // Check if the response starts with XML declaration or a tag
     if (!text.trim().startsWith('<?xml') && !text.trim().startsWith('<')) {
-      console.error(`Response from ${url} is not XML. First 100 chars: ${text.substring(0, 100)}`);
+      console.debug(`Response from ${url} is not XML. First 100 chars: ${text.substring(0, 100)}`);
       return null;
     }
     
     // Check if the response is HTML instead of XML (common with 404 pages)
     if (text.trim().startsWith('<!DOCTYPE html') || text.includes('<html')) {
-      console.error(`Response from ${url} is HTML instead of XML. This usually means the RSS feed doesn't exist.`);
+      console.debug(`Response from ${url} is HTML instead of XML. Feed may not exist at this URL.`);
       return null;
     }
 
@@ -660,9 +660,10 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
         // For other parsing errors, try to extract items anyway
         const hasItems = xmlDoc.querySelector("item, entry");
         if (!hasItems) {
+          console.debug(`No items found in potentially malformed feed: ${url}`);
           return null;
         }
-        console.warn(`Continuing with potentially malformed XML for ${url}`);
+        console.debug(`Continuing with potentially malformed XML for ${url}`);
       }
     }
 
@@ -693,7 +694,7 @@ export async function fetchAndParseRSS(url: string): Promise<{ title: string; it
       // Atom format
       items = Array.from(xmlDoc.querySelectorAll("entry"));
     } else {
-      console.error(`No items found in feed at ${url}`);
+      console.debug(`No items found in feed at ${url}`);
       return null;
     }
 
