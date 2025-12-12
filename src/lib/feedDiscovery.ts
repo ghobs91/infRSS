@@ -466,17 +466,9 @@ async function checkThirdPartyFeeds(url: string): Promise<FeedDiscoveryResult[]>
       });
     }
 
-    // RSS.app fallback (can create feeds for most sites)
-    // Note: This is a hypothetical URL format - RSS.app may have different requirements
-    const encodedUrl = encodeURIComponent(url);
-    results.push({
-      url: `https://rss.app/feeds/${encodedUrl}`,
-      title: 'RSS.app - Generated Feed',
-      confidence: 0.50,
-      source: 'RSS.app (Third-party generator)'
-    });
-
-    // OpenRSS fallback
+    // Prefer direct feed discovery and structured third-party sources (like RSSHub).
+    // Do NOT use RSS.app's generated-feed fallback here — prefer direct URL formats.
+    // Keep OpenRSS as a low-confidence fallback.
     results.push({
       url: `https://openrss.org/${encodeURIComponent(url)}`,
       title: 'OpenRSS - Generated Feed',

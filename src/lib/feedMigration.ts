@@ -30,12 +30,12 @@ export const FEED_MIGRATION_GUIDE: Record<string, FeedMigration> = {
         setupRequired: false
       },
       {
-        title: 'RSS.app Twitter',
-        url: 'https://rss.app/rss/feed/{username}',
-        description: 'RSS.app can create RSS feeds from Twitter accounts',
-        reliability: 'high',
+        title: 'RSS.app (Manual Setup)',
+        url: 'https://rss.app/',
+        description: 'Manually create RSS feeds from Twitter accounts using RSS.app service',
+        reliability: 'medium',
         setupRequired: true,
-        setupInstructions: 'Visit RSS.app, enter Twitter profile URL, and generate RSS feed'
+        setupInstructions: 'Visit RSS.app, manually enter Twitter profile URL, and generate a custom RSS feed URL'
       },
       {
         title: 'Self-hosted RSSHub',
@@ -146,12 +146,12 @@ export function getFeedMigrationSuggestions(failedUrl: string): FeedMigration | 
         setupInstructions: 'Deploy RSSHub to Vercel, Railway, or your own server'
       },
       {
-        title: 'RSS.app',
+        title: 'RSS.app (Manual Setup)',
         url: 'https://rss.app/',
-        description: 'Create RSS feeds from any website',
-        reliability: 'high',
+        description: 'Manually create custom RSS feeds from any website',
+        reliability: 'medium',
         setupRequired: true,
-        setupInstructions: 'Visit RSS.app and create a custom RSS feed'
+        setupInstructions: 'Visit RSS.app and manually create a custom RSS feed with their service'
       },
       {
         title: 'Feed43',
@@ -185,7 +185,7 @@ export function generateMigrationReport(failedUrls: string[]): {
     
     const twitterFeeds = migrations.filter(m => m.originalUrl.includes('/twitter/'));
     if (twitterFeeds.length > 0) {
-      recommendations.push(`${twitterFeeds.length} Twitter feeds can be replaced with Nitter or RSS.app alternatives`);
+      recommendations.push(`${twitterFeeds.length} Twitter feeds can be replaced with Nitter alternatives`);
     }
     
     const githubFeeds = migrations.filter(m => m.originalUrl.includes('/github/'));

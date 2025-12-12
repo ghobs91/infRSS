@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
           // Provide specific alternatives for Twitter feeds
           const isTwitterFeed = validatedUrl.pathname.includes('/twitter/');
           const suggestion = isTwitterFeed 
-            ? 'RSSHub Twitter feeds are currently rate limited. Consider using Nitter (nitter.net/{username}/rss) or RSS.app as alternatives. Twitter feeds through RSSHub may be unreliable due to X/Twitter API restrictions.'
+            ? 'RSSHub Twitter feeds are currently rate limited. Consider using Nitter (nitter.net/{username}/rss) as an alternative. Twitter feeds through RSSHub may be unreliable due to X/Twitter API restrictions.'
             : 'Wait a few minutes before retrying, or consider using a different RSS source.';
             
           return NextResponse.json({ 
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
             retryAfter: isTwitterFeed ? 'Consider using alternatives' : '5 minutes',
             alternatives: isTwitterFeed ? [
               { name: 'Nitter', example: 'https://nitter.net/{username}/rss' },
-              { name: 'RSS.app', example: 'https://rss.app (requires setup)' }
+              { name: 'RSS.app', example: 'https://rss.app (requires manual setup)' }
             ] : undefined
           }, { status: 429 });
         }

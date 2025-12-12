@@ -1415,9 +1415,9 @@ export function getAlternativeRSSSources(failedUrl: string): { title: string; ur
           description: "Nitter provides RSS feeds for Twitter accounts"
         },
         {
-          title: "RSS.app Twitter",
-          url: `https://rss.app/rss/feed/${path.split('/').pop()}`,
-          description: "RSS.app can create RSS feeds from Twitter accounts"
+          title: "RSS.app (Manual Setup)",
+          url: "https://rss.app/",
+          description: "Manually create RSS feeds from Twitter accounts (requires manual setup)"
         }
       ];
     }
@@ -1436,9 +1436,9 @@ export function getAlternativeRSSSources(failedUrl: string): { title: string; ur
     // General alternatives
     return [
       {
-        title: "RSS.app",
+        title: "RSS.app (Manual Setup)",
         url: "https://rss.app/",
-        description: "Create RSS feeds from any website"
+        description: "Manually create custom RSS feeds from any website"
       },
       {
         title: "Feed43",
