@@ -6,8 +6,22 @@ import { ViewProvider } from "@/lib/viewContext";
 import { FeedProvider } from "@/lib/feedContext";
 import { Navigation } from "@/components/Navigation";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useState, createContext, useContext } from "react";
+
+// Context for drawer state
+const DrawerContext = createContext<{
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: (open: boolean) => void;
+}>({
+  isDrawerOpen: false,
+  setIsDrawerOpen: () => {},
+});
+
+export const useDrawer = () => useContext(DrawerContext);
 
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -24,8 +38,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <UnreadProvider>
             <FeedProvider>
               <ViewProvider>
-                <Navigation />
-                {children}
+                <DrawerContext.Provider value={{ isDrawerOpen, setIsDrawerOpen }}>
+                  <Navigation onDrawerStateChange={setIsDrawerOpen} />
+                  {children}
+                </DrawerContext.Provider>
               </ViewProvider>
             </FeedProvider>
           </UnreadProvider>

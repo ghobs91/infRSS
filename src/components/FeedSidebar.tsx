@@ -73,7 +73,6 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
                 key={feed.id}
                 className={`sidebar-item ${selectedFeed === feed.id ? 'active' : ''}`}
                 onClick={() => onSelectFeed(feed.id)}
-                title={feed.owner ? `Owned by: ${feed.owner}` : undefined}
               >
                 <div className="sidebar-item-icon">
                   {feed.favicon ? (
@@ -98,16 +97,6 @@ const FeedSidebarComponent: React.FC<FeedSidebarProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="sidebar-item-text truncate">{feed.name}</div>
-                  {feed.owner && (
-                    <div className="text-xs truncate" style={{ 
-                      fontSize: '0.65rem', 
-                      marginTop: '2px',
-                      opacity: 0.5,
-                      fontWeight: 400
-                    }}>
-                      {feed.owner}
-                    </div>
-                  )}
                 </div>
                 {feed.unreadCount && feed.unreadCount > 0 && (
                   <span className="sidebar-item-count">{feed.unreadCount}</span>

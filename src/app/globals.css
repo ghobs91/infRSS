@@ -547,18 +547,29 @@ a:focus-visible {
   height: 100vh;
   overflow: hidden;
   padding-top: 64px; /* Account for fixed navbar on desktop */
+  transition: grid-template-columns 0.3s ease;
+}
+
+/* When FeedSidebar is hidden (drawer is open), adjust grid */
+.app-layout:has(.sidebar:not(*)) {
+  grid-template-columns: 420px 1fr;
 }
 
 /* Settings page layout styles */
 .settings-layout {
-  padding-top: 80px; /* Account for fixed navbar on desktop */
+  padding-top: 64px; /* Account for fixed navbar on desktop */
   min-height: 100vh;
+  transition: margin-left 0.3s ease;
 }
 
-@media (max-width: 768px) {
+@media (min-width: 1024px) {
+  /* When sidebar is visible on desktop, shift content */
+  .app-layout {
+    margin-left: 0; /* Sidebar is overlaid by default */
+  }
+  
   .settings-layout {
-    padding-top: 0;
-    padding-bottom: 120px;
+    margin-left: 0; /* Sidebar is overlaid by default */
   }
 }
 
@@ -582,23 +593,22 @@ a:focus-visible {
     overflow: hidden;
     padding-top: 0; /* No top padding on mobile */
     padding-bottom: env(safe-area-inset-bottom, 80px);
+    margin-left: 0;
   }
-}
-
-/* Settings page layout styles */
-.settings-layout {
-  padding-top: 64px; /* Account for fixed navbar on desktop */
-  min-height: 100vh;
-}
-
-@media (max-width: 768px) {
+  
   .settings-layout {
     padding-top: 0;
     padding-bottom: 120px;
+    margin-left: 0;
   }
 }
 
 /* Sidebar Styles */
+.sidebar-column {
+  position: relative;
+  overflow: hidden;
+}
+
 .sidebar {
   background: var(--sidebar-bg);
   color: var(--sidebar-text);

@@ -8,12 +8,15 @@ import { ArticleListColumn } from "@/components/ArticleListColumn";
 import { ArticleViewer } from "@/components/ArticleViewer";
 import { useUnread } from "@/lib/unreadContext";
 import { useFeed } from "@/lib/feedContext";
+import { useDrawer } from "@/app/layout";
+import { SettingsDrawer } from "@/components/SettingsDrawer";
 
 export default function HomePage() {
   const { articles, feeds, isLoading, selectedFeed, setSelectedFeed } = useFeed();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const { readArticleIds, previouslyReadArticleIds, toggleReadStatus } = useUnread();
+  const { isDrawerOpen, setIsDrawerOpen } = useDrawer();
 
   // Detect mobile view
   useEffect(() => {
@@ -88,12 +91,18 @@ export default function HomePage() {
   return (
     <>
       <div className="app-layout">
-        <FeedSidebar
-          feeds={feeds}
-          selectedFeed={selectedFeed}
-          onSelectFeed={setSelectedFeed}
-          unreadCount={totalUnreadCount}
-        />
+        <div className="sidebar-column">
+          {!isDrawerOpen ? (
+            <FeedSidebar
+              feeds={feeds}
+              selectedFeed={selectedFeed}
+              onSelectFeed={setSelectedFeed}
+              unreadCount={totalUnreadCount}
+            />
+          ) : (
+            <SettingsDrawer onClose={() => setIsDrawerOpen(false)} />
+          )}
+        </div>
         <ArticleListColumn
           articles={filteredArticles}
           selectedArticle={selectedArticleId}
