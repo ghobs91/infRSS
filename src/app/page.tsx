@@ -15,7 +15,7 @@ export default function HomePage() {
   const { articles, feeds, isLoading, selectedFeed, setSelectedFeed } = useFeed();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const { readArticleIds, previouslyReadArticleIds, toggleReadStatus } = useUnread();
+  const { readArticleIds, toggleReadStatus } = useUnread();
   const { isDrawerOpen, setIsDrawerOpen } = useDrawer();
 
   // Detect mobile view
