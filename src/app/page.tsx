@@ -15,7 +15,7 @@ export default function HomePage() {
   const { articles, feeds, isLoading, selectedFeed, setSelectedFeed } = useFeed();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const { readArticleIds, previouslyReadArticleIds, toggleReadStatus } = useUnread();
+  const { readArticleIds, toggleReadStatus } = useUnread();
   const { isDrawerOpen, setIsDrawerOpen } = useDrawer();
 
   // Detect mobile view
@@ -26,12 +26,11 @@ export default function HomePage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter articles based on selected feed and exclude previously read articles
+  // Filter articles based on selected feed
   const filteredArticles = useMemo(() => {
-    // First filter out articles that were read in previous sessions
-    let filtered = articles.filter(a => !previouslyReadArticleIds.has(a.id));
+    let filtered = articles;
     
-    // Then filter by selected feed if applicable
+    // Filter by selected feed if applicable
     if (selectedFeed) {
       const feed = feeds.find(f => f.id === selectedFeed);
       if (feed) {
@@ -40,7 +39,7 @@ export default function HomePage() {
     }
     
     return filtered;
-  }, [articles, selectedFeed, feeds, previouslyReadArticleIds]);
+  }, [articles, selectedFeed, feeds]);
 
   // Get selected article - memoized
   const selectedArticle = useMemo(() => {
@@ -75,10 +74,8 @@ export default function HomePage() {
   // Calculate total unread count across ALL articles (not just filtered) - memoized
   // This ensures "Today" always shows the total count regardless of selected feed
   const totalUnreadCount = useMemo(() => {
-    return articles
-      .filter(a => !previouslyReadArticleIds.has(a.id))
-      .filter(a => a.readStatus === 'unread').length;
-  }, [articles, previouslyReadArticleIds]);
+    return articles.filter(a => a.readStatus === 'unread').length;
+  }, [articles]);
 
   if (isLoading) {
     return (

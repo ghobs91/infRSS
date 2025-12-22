@@ -905,6 +905,33 @@ export default function ManagePage() {
               </div>
             </div>
           )}
+
+          {/* Your Feeds Section */}
+          <div className="space-y-6 pt-8 border-t-4 border-[var(--border)] mt-8">
+            <div className="glass-card p-6 rounded-[12px] shadow-lg border-l-4 border-green-500">
+              <h2 className="text-2xl font-bold text-[var(--text-primary)]">Your Feeds</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-2">Manage and organize your subscribed feeds</p>
+            </div>
+            <div className="grid gap-3">
+              {savedFeeds.length === 0 ? (
+                <Card className="shadow-lg border-[var(--card-border)]">
+                  <CardContent className="p-8 text-center">
+                    <p className="text-[var(--text-secondary)] text-lg font-medium">No feeds added yet. Add some feeds to get started.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                savedFeeds.map((feed) => (
+                  <SavedFeed 
+                    key={feed.url} 
+                    feed={feed} 
+                    categories={categories}
+                    onRemove={handleRemoveFeed}
+                    onUpdate={handleUpdateFeed}
+                  />
+                ))
+              )}
+            </div>
+          </div>
         </section>
       )}
 
@@ -929,33 +956,6 @@ export default function ManagePage() {
           />
         </section>
       )}
-
-      {/* Your Feeds Section */}
-      <section className="space-y-6 pt-8 border-t-4 border-[var(--border)] mt-8">
-        <div className="glass-card p-6 rounded-[12px] shadow-lg border-l-4 border-green-500">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Your Feeds</h2>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">Manage and organize your subscribed feeds</p>
-        </div>
-        <div className="grid gap-3">
-          {savedFeeds.length === 0 ? (
-            <Card className="shadow-lg border-[var(--card-border)]">
-              <CardContent className="p-8 text-center">
-                <p className="text-[var(--text-secondary)] text-lg font-medium">No feeds added yet. Add some feeds to get started.</p>
-              </CardContent>
-            </Card>
-          ) : (
-            savedFeeds.map((feed) => (
-              <SavedFeed 
-                key={feed.url} 
-                feed={feed} 
-                categories={categories}
-                onRemove={handleRemoveFeed}
-                onUpdate={handleUpdateFeed}
-              />
-            ))
-          )}
-        </div>
-      </section>
       </div>
     </SettingsLayout>
   );
